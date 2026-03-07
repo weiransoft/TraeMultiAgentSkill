@@ -1,0 +1,25 @@
+# Trae Multi-Agent Skill Dependencies
+
+# Core Dependencies
+python>=3.8
+
+# Standard Library (No additional installation required)
+# - sqlite3 (Database operations)
+# - json (Data processing)
+# - pathlib (Path handling)
+# - typing (Type annotations)
+# - logging (Logging)
+# - argparse (Command line arguments)
+# - re (Regular expressions)
+# - datetime (Date and time)
+
+# Development Dependencies (Optional)
+# pytest>=7.0.0          # Testing framework
+# pytest-cov>=3.0.0      # Test coverage
+# black>=22.0.0          # Code formatting
+# flake8>=4.0.0          # Code checking
+# mypy>=0.950            # Type checking
+
+# Note:
+# This skill primarily uses Python standard library, no additional third-party packages required
+# Just ensure Python version >= 3.8

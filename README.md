@@ -11,7 +11,19 @@
 - **智能匹配** / **Smart Matching**: 代码注释自动匹配现有语言
 - **灵活切换** / **Flexible Switching**: 支持会话中切换语言
 
-📄 详细文档 / Detailed documentation: [MULTILINGUAL_GUIDE.md](MULTILINGUAL_GUIDE.md)
+📄 详细文档 / Detailed documentation:
+
+- **中文文档** / **Chinese Documentation**: [README.md](README.md)
+- **English Documentation**: [README_EN.md](README_EN.md)
+
+### 📚 完整文档索引 / Complete Documentation Index
+
+| 文档 / Document | 中文 / Chinese | English |
+|----------------|---------------|---------|
+| 主文档 / Main | [README.md](README.md) | [README_EN.md](README_EN.md) |
+| 使用示例 / Examples | [EXAMPLES.md](EXAMPLES.md) | [EXAMPLES_EN.md](EXAMPLES_EN.md) |
+| 进度追踪 / Progress | [progress.template.md](progress.template.md) | [progress_EN.md](progress_EN.md) |
+| 依赖说明 / Dependencies | [requirements.txt](requirements.txt) | [requirements_EN.txt](requirements_EN.txt) |
 
 ## 📖 目录 / Table of Contents
 
