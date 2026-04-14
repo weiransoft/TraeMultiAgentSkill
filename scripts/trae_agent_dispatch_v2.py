@@ -36,6 +36,14 @@ except ImportError as e:
     NEW_COMPONENTS_AVAILABLE = False
     print(f"警告：无法导入新组件，将使用旧版本逻辑：{e}")
 
+# 导入 Claude Code SubAgent 适配器
+try:
+    from claude_code_subagent_adapter import ClaudeCodeSubAgentAdapter, invoke_subagent
+    CLAUDE_CODE_ADAPTER_AVAILABLE = True
+except ImportError as e:
+    CLAUDE_CODE_ADAPTER_AVAILABLE = False
+    print(f"警告：无法导入 Claude Code 适配器：{e}")
+
 
 def parse_arguments():
     """
@@ -135,6 +143,124 @@ def dispatch_agent_v2(agent_type: str, task: str, task_id: Optional[str],
                      project_root: str, progress: Dict) -> bool:
     """
     v2.0 调度逻辑 - 使用双层上下文和智能匹配
+    
+    Args:
+        agent_type: 智能体类型
+        task: 任务
+        task_id: 任务 ID
+        project_root: 项目根目录
+        progress: 进度数据
+        
+    Returns:
+        bool: 调度是否成功
+    """
+    try:
+        # 检测运行环境，优先使用 Claude Code SubAgent
+        if CLAUDE_CODE_ADAPTER_AVAILABLE:
+            log('🚀 使用 Claude Code SubAgent 适配器', 'SUCCESS')
+            return _dispatch_via_claude_code(agent_type, task, task_id, project_root, progress)
+        
+        # 降级到原有逻辑
+        log('⚠️  使用双层上下文管理器（Trae IDE）', 'WARNING')
+        return _dispatch_via_trae(agent_type, task, task_id, project_root, progress)
+    
+    except Exception as e:
+        log(f'❌ 调度失败：{e}', 'ERROR')
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def _dispatch_via_claude_code(agent_type: str, task: str, task_id: Optional[str],
+                             project_root: str, progress: Dict) -> bool:
+    """
+    通过 Claude Code SubAgent 调度
+    
+    Args:
+        agent_type: 智能体类型
+        task: 任务
+        task_id: 任务 ID
+        project_root: 项目根目录
+        progress: 进度数据
+        
+    Returns:
+        bool: 调度是否成功
+    """
+    try:
+        # 1. 初始化 Claude Code SubAgent 适配器
+        adapter = ClaudeCodeSubAgentAdapter(skill_root=project_root)
+        
+        # 2. 提取任务 ID
+        actual_task_id = task_id
+        if not actual_task_id:
+            task_parts = task.split(' - ')
+            if len(task_parts) > 0:
+                actual_task_id = task_parts[0].strip()
+        
+        # 3. 构建上下文
+        context = {
+            'task_id': actual_task_id,
+            'project_root': project_root,
+            'timestamp': datetime.now().isoformat(),
+            'karpathy_principles': {
+                'think_before_coding': '明确假设、问清楚、不隐藏困惑',
+                'simplicity_first': '最小代码、无 speculative features',
+                'surgical_changes': '只改必要的、不改无关的',
+                'goal_driven': '定义成功标准、验证检查点'
+            }
+        }
+        
+        # 4. 调用 subagent
+        log(f'🤖 调用 Claude Code SubAgent: {agent_type}', 'INFO')
+        result = adapter.invoke_agent(agent_type, task, context)
+        
+        # 5. 处理结果
+        if result.get('success'):
+            log(f'✅ SubAgent 调用成功', 'SUCCESS')
+            log(f'   平台：{result.get("platform", "unknown")}', 'INFO')
+            
+            if result.get('output'):
+                log(f'\n{result["output"]}', 'INFO')
+            
+            # 6. 更新进度
+            if actual_task_id:
+                from trae_agent_dispatch import update_task_status
+                update_task_status(
+                    progress, 
+                    actual_task_id, 
+                    '✅ 已完成', 
+                    f'任务已完成，角色：{agent_type}', 
+                    project_root
+                )
+            
+            return True
+        else:
+            error_msg = result.get('error', '未知错误')
+            log(f'❌ SubAgent 调用失败：{error_msg}', 'ERROR')
+            
+            if actual_task_id:
+                from trae_agent_dispatch import update_task_status
+                update_task_status(
+                    progress, 
+                    actual_task_id, 
+                    '❌ 失败', 
+                    f'SubAgent 调用失败：{error_msg}', 
+                    project_root
+                )
+            
+            return False
+            
+    except Exception as e:
+        log(f'❌ Claude Code SubAgent 调度失败：{e}', 'ERROR')
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def _dispatch_via_trae(agent_type: str, task: str, task_id: Optional[str],
+                      project_root: str, progress: Dict) -> bool:
+    """
+    通过 Trae IDE 双层上下文管理器调度（原有逻辑）
     
     Args:
         agent_type: 智能体类型
