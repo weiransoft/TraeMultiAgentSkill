@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "2.4.1",
   "name": "trae-multi-agent",
-  "description": "多角色智能体调度器 - 基于任务类型自动调度到架构师、产品经理、测试专家、Solo Coder 或 UI 设计师。全面支持 Spring Boot 3、Java 21、AI 辅助设计及现代云原生测试架构。",
+  "description": "多角色智能体调度器 - 基于任务类型自动调度到架构师、产品经理、测试专家、Solo Coder 或 UI 设计师。支持 Karpathy 四大核心原则强制执行、跨平台 Agent 适配、多角色代码走读、3D 代码地图可视化、长程 Agent 支持。",
   "author": "Claw Team",
   "license": "MIT",
   "enabled": true,
@@ -16,12 +16,14 @@
     "多角色",
     "智能调度",
     "共识机制",
-    "Spring Boot 3",
-    "Java 21",
+    "Karpathy",
+    "代码走读",
     "Code Review",
     "UI 设计",
     "AI",
-    "自动化测试"
+    "自动化测试",
+    "Claude Code",
+    "跨平台"
   ],
   "triggers": {
     "automatic": {
@@ -43,7 +45,10 @@
         "UI设计",
         "界面设计",
         "视觉设计",
-        "前端设计"
+        "前端设计",
+        "Karpathy",
+        "代码走读",
+        "原则检查"
       ]
     },
     "manual": {
@@ -111,6 +116,26 @@
     "uiDesign": {
       "enabled": true,
       "description": "创建独特、生产级的 UI 界面，避免通用的 AI \"slop\" 美学"
+    },
+    "karpathyPrinciples": {
+      "enabled": true,
+      "description": "Karpathy 四大核心原则强制执行（Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution）"
+    },
+    "crossPlatformAdapter": {
+      "enabled": true,
+      "description": "跨平台 Agent 适配器，支持 Claude Code / Trae IDE 统一调用"
+    },
+    "multiRoleCodeWalkthrough": {
+      "enabled": true,
+      "description": "多角色代码走读：架构师、产品经理、独立开发者、UI 设计师、测试专家多视角分析"
+    },
+    "codeMap3DVisualization": {
+      "enabled": true,
+      "description": "基于 Three.js 的 3D 代码地图交互式可视化"
+    },
+    "taskVisualization": {
+      "enabled": true,
+      "description": "任务可视化页面：实时展示各角色任务状态、进度、依赖关系"
     }
   },
   "dependencies": {

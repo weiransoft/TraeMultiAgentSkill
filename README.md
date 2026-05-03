@@ -134,6 +134,38 @@ python3 scripts/tests/run_tests.py
 
 **测试结果**: 24 个测试全部通过 ✅
 
+### Karpathy 四大核心原则 (v2.4 新增)
+
+基于 Andrej Karpathy 对 LLM 编程常见陷阱的观察，强制执行四大核心原则：
+
+1. **Think Before Coding（三思而后行）** 🧠
+   - 明确假设、呈现权衡、遇到不清就问
+   - 核心文件：`scripts/karpathy_principle_enforcer.py`
+
+2. **Simplicity First（简单优先）** 🎯
+   - 最小代码、无 speculative features、无过度抽象
+
+3. **Surgical Changes（精准修改）** 🔬
+   - 只改需要的、不改无关的、保持风格一致
+
+4. **Goal-Driven Execution（目标驱动）** ✅
+   - 定义成功标准、验证检查点、迭代直到完成
+
+**Karpathy 原则执行检查器**:
+- 原则合规性检查
+- 违规检测与提醒（5 级严重度：CRITICAL/HIGH/MEDIUM/LOW/INFO）
+- 验证检查点管理
+- 执行报告生成（JSON 导出）
+
+### Claude Code SubAgent 适配器 (v2.4 新增)
+
+跨平台 Agent 适配，统一 Claude Code / Trae IDE 的 subagent 调用接口：
+
+- `ClaudeCodeSubAgentAdapter` 类（`scripts/claude_code_subagent_adapter.py`）
+- 自动平台检测：`claude_code` / `trae` / `unknown`
+- 统一 `invoke_agent()` 接口
+- 环境变量检测：`CLAUDE_CODE_ENV` / `TRAE_ENV`
+
 ### 核心能力
 
 1. **智能角色调度** 🎯

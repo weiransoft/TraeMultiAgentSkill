@@ -1,12 +1,13 @@
 name: trae-multi-agent
-version: 2.3.0
+version: 2.4.1
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
   
   核心特性：
+  - Karpathy 四大核心原则强制执行（Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven）
   - 双层动态上下文管理（长期记忆 + 工作记忆）
   - AI 语义理解驱动的智能角色匹配
   - 灵活的工作流编排引擎
@@ -14,6 +15,7 @@ description: |
   - 经验沉淀和知识积累
   - 大模型 AI 助手深度集成
   - 长程 Agent 支持（Checkpoint + Handoff + TaskList）
+  - Claude Code SubAgent 平台适配
 
 author: Trae Team
 status: active
@@ -24,6 +26,8 @@ ai_capabilities:
   context_understanding: true
   natural_language_interface: true
   long_running_agent: true
+  karpathy_principle_enforcement: true
+  cross_platform_adaptation: true
 
 capabilities:
   - name: product-manager
@@ -483,6 +487,21 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.4.1
+      date: "2026-04-15"
+      changes:
+        - 文档全面更新：根据最新代码和功能更新 README、SKILL、CHANGELOG 等文档
+        - 技能清单版本同步：skill-manifest.yaml 升级至 2.4.1
+        - 新增 Karpathy 原则在 skill-manifest 中的描述
+
+    - version: 2.4.0
+      date: "2026-04-14"
+      changes:
+        - Karpathy 四大核心原则强制执行：Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution
+        - karpathy_principle_enforcer.py：原则合规性检查、违规检测与提醒、验证检查点管理、执行报告生成
+        - Claude Code SubAgent 适配器：claude_code_subagent_adapter.py，支持 claude_code / trae / unknown 平台检测
+        - 所有角色 Prompt 集成 Karpathy 四大核心原则行为准则
+
     - version: 2.3.0
       date: "2026-03-28"
       changes:
@@ -516,4 +535,4 @@ metadata:
         - 简单的上下文管理
 
 created_at: "2026-03-16T00:00:00"
-updated_at: "2026-03-17T00:00:00"
+updated_at: "2026-04-15T00:00:00"

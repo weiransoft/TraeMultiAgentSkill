@@ -1,9 +1,12 @@
 # Trae Multi-Agent Skill
 
-🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, and project understanding. Supports Chinese-English bilingual.
+🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual.
 
-## 🎉 March 2026 Latest Updates
+## 🎉 April 2026 Latest Updates (v2.4)
 
+- ✅ **Karpathy Four Core Principles (v2.4)** - Enforcement of Andrej Karpathy's programming wisdom: Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution
+- ✅ **Karpathy Principle Enforcer (v2.4)** - Principle compliance checks, violation detection with 5 severity levels, verification checkpoint management, execution report generation
+- ✅ **Claude Code SubAgent Adapter (v2.4)** - Cross-platform agent adapter supporting Claude Code, Trae IDE, and generic fallback
 - ✅ **Multi-Role Code Walkthrough (v2.3)** - Architect, PM, Solo Coder, UI Designer, Test Expert analyze code from multiple perspectives, generate aligned unified code map
 - ✅ **Code Map Workspace Support (v2.3)** - Supports single workspace with multiple projects, clear project identification
 - ✅ **3D Code Map Visualization (v2.3)** - Three.js interactive visualization with flowing animations and theme switching
@@ -14,13 +17,6 @@
 - ✅ **AI Assistant Deep Integration (v2.1)** - Integrated LLM capabilities, supports code review, knowledge Q&A, text analysis
 - ✅ **Smart Cache and Fallback Strategy (v2.1)** - Performance optimization, auto-fallback to keyword matching when AI unavailable
 - ✅ **UI Designer Role** - Creates unique, production-grade UI interfaces, avoids generic AI "slop" aesthetics
-- ✅ **Agent Loop Fix** - Fixed is_all_tasks_completed method, added continuous no-progress detection
-- ✅ **Specification-Driven Development** - Complete specification toolchain, unified document management, multi-agent consensus
-- ✅ **Code Map Generation** - Auto-generates project code structure map, supports JSON and Markdown, identifies core components
-- ✅ **Project Understanding** - Quickly reads project docs and code, generates role-specific understanding documents
-- ✅ **8-Stage Standard Workflow** - Requirements → Architecture → UI Design → Test Design → Task Breakdown → Development → Test → Release
-- ✅ **Cross-Role Design Review** - PRD review, architecture review, UI review, test plan review, dev plan review
-- ✅ **Document-Based Task Breakdown** - All roles break down tasks based on documents, ensuring document-driven development
 
 ## 🌍 Multi-Language Support / Multi-Language Support
 
@@ -99,14 +95,15 @@
    - Serves as work initialization context
    - Role-specific insights and recommendations
 
-8. **7-Stage Standard Workflow** 📊
+8. **8-Stage Standard Workflow** 📊
    - Stage 1: Requirements Analysis (Product Manager)
    - Stage 2: Architecture Design (Architect)
-   - Stage 3: Test Design (Test Expert)
-   - Stage 4: Task Breakdown (Solo Coder)
-   - Stage 5: Development Implementation (Solo Coder)
-   - Stage 6: Test Verification (Test Expert)
-   - Stage 7: Release Review (Multi-Agent)
+   - Stage 3: UI Design (UI Designer)
+   - Stage 4: Test Design (Test Expert)
+   - Stage 5: Task Breakdown (Solo Coder)
+   - Stage 6: Development Implementation (Solo Coder)
+   - Stage 7: Test Verification (Test Expert)
+   - Stage 8: Release Review (Multi-Agent)
 
 9. **Cross-Platform Compatibility** 🌍
    - Supports Windows, Mac, and Linux
@@ -123,6 +120,20 @@ Each role is equipped with complete work rules and quality standards:
 - ✅ **Verification-Driven Design** - Complete acceptance criteria
 - ✅ **Completeness Check** - Multi-dimensional checklists
 - ✅ **Self-Testing Rules** - 3-layer test validation
+- ✅ **Karpathy Four Core Principles Enforcement** (v2.4) - Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution
+
+### Karpathy Principles & Cross-Platform (v2.4)
+
+**Karpathy Principle Enforcer** (`scripts/karpathy_principle_enforcer.py`):
+- Principle compliance checking with 5 severity levels (CRITICAL/HIGH/MEDIUM/LOW/INFO)
+- Violation detection and auto-reminder
+- Verification checkpoint management
+- Execution report generation (JSON export)
+
+**Claude Code SubAgent Adapter** (`scripts/claude_code_subagent_adapter.py`):
+- Unified interface for Claude Code / Trae IDE subagent invocation
+- Auto platform detection via environment variables
+- Generic fallback for unknown platforms
 
 ## 🚀 Quick Start / 快速开始
 

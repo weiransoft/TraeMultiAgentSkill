@@ -5,6 +5,63 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.4.1] - 2026-05-03
+
+### Changed
+
+#### 文档全面更新
+- ✅ 更新 `IMPLEMENTATION_STATUS.md`：版本号升级至 2.4.1，新增 v2.4 组件列表和完整文件清单
+- ✅ 更新 `skill-manifest.yaml`：版本号升级至 2.4.1，新增 v2.4 变更记录，新增 ai_capabilities 扩展
+- ✅ 更新 `CHANGELOG.md`：添加 v2.4.0 和 v2.4.1 变更记录
+- ✅ 更新 `README_EN.md`：添加 v2.4 Karpathy 原则更新标题
+
+#### 文档对齐
+- ✅ 所有文档版本号统一为 2.4.1
+- ✅ 技能清单描述更新，反映最新功能
+- ✅ 实现状态文档完全重写，按版本分组展示组件
+
+## [2.4.0] - 2026-04-14
+
+### Added
+
+#### Karpathy 四大核心原则强制执行 (v2.4)
+
+##### 原则执行检查器
+- ✅ `KarpathyPrincipleEnforcer` 类 (`scripts/karpathy_principle_enforcer.py`)
+- ✅ `PrincipleType` 枚举：THINK_BEFORE_CODING / SIMPLICITY_FIRST / SURGICAL_CHANGES / GOAL_DRIVEN
+- ✅ `ViolationSeverity` 枚举：CRITICAL / HIGH / MEDIUM / LOW / INFO (5 级严重度)
+- ✅ `PrincipleViolation` 数据类：原则违规记录
+- ✅ `VerificationCheckpoint` 数据类：验证检查点
+- ✅ `KarpathyEnforcementReport` 数据类：执行报告（含 to_dict 序列化）
+- ✅ 原则合规性检查功能
+- ✅ 违规检测与提醒功能
+- ✅ 验证检查点管理功能
+- ✅ 执行报告生成功能（JSON 导出）
+
+##### Karpathy 原则融入角色 Prompt
+- ✅ SKILL.md 新增 Karpathy 四大核心原则整体行为准则
+- ✅ 每个角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）新增 Karpathy 原则应用表
+- ✅ 新增"Karpathy 原则应用速查"表
+- ✅ 新增"LLM 常见问题"对照表
+- ✅ 新增"通用行为准则"（所有角色必须遵守）
+
+##### 四大原则详细说明
+- ✅ Think Before Coding（三思而后行）：明确假设、呈现权衡、遇到不清就问
+- ✅ Simplicity First（简单优先）：最小代码、无 speculative features、无过度抽象
+- ✅ Surgical Changes（精准修改）：只改需要的、不改无关的、保持风格一致
+- ✅ Goal-Driven Execution（目标驱动）：定义成功标准、验证检查点、迭代直到完成
+
+#### Claude Code SubAgent 适配器
+
+##### 跨平台适配
+- ✅ `ClaudeCodeSubAgentAdapter` 类 (`scripts/claude_code_subagent_adapter.py`)
+- ✅ 自动平台检测：`claude_code` / `trae` / `unknown`
+- ✅ 统一 `invoke_agent()` 接口
+- ✅ Claude Code 平台：通过 claude subagent 命令调用
+- ✅ Trae IDE 平台：通过原有机制调用
+- ✅ 未知平台：通用回退方法
+- ✅ 环境变量检测：`CLAUDE_CODE_ENV` / `ANTHROPIC_ENV` / `TRAE_ENV` / `TRAE_AGENT_PATH`
+
 ## [2.3.0] - 2026-03-28
 
 ### Added

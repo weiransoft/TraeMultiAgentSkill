@@ -20,12 +20,36 @@ Trae Multi-Agent Skill 是一个强大的多智能体协作工具，能够根据
 8. **发布评审**（多角色）- 多角色共识评审
 
 ### 核心特性
+- **Karpathy 四大核心原则** (v2.4)：Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution 强制执行
+- **跨平台适配** (v2.4)：Claude Code / Trae IDE 统一 subagent 调用接口
+- **多角色代码走读** (v2.3)：5 个角色多视角分析代码，生成对齐后的统一代码地图
+- **3D 代码地图可视化** (v2.3)：Three.js 交互式可视化，动态流动效果
+- **任务可视化** (v2.3)：实时任务状态、进度、依赖关系、交接记录
+- **长程 Agent 支持** (v2.2)：Checkpoint 检查点、Handoff 交接班、TaskList 任务清单
 - **规范驱动开发**：基于项目规范和文档进行开发
 - **代码地图生成**：自动生成项目代码结构映射
 - **项目理解**：快速读取项目文档和代码
 - **多角色协同**：组织多个角色共同完成复杂任务
 - **共识机制**：复杂任务自动组织多角色评审
 - **中英文双语**：支持自动语言识别和切换
+
+### v2.4 新功能
+
+#### Karpathy 原则检查
+```bash
+# 对项目执行 Karpathy 原则合规性检查
+python3 scripts/karpathy_principle_enforcer.py /path/to/project
+
+# 生成原则执行报告
+python3 scripts/karpathy_principle_enforcer.py /path/to/project --report
+```
+
+#### Claude Code 平台调用
+```python
+from claude_code_subagent_adapter import ClaudeCodeSubAgentAdapter
+
+adapter = ClaudeCodeSubAgentAdapter()
+result = adapter.invoke_agent('architect', '设计系统架构')
 
 ## 快速开始
 

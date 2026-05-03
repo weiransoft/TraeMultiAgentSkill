@@ -7,6 +7,8 @@ This document provides practical usage examples for Trae Multi-Agent Skill.
 - [Basic Examples](#-basic-examples)
 - [Advanced Examples](#-advanced-examples)
 - [Scenario Examples](#-scenario-examples)
+  - [Example 11: Karpathy Principle Checking (v2.4)](#example-11-karpathy-principle-checking-v24)
+  - [Example 12: Claude Code Platform Invocation (v2.4)](#example-12-claude-code-platform-invocation-v24)
 - [Best Practices](#-best-practices)
 
 ## 🎯 Basic Examples
@@ -407,6 +409,94 @@ Next Actions:
 ---
 
 ## 🎬 Scenario Examples
+
+### Example 11: Karpathy Principle Checking (v2.4)
+
+**Input**:
+```bash
+# Run Karpathy principle compliance check on project
+python3 scripts/karpathy_principle_enforcer.py /path/to/project
+
+# Generate principle enforcement report
+python3 scripts/karpathy_principle_enforcer.py /path/to/project --report
+```
+
+**Expected Output**:
+```
+🧠 Karpathy Four Core Principles Enforcement Checker
+
+📊 Checking project: /path/to/project
+📁 Files scanned: 156
+
+📋 Principle Compliance Check:
+
+1️⃣ Think Before Coding
+   ✅ Requirements documented (PRD.md, SPEC.md)
+   ✅ Technical plan reviewed
+   ⚠ Some code缺少 assumption documentation
+
+2️⃣ Simplicity First
+   ⚠ [HIGH] file.py:45 - Over-abstraction detected: unnecessary inheritance hierarchy
+   ⚠ [MEDIUM] utils.py:120 - Speculative code found: "might use later"
+   ✅ No duplicated code
+
+3️⃣ Surgical Changes
+   ✅ Change scope reasonable
+   ⚠ [MEDIUM] service.py:230 - Bug fix also reformatted 2 other functions
+
+4️⃣ Goal-Driven Execution
+   ✅ Verification checkpoints set
+   ✅ Success criteria defined
+   ✅ All tests passing
+
+📊 Enforcement Report:
+   - Total violations: 3
+   - Critical: 0
+   - High: 1
+   - Medium: 2
+   - Pass rate: 92%
+```
+
+### Example 12: Claude Code Platform Invocation (v2.4)
+
+**Input**:
+```python
+from claude_code_subagent_adapter import ClaudeCodeSubAgentAdapter
+
+# Auto-detect platform and invoke
+adapter = ClaudeCodeSubAgentAdapter()
+
+# Architecture design
+result = adapter.invoke_agent('architect', 'Design microservice architecture')
+
+# Product requirements
+result = adapter.invoke_agent(
+    'product-manager', 
+    'Define user authentication feature requirements',
+    context={'prd_template': 'standard'}
+)
+
+# Code implementation
+result = adapter.invoke_agent('solo-coder', 'Implement JWT auth middleware')
+
+# UI design
+result = adapter.invoke_agent('ui-designer', 'Design login page')
+```
+
+**Expected Output**:
+```
+🔌 Claude Code SubAgent Adapter
+
+📡 Platform detected: trae
+✅ Platform identified, using Trae IDE dispatch mechanism
+
+🤖 Invoking Agent: architect
+📋 Task: Design microservice architecture
+⏳ Executing...
+
+✅ Execution completed
+📊 Result: Architecture design document generated
+```
 
 ### Scenario 1: Emergency Bug Fix
 

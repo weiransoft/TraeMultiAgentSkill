@@ -1,0 +1,253 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" width="1200" height="1600">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="thinkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0.05" />
+    </linearGradient>
+    <linearGradient id="simpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:0.05" />
+    </linearGradient>
+    <linearGradient id="surgicalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:0.05" />
+    </linearGradient>
+    <linearGradient id="goalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#ef4444;stop-opacity:0.05" />
+    </linearGradient>
+    <linearGradient id="logicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:0.05" />
+    </linearGradient>
+    <linearGradient id="uiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0.05" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="1600" fill="#0f172a"/>
+
+  <!-- Decorative grid -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+  </pattern>
+  <rect width="1200" height="1600" fill="url(#grid)"/>
+
+  <!-- Header Section -->
+  <rect x="0" y="0" width="1200" height="200" fill="url(#headerGrad)"/>
+  <rect x="0" y="196" width="1200" height="4" fill="url(#accentGrad)"/>
+
+  <!-- Version Badge -->
+  <rect x="50" y="40" width="80" height="32" rx="16" fill="url(#accentGrad)" filter="url(#shadow)"/>
+  <text x="90" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#fff" text-anchor="middle">v2.4</text>
+
+  <!-- Title -->
+  <text x="600" y="80" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="42" font-weight="800" fill="#fff" text-anchor="middle">Trae Multi-Agent Skill</text>
+  <text x="600" y="120" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="400" fill="#94a3b8" text-anchor="middle">当 AI 团队协作有了「行为准则」</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="165" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#64748b" text-anchor="middle">Karpathy 四大核心原则 · 逻辑漏洞审查 · UI 操作流设计 · 角色 Prompt 升级</text>
+
+  <!-- Section 1: Karpathy Principles -->
+  <text x="60" y="250" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" fill="#fff">Karpathy 四大核心原则</text>
+  <rect x="60" y="262" width="280" height="3" rx="1.5" fill="url(#accentGrad)"/>
+
+  <!-- Principle 1: Think Before Coding -->
+  <rect x="60" y="290" width="540" height="140" rx="16" fill="url(#thinkGrad)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)"/>
+  <circle cx="100" cy="330" r="28" fill="#3b82f6" opacity="0.2"/>
+  <text x="100" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" text-anchor="middle" fill="#3b82f6">🧠</text>
+  <text x="145" y="325" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" fill="#fff">Think Before Coding</text>
+  <text x="145" y="348" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">明确假设 · 呈现权衡 · 遇到不清就问</text>
+  <text x="145" y="375" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">❌ 禁止：假设用户意图、默默选择方案、隐藏困惑</text>
+  <text x="145" y="395" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">✅ 要求：明确陈述假设、呈现多种解释、提出更简单的方法</text>
+
+  <!-- Principle 2: Simplicity First -->
+  <rect x="620" y="290" width="520" height="140" rx="16" fill="url(#simpleGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#shadow)"/>
+  <circle cx="660" cy="330" r="28" fill="#10b981" opacity="0.2"/>
+  <text x="660" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" text-anchor="middle" fill="#10b981">🎯</text>
+  <text x="705" y="325" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" fill="#fff">Simplicity First</text>
+  <text x="705" y="348" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">最小代码 · 无 speculative features · 无过度抽象</text>
+  <text x="705" y="375" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">❌ 禁止：过度抽象、预留未来代码、添加「以后可能用到」的功能</text>
+  <text x="705" y="395" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">✅ 要求：无单次使用的抽象、无「灵活性」或「可配置性」、无未来代码</text>
+
+  <!-- Principle 3: Surgical Changes -->
+  <rect x="60" y="450" width="540" height="140" rx="16" fill="url(#surgicalGrad)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)"/>
+  <circle cx="100" cy="490" r="28" fill="#f59e0b" opacity="0.2"/>
+  <text x="100" y="500" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" text-anchor="middle" fill="#f59e0b">🔬</text>
+  <text x="145" y="485" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" fill="#fff">Surgical Changes</text>
+  <text x="145" y="508" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">只改需要的 · 不改无关的 · 保持风格一致</text>
+  <text x="145" y="535" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">❌ 禁止：溢出修改、顺手改无关代码、修复 bug 时同时重构</text>
+  <text x="145" y="555" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">✅ 要求：只改直接相关的行、遵循项目风格指南、模仿现有模式</text>
+
+  <!-- Principle 4: Goal-Driven -->
+  <rect x="620" y="450" width="520" height="140" rx="16" fill="url(#goalGrad)" stroke="#ef4444" stroke-width="1.5" filter="url(#shadow)"/>
+  <circle cx="660" cy="490" r="28" fill="#ef4444" opacity="0.2"/>
+  <text x="660" y="500" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="28" text-anchor="middle" fill="#ef4444">✅</text>
+  <text x="705" y="485" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" fill="#fff">Goal-Driven Execution</text>
+  <text x="705" y="508" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">定义成功标准 · 验证检查点 · 迭代直到完成</text>
+  <text x="705" y="535" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">❌ 禁止：不知道何时完成、跳过验证、没有明确的成功标准</text>
+  <text x="705" y="555" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b">✅ 要求：定义成功标准、设定验证检查点、迭代直到验证通过</text>
+
+  <!-- Section 2: Enforcement Checker -->
+  <text x="60" y="640" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" fill="#fff">原则执行检查器</text>
+  <rect x="60" y="652" width="200" height="3" rx="1.5" fill="url(#accentGrad)"/>
+
+  <rect x="60" y="675" width="1080" height="200" rx="16" fill="url(#cardGrad1)" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+
+  <!-- Checker Features -->
+  <rect x="90" y="700" width="320" height="155" rx="12" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <rect x="90" y="700" width="4" height="155" rx="2" fill="#3b82f6"/>
+  <text x="115" y="730" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#fff">🔍 违规模式自动检测</text>
+  <text x="115" y="755" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">内置 20+ 种违规模式扫描</text>
+  <text x="115" y="775" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">TODO/FIXME/HACK 标记检测</text>
+  <text x="115" y="795" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">占位符/mock 代码检测</text>
+  <text x="115" y="815" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">过度设计模式检测</text>
+  <text x="115" y="835" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">空测试函数检测</text>
+
+  <rect x="430" y="700" width="320" height="155" rx="12" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <rect x="430" y="700" width="4" height="155" rx="2" fill="#10b981"/>
+  <text x="455" y="730" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#fff">✓ 验证检查点管理</text>
+  <text x="455" y="755" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">6 个默认检查点</text>
+  <text x="455" y="775" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">需求理解检查点</text>
+  <text x="455" y="795" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">方案评估检查点</text>
+  <text x="455" y="815" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">简单性/精准修改检查点</text>
+  <text x="455" y="835" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">目标定义/验证完成检查点</text>
+
+  <rect x="770" y="700" width="340" height="155" rx="12" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <rect x="770" y="700" width="4" height="155" rx="2" fill="#f59e0b"/>
+  <text x="795" y="730" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#fff">📊 执行报告生成</text>
+  <text x="795" y="755" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">违规统计（Critical/High/Medium/Low）</text>
+  <text x="795" y="775" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">违规详情（文件位置、代码片段）</text>
+  <text x="795" y="795" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">检查点状态（已通过/待验证）</text>
+  <text x="795" y="815" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">改进建议（立即行动项 + 中优先级）</text>
+  <text x="795" y="835" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">Markdown 格式输出</text>
+
+  <!-- Section 3: Logic Vulnerability -->
+  <text x="60" y="915" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" fill="#fff">逻辑漏洞与业务漏洞审查</text>
+  <rect x="60" y="927" width="320" height="3" rx="1.5" fill="url(#accentGrad)"/>
+
+  <rect x="60" y="950" width="1080" height="180" rx="16" fill="url(#logicGrad)" stroke="#ec4899" stroke-width="1.5" filter="url(#shadow)"/>
+
+  <!-- Vulnerability Types -->
+  <rect x="90" y="975" width="190" height="130" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="185" y="1005" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="#ec4899" text-anchor="middle">逻辑漏洞</text>
+  <text x="185" y="1030" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">条件判断缺陷</text>
+  <text x="185" y="1050" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">循环边界错误</text>
+  <text x="185" y="1070" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">状态机不一致</text>
+  <text x="185" y="1090" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">时序问题</text>
+
+  <rect x="300" y="975" width="190" height="130" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="395" y="1005" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="#ec4899" text-anchor="middle">业务漏洞</text>
+  <text x="395" y="1030" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">业务流程绕过</text>
+  <text x="395" y="1050" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">业务规则违反</text>
+  <text x="395" y="1070" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">数据完整性破坏</text>
+  <text x="395" y="1090" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">权限提升</text>
+
+  <rect x="510" y="975" width="190" height="130" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="605" y="1005" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="#ec4899" text-anchor="middle">数据一致性</text>
+  <text x="605" y="1030" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">事务边界</text>
+  <text x="605" y="1050" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">并发修改</text>
+  <text x="605" y="1070" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">脏读幻读</text>
+  <text x="605" y="1090" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">缓存不一致</text>
+
+  <rect x="720" y="975" width="190" height="130" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="815" y="1005" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="#ec4899" text-anchor="middle">权限与授权</text>
+  <text x="815" y="1030" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">水平越权</text>
+  <text x="815" y="1050" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">垂直越权</text>
+  <text x="815" y="1070" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">未授权访问</text>
+  <text x="815" y="1090" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">权限检查遗漏</text>
+
+  <rect x="930" y="975" width="190" height="130" rx="10" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="1025" y="1005" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="#ec4899" text-anchor="middle">竞态条件</text>
+  <text x="1025" y="1030" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">并发安全</text>
+  <text x="1025" y="1050" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">原子性缺失</text>
+  <text x="1025" y="1070" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">死锁风险</text>
+  <text x="1025" y="1090" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">资源竞争</text>
+
+  <!-- Section 4: UI Design -->
+  <text x="60" y="1165" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" fill="#fff">UI 设计升级</text>
+  <rect x="60" y="1177" width="160" height="3" rx="1.5" fill="url(#accentGrad)"/>
+
+  <rect x="60" y="1200" width="1080" height="200" rx="16" fill="url(#uiGrad)" stroke="#06b6d4" stroke-width="1.5" filter="url(#shadow)"/>
+
+  <!-- Inline Features -->
+  <rect x="90" y="1225" width="500" height="155" rx="12" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <rect x="90" y="1225" width="4" height="155" rx="2" fill="#06b6d4"/>
+  <text x="115" y="1255" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#fff">🎨 页面内联功能设计</text>
+  <text x="115" y="1280" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">内联编辑：表格行双击编辑、就地修改、实时校验、撤销支持</text>
+  <text x="115" y="1300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">内联详情：展开行、悬浮卡片、侧边抽屉、快速预览</text>
+  <text x="115" y="1320" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">内联操作：批量操作、快捷按钮、拖拽排序、状态切换</text>
+  <text x="115" y="1340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">内联反馈：Toast 通知、进度指示、骨架屏、空状态引导</text>
+  <text x="115" y="1360" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">零容忍：禁止频繁页面跳转、禁止所有编辑跳转表单页</text>
+
+  <!-- Operation Flow -->
+  <rect x="610" y="1225" width="500" height="155" rx="12" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <rect x="610" y="1225" width="4" height="155" rx="2" fill="#8b5cf6"/>
+  <text x="635" y="1255" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#fff">🚀 操作流设计</text>
+  <text x="635" y="1280" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">操作路径：核心功能 3 步内完成、全局快捷入口、智能默认</text>
+  <text x="635" y="1300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">操作引导：新手 Tour、上下文帮助、二次确认、进度指示</text>
+  <text x="635" y="1320" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">操作连贯性：保持上下文、连续创建、快捷返回、状态记忆</text>
+  <text x="635" y="1340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">反馈闭环：100ms 内反馈、结果确认、错误恢复、成功引导</text>
+  <text x="635" y="1360" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8">目标：减少用户思考成本，让操作像呼吸一样自然</text>
+
+  <!-- Section 5: Role Matrix -->
+  <text x="60" y="1435" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="700" fill="#fff">角色 Prompt 升级</text>
+  <rect x="60" y="1447" width="220" height="3" rx="1.5" fill="url(#accentGrad)"/>
+
+  <rect x="60" y="1470" width="1080" height="80" rx="16" fill="url(#cardGrad1)" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+
+  <!-- Role Icons -->
+  <circle cx="130" cy="1510" r="22" fill="#3b82f6" opacity="0.2"/>
+  <text x="130" y="1517" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" text-anchor="middle" fill="#3b82f6">🏗️</text>
+  <text x="130" y="1545" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">架构师</text>
+
+  <circle cx="280" cy="1510" r="22" fill="#10b981" opacity="0.2"/>
+  <text x="280" y="1517" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" text-anchor="middle" fill="#10b981">📋</text>
+  <text x="280" y="1545" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">产品经理</text>
+
+  <circle cx="430" cy="1510" r="22" fill="#f59e0b" opacity="0.2"/>
+  <text x="430" y="1517" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" text-anchor="middle" fill="#f59e0b">💻</text>
+  <text x="430" y="1545" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">独立开发者</text>
+
+  <circle cx="580" cy="1510" r="22" fill="#ef4444" opacity="0.2"/>
+  <text x="580" y="1517" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" text-anchor="middle" fill="#ef4444">🧪</text>
+  <text x="580" y="1545" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">测试专家</text>
+
+  <circle cx="730" cy="1510" r="22" fill="#06b6d4" opacity="0.2"/>
+  <text x="730" y="1517" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" text-anchor="middle" fill="#06b6d4">🎨</text>
+  <text x="730" y="1545" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">UI 设计师</text>
+
+  <circle cx="880" cy="1510" r="22" fill="#ec4899" opacity="0.2"/>
+  <text x="880" y="1517" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" text-anchor="middle" fill="#ec4899">🔒</text>
+  <text x="880" y="1545" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">漏洞专家</text>
+
+  <text x="1030" y="1510" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#64748b" text-anchor="middle">每个角色都新增</text>
+  <text x="1030" y="1530" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#64748b" text-anchor="middle">【Karpathy 原则提醒】</text>
+  <text x="1030" y="1550" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#475569" text-anchor="middle">确保执行时严格遵守</text>
+
+  <!-- Footer -->
+  <rect x="0" y="1570" width="1200" height="30" fill="#0f172a"/>
+  <text x="600" y="1590" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#475569" text-anchor="middle">Trae Multi-Agent Skill v2.4 · Made with ❤️ by weiansoft · GitHub: weiransoft/TraeMultiAgentSkill</text>
+</svg>

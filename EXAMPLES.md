@@ -7,6 +7,8 @@
 - [基础示例](#-基础示例)
 - [进阶示例](#-进阶示例)
 - [场景示例](#-场景示例)
+  - [示例 11: Karpathy 原则检查 (v2.4)](#示例-11-karpathy-原则检查-v24)
+  - [示例 12: Claude Code 平台调用 (v2.4)](#示例-12-claude-code-平台调用-v24)
 - [最佳实践](#-最佳实践)
 
 ## 🎯 基础示例
@@ -407,6 +409,94 @@ python3 scripts/trae_agent_dispatch.py \
 ---
 
 ## 🎬 场景示例
+
+### 示例 11: Karpathy 原则检查 (v2.4)
+
+**输入**:
+```bash
+# 对项目执行 Karpathy 原则合规性检查
+python3 scripts/karpathy_principle_enforcer.py /path/to/project
+
+# 生成原则执行报告
+python3 scripts/karpathy_principle_enforcer.py /path/to/project --report
+```
+
+**预期输出**:
+```
+🧠 Karpathy 四大核心原则执行检查器
+
+📊 检查项目：/path/to/project
+📁 扫描文件：156 个
+
+📋 原则合规性检查:
+
+1️⃣ Think Before Coding（三思而后行）
+   ✅ 需求文档已明确 (PRD.md, SPEC.md)
+   ✅ 技术方案已评审
+   ⚠ 部分代码缺少假设说明
+
+2️⃣ Simplicity First（简单优先）
+   ⚠ [HIGH] file.py:45 - 发现过度抽象：引入了不必要的继承层级
+   ⚠ [MEDIUM] utils.py:120 - 发现 speculative code："以后可能会用到"
+   ✅ 无重复代码
+
+3️⃣ Surgical Changes（精准修改）
+   ✅ 修改范围合理
+   ⚠ [MEDIUM] service.py:230 - 修复 bug 时同时改了其他 2 个函数的格式
+
+4️⃣ Goal-Driven Execution（目标驱动执行）
+   ✅ 验证检查点已设置
+   ✅ 成功标准已定义
+   ✅ 所有测试通过
+
+📊 原则执行报告:
+   - 总违规数：3
+   - 严重：0
+   - 高风险：1
+   - 中等风险：2
+   - 通过率：92%
+```
+
+### 示例 12: Claude Code 平台调用 (v2.4)
+
+**输入**:
+```python
+from claude_code_subagent_adapter import ClaudeCodeSubAgentAdapter
+
+# 自动检测平台并调用
+adapter = ClaudeCodeSubAgentAdapter()
+
+# 架构设计
+result = adapter.invoke_agent('architect', '设计微服务架构')
+
+# 产品需求
+result = adapter.invoke_agent(
+    'product-manager', 
+    '定义用户认证功能需求',
+    context={'prd_template': 'standard'}
+)
+
+# 代码实现
+result = adapter.invoke_agent('solo-coder', '实现JWT认证中间件')
+
+# UI设计
+result = adapter.invoke_agent('ui-designer', '设计登录页面')
+```
+
+**预期输出**:
+```
+🔌 Claude Code SubAgent 适配器
+
+📡 检测平台：trae
+✅ 平台已识别，使用 Trae IDE 调度机制
+
+🤖 调用 Agent: architect
+📋 任务: 设计微服务架构
+⏳ 执行中...
+
+✅ 执行完成
+📊 结果: 架构设计文档已生成
+```
 
 ### 场景 1: 紧急 Bug 修复
 
