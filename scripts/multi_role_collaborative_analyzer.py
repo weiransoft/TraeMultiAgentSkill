@@ -66,7 +66,13 @@ class RolePromptLoader:
             "focus_areas": ["系统架构", "模块划分", "技术选型", "扩展性设计", "性能考量"],
             "task_template": """你是一位资深架构师，负责分析项目代码的架构设计。
 
-请分析以下项目的代码结构，从架构师视角输出你的分析：
+请分析以下项目的代码结构，从架构师视角输出你的分析。
+
+【Karpathy 原则提醒】
+- 🧠 Think Before Coding: 分析前先明确系统边界和技术约束
+- 🎯 Simplicity First: 评估架构是否过度设计，是否有不必要的抽象
+- 🔬 Surgical Changes: 只关注架构问题，不碰业务逻辑
+- ✅ Goal-Driven: 确保架构建议可验证、可落地
 
 项目路径: {project_path}
 工作空间: {workspace}
@@ -77,15 +83,17 @@ class RolePromptLoader:
 3. 设计模式识别
 4. 扩展性评估
 5. 性能考量
+6. 逻辑漏洞检查（状态流转是否闭环、模块依赖是否有循环依赖、数据流是否清晰）
 
 请阅读代码文件并输出你的分析结果，格式要求：
 - 识别的模块列表
 - 核心类和函数
 - 调用关系
 - 架构建议
+- 逻辑漏洞清单（如有）
 
 输出完成后，用 JSON 格式总结你的发现：
-{{"modules": [...], "classes": [...], "functions": [...], "recommendations": [...]}}
+{{"modules": [...], "classes": [...], "functions": [...], "recommendations": [...], "logic_vulnerabilities": [...]}}
 """
         },
         "product_manager": {
@@ -94,7 +102,13 @@ class RolePromptLoader:
             "focus_areas": ["业务功能", "用户流程", "数据需求", "需求完整性"],
             "task_template": """你是一位资深产品经理，负责分析项目代码的业务价值。
 
-请分析以下项目的代码结构，从产品经理视角输出你的分析：
+请分析以下项目的代码结构，从产品经理视角输出你的分析。
+
+【Karpathy 原则提醒】
+- 🧠 Think Before Coding: 分析前先明确业务目标和用户价值
+- 🎯 Simplicity First: 识别过度功能，建议最小可行产品
+- 🔬 Surgical Changes: 只关注业务逻辑问题，不碰技术实现
+- ✅ Goal-Driven: 确保业务建议可衡量、可验证
 
 项目路径: {project_path}
 工作空间: {workspace}
@@ -105,15 +119,17 @@ class RolePromptLoader:
 3. 数据需求（核心数据实体、数据流转）
 4. 需求完整性（功能闭环、异常处理）
 5. 产品亮点与改进点
+6. 业务漏洞检查（业务流程是否可绕过、业务规则是否有漏洞、权限控制是否完善）
 
 请阅读代码文件并输出你的分析结果，格式要求：
 - 识别的业务模块
 - 核心用户流程
 - 数据模型
 - 需求缺口
+- 业务漏洞清单（如有）
 
 输出完成后，用 JSON 格式总结你的发现：
-{{"modules": [...], "user_flows": [...], "data_models": [...], "recommendations": [...]}}
+{{"modules": [...], "user_flows": [...], "data_models": [...], "recommendations": [...], "business_vulnerabilities": [...]}}
 """
         },
         "solo_coder": {
@@ -122,7 +138,13 @@ class RolePromptLoader:
             "focus_areas": ["代码实现", "函数逻辑", "接口设计", "错误处理", "代码质量"],
             "task_template": """你是一位资深独立开发者，负责详细分析代码实现细节。
 
-请分析以下项目的代码结构，从开发者视角输出你的分析：
+请分析以下项目的代码结构，从开发者视角输出你的分析。
+
+【Karpathy 原则提醒】
+- 🧠 Think Before Coding: 分析前先明确功能边界和输入输出
+- 🎯 Simplicity First: 识别过度抽象，建议简化方案
+- 🔬 Surgical Changes: 只改必要的代码，不碰无关功能
+- ✅ Goal-Driven: 确保每个函数都有明确的测试覆盖
 
 项目路径: {project_path}
 工作空间: {workspace}
@@ -133,15 +155,17 @@ class RolePromptLoader:
 3. 错误处理（异常处理、边界条件、容错）
 4. 代码质量（可读性、可维护性、可测试性）
 5. 改进建议
+6. 逻辑漏洞检查（条件判断缺陷、循环边界、状态机一致性、时序问题）
 
 请阅读代码文件并输出你的分析结果，格式要求：
 - 核心函数列表及说明
 - 接口设计评估
 - 错误处理覆盖
 - 代码质量问题
+- 逻辑漏洞清单（如有）
 
 输出完成后，用 JSON 格式总结你的发现：
-{{"functions": [...], "interfaces": [...], "quality_issues": [...], "recommendations": [...]}}
+{{"functions": [...], "interfaces": [...], "quality_issues": [...], "recommendations": [...], "logic_vulnerabilities": [...]}}
 """
         },
         "ui_designer": {
@@ -150,7 +174,13 @@ class RolePromptLoader:
             "focus_areas": ["界面组件", "交互流程", "状态管理", "响应式设计", "用户体验"],
             "task_template": """你是一位资深 UI 设计师，负责分析代码中的界面和交互实现。
 
-请分析以下项目的代码结构，从 UI 设计师视角输出你的分析：
+请分析以下项目的代码结构，从 UI 设计师视角输出你的分析。
+
+【Karpathy 原则提醒】
+- 🧠 Think Before Coding: 分析前先明确用户群体和使用场景
+- 🎯 Simplicity First: 识别过度设计，建议最小必要组件
+- 🔬 Surgical Changes: 只改需要的设计元素，不碰无关部分
+- ✅ Goal-Driven: 确保设计有明确的验收标准
 
 项目路径: {project_path}
 工作空间: {workspace}
@@ -161,15 +191,19 @@ class RolePromptLoader:
 3. 状态管理（组件状态、全局状态、数据流）
 4. 响应式设计（多端适配、不同屏幕尺寸）
 5. 用户体验（可用性、可访问性、一致性）
+6. 页面内联功能设计（行内编辑、就地修改、内联校验、撤销机制）
+7. 操作流设计（最短路径、操作引导、操作连贯性、反馈闭环）
 
 请阅读代码文件并输出你的分析结果，格式要求：
 - 识别的 UI 组件
 - 交互流程
 - 状态管理方式
 - 用户体验评估
+- 页面内联功能评估
+- 操作流评估
 
 输出完成后，用 JSON 格式总结你的发现：
-{{"components": [...], "interactions": [...], "state_management": [...], "recommendations": [...]}}
+{{"components": [...], "interactions": [...], "state_management": [...], "recommendations": [...], "inline_features": [...], "operation_flows": [...]}}
 """
         },
         "test_expert": {
@@ -178,7 +212,13 @@ class RolePromptLoader:
             "focus_areas": ["测试覆盖", "边界条件", "异常处理", "测试策略", "质量风险"],
             "task_template": """你是一位资深测试专家，负责分析代码的测试覆盖和质量风险。
 
-请分析以下项目的代码结构，从测试专家视角输出你的分析：
+请分析以下项目的代码结构，从测试专家视角输出你的分析。
+
+【Karpathy 原则提醒】
+- 🧠 Think Before Coding: 分析前先明确测试范围和验证标准
+- 🎯 Simplicity First: 测试用例最小必要，避免冗余测试
+- 🔬 Surgical Changes: 只改需要的测试，不碰其他测试用例
+- ✅ Goal-Driven: 定义明确的通过/失败标准
 
 项目路径: {project_path}
 工作空间: {workspace}
@@ -189,15 +229,54 @@ class RolePromptLoader:
 3. 异常处理（try-catch、错误码、超时处理）
 4. 测试策略（测试金字塔、Mock 使用、测试数据）
 5. 质量风险（安全风险、性能风险、可靠性）
+6. 逻辑漏洞测试覆盖（条件分支、状态流转、并发场景）
+7. 业务漏洞测试覆盖（业务流程、权限控制、数据一致性）
 
 请阅读代码文件并输出你的分析结果，格式要求：
 - 测试覆盖评估
 - 边界条件处理
 - 异常处理机制
 - 质量风险点
+- 逻辑漏洞测试覆盖评估
+- 业务漏洞测试覆盖评估
 
 输出完成后，用 JSON 格式总结你的发现：
-{{"test_coverage": {...}, "boundary_conditions": [...], "quality_risks": [...], "recommendations": [...]}}
+{{"test_coverage": {...}, "boundary_conditions": [...], "quality_risks": [...], "recommendations": [...], "logic_vulnerability_coverage": [...], "business_vulnerability_coverage": [...]}}
+"""
+        },
+        "logic_vulnerability_expert": {
+            "name": "逻辑漏洞与业务漏洞审查专家",
+            "template_path": "docs/spec/role-prompts/logic-vulnerability-analysis.md",
+            "focus_areas": ["逻辑漏洞", "业务漏洞", "数据一致性", "权限与授权", "竞态条件"],
+            "task_template": """你是一位资深逻辑漏洞与业务漏洞审查专家，负责深入分析代码中的逻辑漏洞、业务漏洞、数据一致性风险、权限绕过风险和竞态条件。
+
+请分析以下项目的代码结构，从逻辑漏洞与业务漏洞审查专家视角输出你的分析。
+
+【Karpathy 原则提醒】
+- 🧠 Think Before Coding: 分析前先明确业务规则和预期行为
+- 🎯 Simplicity First: 识别过度复杂的业务逻辑，建议简化
+- 🔬 Surgical Changes: 只关注漏洞问题，不提出无关重构
+- ✅ Goal-Driven: 确保每个漏洞都有明确的修复标准和验证方法
+
+项目路径: {project_path}
+工作空间: {workspace}
+
+需要分析的内容：
+1. 逻辑漏洞（条件判断缺陷、循环边界错误、状态机不一致、时序问题）
+2. 业务漏洞（业务流程绕过、业务规则违反、数据完整性破坏、权限提升）
+3. 数据一致性（事务边界、并发修改、脏读幻读、缓存不一致）
+4. 权限与授权（水平越权、垂直越权、未授权访问、权限检查遗漏）
+5. 竞态条件（并发安全、原子性缺失、死锁风险、资源竞争）
+
+请阅读代码文件并输出你的分析结果，格式要求：
+- 逻辑漏洞清单（含位置、风险等级、修复建议）
+- 业务漏洞清单（含位置、风险等级、修复建议）
+- 数据一致性风险清单
+- 权限漏洞清单
+- 竞态条件清单
+
+输出完成后，用 JSON 格式总结你的发现：
+{{"logic_vulnerabilities": [...], "business_vulnerabilities": [...], "data_consistency_risks": [...], "permission_vulnerabilities": [...], "race_conditions": [...], "recommendations": [...]}}
 """
         }
     }
@@ -848,8 +927,26 @@ class MultiRoleCollaborativeAnalyzer:
         for analysis in self.role_results.values():
             all_recommendations.extend(analysis.recommendations)
 
-        high_priority = [r for r in all_recommendations if any(kw in r.lower() for kw in ['安全', '性能', 'bug', 'critical', '紧急', '必须'])]
+        high_priority = [r for r in all_recommendations if any(kw in r.lower() for kw in ['安全', '性能', 'bug', 'critical', '紧急', '必须', '漏洞', '越权', '死锁', '竞态'])]
         medium_priority = [r for r in all_recommendations if r not in high_priority][:15]
+
+        # 提取逻辑漏洞专家的分析结果
+        logic_vuln_findings = []
+        business_vuln_findings = []
+        permission_vuln_findings = []
+        race_condition_findings = []
+
+        if "logic_vulnerability_expert" in self.role_results:
+            logic_expert = self.role_results["logic_vulnerability_expert"]
+            for finding in logic_expert.key_findings:
+                if any(kw in finding.lower() for kw in ['逻辑', '条件', '循环', '状态机', '时序']):
+                    logic_vuln_findings.append(finding)
+                elif any(kw in finding.lower() for kw in ['业务', '流程', '规则', '完整性']):
+                    business_vuln_findings.append(finding)
+                elif any(kw in finding.lower() for kw in ['权限', '越权', '授权']):
+                    permission_vuln_findings.append(finding)
+                elif any(kw in finding.lower() for kw in ['竞态', '并发', '死锁', '原子']):
+                    race_condition_findings.append(finding)
 
         md = f"""# {project_info['name']} 代码走读审查报告
 
@@ -911,7 +1008,45 @@ class MultiRoleCollaborativeAnalyzer:
 | 代码规模 | {'高' if project_info['source_file_count'] > 100 else '中' if project_info['source_file_count'] > 50 else '低'} | {'建议关注重点模块' if project_info['source_file_count'] > 50 else '规模可控'} |
 | 模块划分 | {'建议优化' if len(project_info['modules']) > 15 else '划分合理'} | - |
 
-## 4. 多角色共识
+## 4. 逻辑漏洞与业务漏洞审查
+
+### 4.1 逻辑漏洞
+
+"""
+        if logic_vuln_findings:
+            md += "| 序号 | 发现内容 |\n|------|----------|\n"
+            for i, finding in enumerate(logic_vuln_findings[:10], 1):
+                md += f"| {i} | {finding} |\n"
+        else:
+            md += "未发现明显的逻辑漏洞\n"
+
+        md += "\n### 4.2 业务漏洞\n\n"
+        if business_vuln_findings:
+            md += "| 序号 | 发现内容 |\n|------|----------|\n"
+            for i, finding in enumerate(business_vuln_findings[:10], 1):
+                md += f"| {i} | {finding} |\n"
+        else:
+            md += "未发现明显的业务漏洞\n"
+
+        md += "\n### 4.3 权限与授权漏洞\n\n"
+        if permission_vuln_findings:
+            md += "| 序号 | 发现内容 |\n|------|----------|\n"
+            for i, finding in enumerate(permission_vuln_findings[:10], 1):
+                md += f"| {i} | {finding} |\n"
+        else:
+            md += "未发现明显的权限漏洞\n"
+
+        md += "\n### 4.4 竞态条件与并发安全\n\n"
+        if race_condition_findings:
+            md += "| 序号 | 发现内容 |\n|------|----------|\n"
+            for i, finding in enumerate(race_condition_findings[:10], 1):
+                md += f"| {i} | {finding} |\n"
+        else:
+            md += "未发现明显的竞态条件问题\n"
+
+        md += f"""
+
+## 5. 多角色共识
 
 """
         for consensus in aligned.get("consensus", []):
@@ -919,20 +1054,20 @@ class MultiRoleCollaborativeAnalyzer:
 
         md += f"""
 
-## 5. 改进建议
+## 6. 改进建议
 
-### 5.1 高优先级
+### 6.1 高优先级（安全/漏洞相关）
 
 """
         if high_priority:
-            for rec in high_priority[:5]:
+            for rec in high_priority[:10]:
                 md += f"- {rec}\n"
         else:
             md += "无高优先级改进项\n"
 
         md += f"""
 
-### 5.2 中优先级
+### 6.2 中优先级
 
 """
         for rec in medium_priority[:10]:
@@ -948,7 +1083,10 @@ class MultiRoleCollaborativeAnalyzer:
 
 1. **架构评估**: 项目{'采用分层架构，模块划分基本合理' if len(project_info['modules']) > 3 else '采用模块化架构'}
 2. **代码质量**: 代码规模{'较大，建议关注重点模块' if project_info['source_file_count'] > 50 else '规模适中'}
-3. **改进建议**: 详见第五章，建议按优先级逐步实施
+3. **逻辑漏洞**: {'发现 ' + str(len(logic_vuln_findings)) + ' 个逻辑漏洞，建议优先修复' if logic_vuln_findings else '未发现明显逻辑漏洞'}
+4. **业务漏洞**: {'发现 ' + str(len(business_vuln_findings)) + ' 个业务漏洞，建议优先修复' if business_vuln_findings else '未发现明显业务漏洞'}
+5. **权限漏洞**: {'发现 ' + str(len(permission_vuln_findings)) + ' 个权限漏洞，建议优先修复' if permission_vuln_findings else '未发现明显权限漏洞'}
+6. **改进建议**: 详见第六章，建议按优先级逐步实施
 
 ---
 
