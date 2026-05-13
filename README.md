@@ -7,7 +7,7 @@
 > 来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  
 > 理论依据：ICLR 2026 Profile-Aware Maneuvering 架构、钱学森工程控制论（系统工程、系统学）、Norbert Wiener 控制论、Ashby 必要多样性定律
 
-- ✅ **Cybernetics 工程控制论增强 (v2.5)** - 基于 cybernetics-agent 项目引入反馈闭环、自适应和可观测性增强
+- ✅ ** 工程控制论增强 (v2.5)** - 基于 cybernetics-agent 项目引入反馈闭环、自适应和可观测性增强
   - 🔄 **三环控制模型**：战略层（任务规划、AI动态规划）、战术层（Guard验证、异常检测）、执行层（任务执行、反馈收集）
   - 💫 **反馈控制环**：感知-决策-执行-反馈完整闭环，基于案例的策略选择（非PID，适配认知任务）
   - 📊 **性能画像**：执行案例记录、失败/成功模式提取、相似案例检索（非预测）、冷启动优雅降级
