@@ -1,12 +1,20 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强。
 ---
 
 # Multi-Agent Team Dispatcher (AI-Enhanced)
 
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
+
+**v2.5 新增（Cybernetics 工程控制论增强）**:
+> 参考来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  
+> 理论依据：钱学森工程控制论（系统工程、系统学）、ICLR 2026 Profile-Aware Maneuvering 架构、Norbert Wiener 控制论、Ashby 必要多样性定律  
+> - 🔄 三环控制模型：战略层、战术层、执行层
+> - 💫 反馈控制环：感知-决策-执行-反馈完整闭环
+> - 📊 性能画像：执行案例记录、相似案例检索
+> - 🛡️ 守护协调器：执行前验证、异常检测、AI增强风险评估
 
 **v2.4 新增（Karpathy 四大核心原则）**:
 - 🧠 **Think Before Coding（三思而后行）**: 明确假设、呈现权衡、遇到不清就问

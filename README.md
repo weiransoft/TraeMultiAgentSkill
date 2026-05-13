@@ -2,6 +2,19 @@
 
 🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。
 
+## 🎉 2026 年 5 月最新更新 (v2.5)
+
+> 来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  
+> 理论依据：ICLR 2026 Profile-Aware Maneuvering 架构、钱学森工程控制论（系统工程、系统学）、Norbert Wiener 控制论、Ashby 必要多样性定律
+
+- ✅ **Cybernetics 工程控制论增强 (v2.5)** - 基于 cybernetics-agent 项目引入反馈闭环、自适应和可观测性增强
+  - 🔄 **三环控制模型**：战略层（任务规划、AI动态规划）、战术层（Guard验证、异常检测）、执行层（任务执行、反馈收集）
+  - 💫 **反馈控制环**：感知-决策-执行-反馈完整闭环，基于案例的策略选择（非PID，适配认知任务）
+  - 📊 **性能画像**：执行案例记录、失败/成功模式提取、相似案例检索（非预测）、冷启动优雅降级
+  - 🛡️ **守护协调器**：执行前预验证、实时异常检测、执行后审查、AI增强风险评估
+  - 🎯 **预期收益**：执行成功率 +8%，方差 -67%，人工介入 -70%
+  - 核心组件：`scripts/feedback_control_loop.py`、`scripts/performance_fingerprint.py`、`scripts/guard_coordinator.py`、`scripts/hierarchical_control.py`
+
 ## 🎉 2026 年 4 月最新更新 (v2.4)
 
 - ✅ **Karpathy 四大核心原则** - 融入 Andrej Karpathy 的编程智慧：Think Before Coding、Simplicity First、Surgical Changes、Goal-Driven Execution

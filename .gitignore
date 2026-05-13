@@ -1,45 +1,20 @@
-# 视频项目目录
-video/
-
-# 视频输出文件
-video/out/*.mp4
-video/out/*.mov
-video/out/*.avi
-
-# 视频构建产物
-video/node_modules/
-video/package-lock.json
-video/dist/
-video/.next/
-video/.cache/
-
-# 视频临时文件
-video/*.tmp
-video/*.log
-#本地目录
-/content/
-/examples/
-/test/
-# 视频公共资源（可选，根据需要）
-# video/public/
-
-# IDE 和编辑器文件
-.idea/
-.vscode/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+.DS_Store
+Thumbs.db
+fingerprints/
 *.swp
 *.swo
 *~
-.trae/
-# OS 文件
-.DS_Store
-Thumbs.db
-
-# 临时文件
-tmp/
-temp/
-*.tmp
-
-# 本地运行时生成的上下文目录
-context/
-.trae/
-
