@@ -143,19 +143,47 @@ class KnowledgeToFingerprintEnhancer:
     ):
         """
         使用知识库增强性能画像
-        
+
+        将知识库中的最佳实践注入为成功模式，
+        将经验教训注入为失败模式的缓解措施
+
         Args:
             fingerprint: 性能画像
             knowledge_items: 知识项列表
         """
+        from performance_fingerprint import SuccessPattern
+
         for knowledge in knowledge_items:
-            # 知识标签可以作为任务类型的参考
             if knowledge.category == 'best_practices':
-                # 最佳实践可以作为成功模式
-                pass
+                # 最佳实践作为成功模式注入
+                success_key = f"success_best_practice_{knowledge.id}"
+                if success_key not in fingerprint.success_patterns:
+                    key_factors = []
+                    if isinstance(knowledge.content, str):
+                        key_factors = [knowledge.content]
+                    elif isinstance(knowledge.content, dict):
+                        key_factors = list(knowledge.content.values())
+
+                    fingerprint.success_patterns[success_key] = SuccessPattern(
+                        pattern_id=f"sp_{success_key}",
+                        success_type='best_practice',
+                        trigger_conditions=[{'type': 'knowledge_id', 'value': knowledge.id}],
+                        description=knowledge.title,
+                        key_factors=key_factors,
+                        frequency=1
+                    )
+                else:
+                    fingerprint.success_patterns[success_key].frequency += 1
+
             elif knowledge.category == 'lessons_learned':
-                # 经验教训可以作为失败模式的缓解措施
-                pass
+                # 经验教训作为失败模式的缓解措施注入
+                if isinstance(knowledge.content, dict):
+                    error_type = knowledge.content.get('error_type', 'unknown')
+                    if error_type in fingerprint.failure_patterns:
+                        pattern = fingerprint.failure_patterns[error_type]
+                        mitigation = knowledge.content.get('mitigation', '')
+                        if mitigation:
+                            pattern.mitigation = mitigation
 
 
 class EnhancedTaskContext(TaskContext):

@@ -240,7 +240,7 @@ class GuardCoordinator:
             self.anomaly_patterns[pattern.pattern_id] = pattern
     
     def _init_default_rules(self):
-        """初始化默认验证规则"""
+        """初始化默认验证规则（含 Karpathy 四大核心原则规则）"""
         self.validation_rules = [
             {
                 "rule_id": "rule_complexity",
@@ -262,8 +262,141 @@ class GuardCoordinator:
                 "check": lambda task: 'type' in task and 'id' in task,
                 "error_message": "缺少必填字段 (type, id)",
                 "severity": "error"
+            },
+            {
+                "rule_id": "rule_karpathy_no_placeholder",
+                "name": "Karpathy原则-禁止占位符代码",
+                "check": lambda task: not self._contains_placeholder_code(task),
+                "error_message": "任务包含占位符代码（pass/TODO/mock/简化实现），违反 Surgical Changes 原则",
+                "severity": "critical"
+            },
+            {
+                "rule_id": "rule_karpathy_no_speculative",
+                "name": "Karpathy原则-禁止投机性代码",
+                "check": lambda task: not self._contains_speculative_code(task),
+                "error_message": "任务包含投机性代码（为未来预留/以后可能用到），违反 Simplicity First 原则",
+                "severity": "error"
+            },
+            {
+                "rule_id": "rule_karpathy_goal_defined",
+                "name": "Karpathy原则-目标必须明确",
+                "check": lambda task: self._has_clear_goals(task),
+                "error_message": "任务缺少明确目标定义（goals或description），违反 Goal-Driven 原则",
+                "severity": "warning"
+            },
+            {
+                "rule_id": "rule_karpathy_no_assumption",
+                "name": "Karpathy原则-禁止未验证假设",
+                "check": lambda task: not self._contains_unverified_assumptions(task),
+                "error_message": "任务描述包含未验证的假设，违反 Think Before Coding 原则",
+                "severity": "warning"
             }
         ]
+
+    def _contains_placeholder_code(self, task: Dict[str, Any]) -> bool:
+        """
+        检查任务是否包含占位符代码标记
+
+        对应 Karpathy 原则：Surgical Changes（精准修改）
+        禁止使用 pass/TODO/FIXME/mock/简化/占位 等标记
+
+        Args:
+            task: 任务字典
+
+        Returns:
+            bool: 是否包含占位符代码
+        """
+        import re
+        description = task.get('description', '')
+        code_snippet = task.get('code', '')
+        combined = f"{description} {code_snippet}"
+
+        placeholder_patterns = [
+            r'pass\s*#\s*(占位|placeholder|TODO)',
+            r'mock|Mock|stub|Stub',
+            r'简化实现|模拟实现|占位实现',
+            r'#.*TODO|#.*FIXME|#.*HACK|#.*XXX'
+        ]
+
+        for pattern in placeholder_patterns:
+            if re.search(pattern, combined, re.IGNORECASE):
+                return True
+        return False
+
+    def _contains_speculative_code(self, task: Dict[str, Any]) -> bool:
+        """
+        检查任务是否包含投机性代码标记
+
+        对应 Karpathy 原则：Simplicity First（简单优先）
+        禁止为未来预留代码、添加"以后可能用到"的功能
+
+        Args:
+            task: 任务字典
+
+        Returns:
+            bool: 是否包含投机性代码
+        """
+        import re
+        description = task.get('description', '')
+        code_snippet = task.get('code', '')
+        combined = f"{description} {code_snippet}"
+
+        speculative_patterns = [
+            r'#.*以后|#.*future|#.*预留|#.*reserve',
+            r'为未来|以后可能|暂时不用|先留着',
+            r'class.*Factory|class.*Builder(?!\s*\()'
+        ]
+
+        for pattern in speculative_patterns:
+            if re.search(pattern, combined, re.IGNORECASE):
+                return True
+        return False
+
+    def _has_clear_goals(self, task: Dict[str, Any]) -> bool:
+        """
+        检查任务是否有明确的目标定义
+
+        对应 Karpathy 原则：Goal-Driven Execution（目标驱动执行）
+        任务必须有 goals 或 description 字段
+
+        Args:
+            task: 任务字典
+
+        Returns:
+            bool: 是否有明确目标
+        """
+        has_goals = 'goals' in task and len(task.get('goals', [])) > 0
+        has_description = 'description' in task and len(task.get('description', '')) > 5
+        return has_goals or has_description
+
+    def _contains_unverified_assumptions(self, task: Dict[str, Any]) -> bool:
+        """
+        检查任务描述是否包含未验证的假设
+
+        对应 Karpathy 原则：Think Before Coding（三思而后行）
+        检测"假设"、"assume"等关键词
+
+        Args:
+            task: 任务字典
+
+        Returns:
+            bool: 是否包含未验证假设
+        """
+        import re
+        description = task.get('description', '')
+        code_snippet = task.get('code', '')
+        combined = f"{description} {code_snippet}"
+
+        assumption_patterns = [
+            r'#.*假设|#.*assume|#.*可能|#.*maybe',
+            r'假设.*是|assume.*is',
+            r'假设'
+        ]
+
+        for pattern in assumption_patterns:
+            if re.search(pattern, combined, re.IGNORECASE):
+                return True
+        return False
     
     def set_ai_provider(self, ai_provider: Any):
         """

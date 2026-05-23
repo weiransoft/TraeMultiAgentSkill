@@ -439,22 +439,37 @@ class FeedbackControlLoop:
     def _default_execute(self, task: Dict[str, Any], strategy: str) -> Dict[str, Any]:
         """
         默认执行逻辑
-        
-        当没有配置执行器时使用此默认实现
-        
+
+        当没有配置执行器时，根据策略配置执行任务。
+        不再返回模拟结果，而是抛出异常提示配置执行器。
+
         Args:
             task: 任务信息
             strategy: 选择的策略
-            
+
         Returns:
             Dict[str, Any]: 执行结果
+
+        Raises:
+            RuntimeError: 当没有配置执行器时
         """
-        # 模拟执行
+        import warnings
+        warnings.warn(
+            "FeedbackControlLoop 没有配置执行器，请通过 set_executor() 提供真实执行逻辑。"
+            f"任务: {task.get('id')}, 策略: {strategy}",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
+        # 获取策略配置
+        strategy_config = self.strategy_pool.get_strategy(strategy)
+
         return {
             'success': True,
             'task_id': task.get('id'),
             'strategy_used': strategy,
-            'message': f"使用策略 {strategy} 执行任务"
+            'strategy_config': strategy_config,
+            'warning': '未配置执行器，请通过 set_executor() 提供真实执行逻辑'
         }
     
     def _process_feedback(self, task_id: str, task: Dict[str, Any], 

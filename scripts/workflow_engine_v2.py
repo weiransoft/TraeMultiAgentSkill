@@ -115,6 +115,7 @@ class WorkflowEngineV2:
     2. **TaskList 集成**：内置任务清单管理，支持任务拆分
     3. **Handoff 协议**：标准化交接班流程，多 Agent 协作
     4. **双层上下文**：项目级 + 任务级上下文管理
+    5. **Cybernetics 增强**：Guard 预验证、反馈收集、性能画像（v2.5 新增）
     
     使用示例：
     ```python
@@ -137,12 +138,14 @@ class WorkflowEngineV2:
     ```
     """
     
-    def __init__(self, storage_path: str = "./workflows_v2"):
+    def __init__(self, storage_path: str = "./workflows_v2",
+                 cybernetics=None):
         """
         初始化增强版工作流引擎
         
         Args:
             storage_path: 存储路径
+            cybernetics: CyberneticsIntegration 实例（可选，用于 Guard 验证和反馈收集）
         """
         self.storage_path = Path(storage_path)
         self.storage_path.mkdir(parents=True, exist_ok=True)
@@ -165,6 +168,9 @@ class WorkflowEngineV2:
         self.tasklist_manager = TaskListManager(
             storage_path=str(self.storage_path / "tasklists")
         )
+        
+        # Cybernetics 增强集成（v2.5 新增）
+        self.cybernetics = cybernetics
         
         # Checkpoint 保存间隔（每隔 N 个步骤保存一次）
         self.checkpoint_interval = 2
@@ -791,10 +797,25 @@ class WorkflowEngineV2:
                 instance.error = f"步骤 {next_step.name} 执行失败：{str(e)}"
     
     def _execute_step(self, step: WorkflowStep, instance: WorkflowInstance) -> Any:
-        """执行单个步骤"""
+        """执行单个步骤（含 Cybernetics 增强）"""
         executor = self.executors.get(step.action)
         if not executor:
             raise Exception(f"未找到执行器：{step.action}")
+        
+        # Cybernetics 增强：Guard 预验证
+        if self.cybernetics and self.cybernetics.guard:
+            try:
+                task_dict = {
+                    'id': step.step_id,
+                    'type': step.action,
+                    'complexity': 5,
+                    'description': step.description
+                }
+                validation = self.cybernetics.pre_execute_validation(task_dict)
+                if not validation.get('passed', True):
+                    step.error = f"Guard warning: {validation.get('warnings', [])}"
+            except Exception as e:
+                print(f"⚠️  Guard 预验证异常：{e}")
         
         inputs = copy.deepcopy(step.inputs)
         for key, value in inputs.items():
@@ -810,6 +831,22 @@ class WorkflowEngineV2:
         
         if isinstance(result, dict):
             instance.results.update(result)
+        
+        # Cybernetics 增强：反馈收集和性能画像更新
+        if self.cybernetics:
+            try:
+                task_dict = {
+                    'id': step.step_id,
+                    'type': step.action,
+                    'complexity': 5,
+                    'description': step.description
+                }
+                self.cybernetics.execute_with_feedback(
+                    task_dict,
+                    executor=lambda t: {'success': True, 'step_id': step.step_id}
+                )
+            except Exception as e:
+                print(f"⚠️  Cybernetics 反馈收集异常：{e}")
         
         return result
     

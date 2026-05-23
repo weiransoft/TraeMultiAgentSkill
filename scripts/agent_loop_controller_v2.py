@@ -47,10 +47,12 @@ class AgentLoopControllerV2:
     6. 双层上下文管理（新增）
     7. 经验自动沉淀（新增）
     8. 知识动态注入（新增）
+    9. Cybernetics 反馈控制环集成（v2.5 新增）
     """
     
     def __init__(self, project_root: str = ".", max_iterations: int = 100, 
-                 task_file: Optional[str] = None):
+                 task_file: Optional[str] = None,
+                 cybernetics=None):
         """
         初始化控制器
         
@@ -58,10 +60,14 @@ class AgentLoopControllerV2:
             project_root: 项目根目录
             max_iterations: 最大迭代次数
             task_file: 任务文件路径
+            cybernetics: CyberneticsIntegration 实例（可选，用于反馈控制环）
         """
         self.project_root = Path(project_root)
         self.max_iterations = max_iterations
         self.task_file = task_file
+        
+        # Cybernetics 反馈控制环集成（v2.5 新增）
+        self.cybernetics = cybernetics
         
         # 技能目录
         self.skill_root = Path(__file__).parent.parent
@@ -258,7 +264,13 @@ class AgentLoopControllerV2:
     
     def run_loop(self, tasks: List[Dict], task_executor=None) -> Dict:
         """
-        运行循环（v2.0 - 集成双层上下文）
+        运行循环（v2.5 - 集成 Cybernetics 反馈控制环）
+        
+        完整流程：
+        1. 感知阶段：收集当前状态（Cybernetics 增强）
+        2. 决策阶段：基于案例选择策略（Cybernetics 增强）
+        3. 执行阶段：执行任务并记录结果
+        4. 反馈阶段：收集反馈并更新案例库（Cybernetics 增强）
         
         Args:
             tasks: 任务列表
@@ -267,7 +279,7 @@ class AgentLoopControllerV2:
         Returns:
             Dict: 执行结果
         """
-        print(f"\n🚀 Trae Multi-Agent 循环控制器 v2.0 启动")
+        print(f"\n🚀 Trae Multi-Agent 循环控制器 v2.5 启动")
         print(f"📋 任务数量：{len(tasks)}")
         print(f"🔄 最大迭代次数：{self.max_iterations}")
         
@@ -275,6 +287,11 @@ class AgentLoopControllerV2:
             print(f"✅ 双层上下文管理器：已启用")
         else:
             print(f"⚠️  双层上下文管理器：未启用")
+        
+        if self.cybernetics:
+            print(f"✅ Cybernetics 反馈控制环：已启用")
+        else:
+            print(f"⚠️  Cybernetics 反馈控制环：未启用")
         
         self.loop_progress["start_time"] = datetime.now().isoformat()
         self.loop_progress["tasks_pending"] = [t["id"] for t in tasks]
@@ -294,6 +311,21 @@ class AgentLoopControllerV2:
                 self.save_loop_progress()
                 break
             
+            # Cybernetics 增强：执行前验证
+            if self.cybernetics:
+                task_dict = {
+                    'id': task_id,
+                    'type': task.get('type', 'unknown'),
+                    'complexity': task.get('complexity', 5),
+                    'description': task_description
+                }
+                try:
+                    validation = self.cybernetics.pre_execute_validation(task_dict)
+                    if not validation.get('passed', True):
+                        print(f"⚠️  Guard 验证警告：{validation.get('warnings', [])}")
+                except Exception as e:
+                    print(f"⚠️  Guard 预验证异常：{e}")
+            
             # 开始任务
             self.start_task(task_id, task_description)
             self.iteration_count += 1
@@ -307,6 +339,26 @@ class AgentLoopControllerV2:
                 time.sleep(0.1)  # 模拟执行
                 success = True
                 artifacts = {}
+            
+            # Cybernetics 增强：反馈收集
+            if self.cybernetics:
+                try:
+                    task_dict = {
+                        'id': task_id,
+                        'type': task.get('type', 'unknown'),
+                        'complexity': task.get('complexity', 5),
+                        'description': task_description
+                    }
+                    self.cybernetics.execute_with_feedback(
+                        task_dict,
+                        executor=lambda t: {
+                            'success': success,
+                            'task_id': task_id,
+                            'artifacts': artifacts
+                        }
+                    )
+                except Exception as e:
+                    print(f"⚠️  Cybernetics 反馈收集异常：{e}")
             
             # 完成任务
             self.complete_task(task_id, success, artifacts)
@@ -348,6 +400,18 @@ class AgentLoopControllerV2:
             print(f"  全局上下文版本：{stats['global_context']['version']}")
             print(f"  知识库条目：{stats['global_context']['knowledge_count']}")
             print(f"  经验库条目：{stats['global_context']['experience_count']}")
+        
+        # Cybernetics 增强统计
+        if self.cybernetics:
+            try:
+                cyber_stats = self.cybernetics.get_statistics()
+                print(f"\n🔄 Cybernetics 统计:")
+                print(f"  反馈循环调用：{cyber_stats['metrics']['feedback_loop_calls']}")
+                print(f"  反馈成功率：{cyber_stats['metrics']['feedback_success_rate']:.1%}")
+                print(f"  Guard 验证次数：{cyber_stats['metrics']['guard_validations']}")
+                print(f"  性能画像记录：{cyber_stats['metrics']['fingerprint_records']}")
+            except Exception:
+                pass
         
         self.save_loop_progress()
         

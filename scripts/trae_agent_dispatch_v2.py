@@ -139,10 +139,17 @@ def log(message: str, level: str = 'INFO'):
     print(f"{color}[{timestamp}] [{level}] {message}{reset_color}")
 
 
-def dispatch_agent_v2(agent_type: str, task: str, task_id: Optional[str], 
-                     project_root: str, progress: Dict) -> bool:
+def dispatch_agent_v2(agent_type: str, task: str, task_id: Optional[str] = None,
+                     project_root: str = ".", progress: Optional[Dict] = None,
+                     cybernetics_enabled: bool = True) -> bool:
     """
-    v2.0 调度逻辑 - 使用双层上下文和智能匹配
+    v2.0 调度逻辑 - 使用双层上下文和智能匹配 + Cybernetics 增强
+    
+    v2.5 新增：Cybernetics 增强桥接层
+    - Guard 预验证（含 Karpathy 原则检查）
+    - 反馈控制环
+    - 性能画像更新
+    - 检查点自动验证
     
     Args:
         agent_type: 智能体类型
@@ -150,19 +157,60 @@ def dispatch_agent_v2(agent_type: str, task: str, task_id: Optional[str],
         task_id: 任务 ID
         project_root: 项目根目录
         progress: 进度数据
+        cybernetics_enabled: 是否启用 Cybernetics 增强（默认启用）
         
     Returns:
         bool: 调度是否成功
     """
+    if progress is None:
+        progress = {}
+    
+    # Cybernetics 增强桥接
+    bridge = None
+    validation = {"passed": True}
+    if cybernetics_enabled:
+        try:
+            from cybernetics_bridge import CyberneticsBridge
+            bridge = CyberneticsBridge(project_root=project_root)
+        except Exception as e:
+            log(f'⚠️  Cybernetics 桥接层初始化失败，将使用无增强模式：{e}', 'WARNING')
+            bridge = None
+    
     try:
+        # 执行前验证（Guard + Karpathy）
+        if bridge:
+            task_dict = bridge._build_task_dict(agent_type, task, task_id)
+            validation = bridge._pre_execute_check(task_dict)
+            if not validation.get('passed', True):
+                log(f'⚠️  Guard 验证警告：{validation.get("warnings", [])}', 'WARNING')
+                if validation.get('karpathy_violations'):
+                    for v in validation['karpathy_violations']:
+                        log(f'  📛 Karpathy 违规：{v.get("description", "")}', 'WARNING')
+        
         # 检测运行环境，优先使用 Claude Code SubAgent
         if CLAUDE_CODE_ADAPTER_AVAILABLE:
             log('🚀 使用 Claude Code SubAgent 适配器', 'SUCCESS')
-            return _dispatch_via_claude_code(agent_type, task, task_id, project_root, progress)
+            result = _dispatch_via_claude_code(agent_type, task, task_id, project_root, progress)
+        else:
+            # 降级到原有逻辑
+            log('⚠️  使用双层上下文管理器（Trae IDE）', 'WARNING')
+            result = _dispatch_via_trae(agent_type, task, task_id, project_root, progress)
         
-        # 降级到原有逻辑
-        log('⚠️  使用双层上下文管理器（Trae IDE）', 'WARNING')
-        return _dispatch_via_trae(agent_type, task, task_id, project_root, progress)
+        # 执行后处理（反馈收集 + 性能画像更新）
+        if bridge:
+            try:
+                task_dict = bridge._build_task_dict(agent_type, task, task_id)
+                bridge._post_execute_process(
+                    task_dict=task_dict,
+                    success=result,
+                    strategy=bridge.strategy_resolver.select_strategy(task_dict),
+                    validation=validation,
+                    execution_time=0.0
+                )
+            except Exception as e:
+                log(f'⚠️  Cybernetics 执行后处理异常：{e}', 'WARNING')
+        
+        return result
     
     except Exception as e:
         log(f'❌ 调度失败：{e}', 'ERROR')
