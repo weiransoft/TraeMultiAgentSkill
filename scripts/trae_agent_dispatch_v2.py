@@ -11,6 +11,13 @@ Trae Agent 调度脚本（v2.0 - 双层上下文增强版）
 - 智能角色匹配
 - 工作流编排
 - 技能注册管理
+
+Phase 11 新增:
+- /loop + /goal 集成：长程任务"目标定义 → 循环迭代 → 收敛退出"能力
+- --loop N：循环执行 N 次
+- --goal <id>：目标 ID
+- --goal-desc <desc>：目标描述
+- --criteria <criterion>：验收标准（可多次传入）
 """
 
 import os
@@ -19,7 +26,24 @@ import argparse
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
+
+# Phase 11 P1-6 修复：将 GoalStatus 提到模块级导入
+# 原问题：_is_overall_success（模块级函数）使用 GoalStatus 但仅在
+# dispatch_agent_v2_with_loop_goal 函数内部 import，导致 NameError。
+try:
+    from loop_goal import GoalStatus as _GoalStatus
+    GoalStatus = _GoalStatus
+    _LOOP_GOAL_AVAILABLE = True
+except ImportError:
+    # loop_goal 模块不可用时（向后兼容）：提供占位枚举
+    class _FallbackGoalStatus:
+        ACHIEVED = "achieved"
+        FAILED = "failed"
+        IN_PROGRESS = "in_progress"
+        ABANDONED = "abandoned"
+    GoalStatus = _FallbackGoalStatus  # type: ignore[assignment]
+    _LOOP_GOAL_AVAILABLE = False
 
 # 导入新组件
 try:
@@ -114,7 +138,122 @@ def parse_arguments():
         action='store_true',
         help='启用项目全生命周期模式（8 阶段标准工作流程：需求→架构→UI→测试→任务→开发→测试→发布）'
     )
-    
+
+    # Phase 11 新增：/loop + /goal 集成
+    parser.add_argument(
+        '--loop',
+        type=int,
+        default=1,
+        help='循环执行次数（默认 1 = 不循环；范围 [1, 100]）'
+    )
+
+    parser.add_argument(
+        '--goal',
+        type=str,
+        default=None,
+        help='目标 ID（kebab-case，例如：fix-tests / refactor-auth）'
+    )
+
+    parser.add_argument(
+        '--goal-desc',
+        type=str,
+        default=None,
+        help='目标描述（创建新目标时必填；已存在目标可省略）'
+    )
+
+    parser.add_argument(
+        '--criteria',
+        action='append',
+        default=[],
+        help='验收标准（可多次传入，例如：--criteria "tests pass" --criteria "no warnings"）'
+    )
+
+    parser.add_argument(
+        '--convergence-window',
+        type=int,
+        default=3,
+        help='收敛窗口：连续 N 次无新产出则提前退出（默认 3）'
+    )
+
+    # Phase 13 新增：多 Goal 编排 CLI 标志
+    # --multi-goal <root_id>：以 root_id 为入口执行多 Goal 编排（DAG 调度）
+    parser.add_argument(
+        '--multi-goal',
+        type=str,
+        default=None,
+        help='以指定 root Goal ID 为入口执行多 Goal 编排（触发 DAG 调度器）',
+    )
+    # --goal-parent <parent_id>：创建子 Goal 时指定 parent_goal_id
+    parser.add_argument(
+        '--goal-parent',
+        type=str,
+        default=None,
+        help='创建新 Goal 时指定 parent_goal_id（多 Goal 树）',
+    )
+    # --goal-depends <dep_id>：为新 Goal 增加 depends_on 依赖（可多次传入）
+    parser.add_argument(
+        '--goal-depends',
+        action='append',
+        default=[],
+        help='为新 Goal 增加 depends_on 依赖（可多次传入，例如：--goal-depends g1 --goal-depends g2）',
+    )
+    # --goal-aggregation <strategy>：子 Goal 聚合策略（AND / OR / MAJORITY）
+    parser.add_argument(
+        '--goal-aggregation',
+        type=str,
+        default='AND',
+        choices=['AND', 'OR', 'MAJORITY'],
+        help='子 Goal 聚合策略（AND=全部成功 / OR=任一成功 / MAJORITY=多数成功；默认 AND）',
+    )
+    # --goal-resume <goal_id>：续跑指定 Goal（无 force 仅续可续跑的）
+    parser.add_argument(
+        '--goal-resume',
+        type=str,
+        default=None,
+        help='续跑指定 Goal（不带 --force 时仅续可续跑 goal）',
+    )
+    # --goal-resume-force：强制续跑（覆盖 ABANDONED / FAILED 超限）
+    parser.add_argument(
+        '--goal-resume-force',
+        action='store_true',
+        help='强制续跑（包括 ABANDONED 状态的 Goal / FAILED 续跑超限）',
+    )
+    # --goal-max-resume-count <N>：覆盖单 Goal 续跑上限
+    parser.add_argument(
+        '--goal-max-resume-count',
+        type=int,
+        default=3,
+        help='覆盖单 Goal 续跑上限（默认 3）',
+    )
+    # --reuse-threshold <float>：跨 Goal 复用相似度阈值
+    parser.add_argument(
+        '--reuse-threshold',
+        type=float,
+        default=0.85,
+        help='跨 Goal 复用相似度阈值（0.0-1.0；默认 0.85）',
+    )
+    # --disable-iteration-reuse：禁用跨 Goal iteration 语义复用
+    parser.add_argument(
+        '--disable-iteration-reuse',
+        action='store_true',
+        help='禁用跨 Goal iteration 语义复用',
+    )
+    # --max-concurrent <N>：DAG 并发 worker 数（D1 优化默认 20）
+    parser.add_argument(
+        '--max-concurrent',
+        type=int,
+        default=10,
+        help='多 Goal 编排时 DAG 并发 worker 数（默认 10）',
+    )
+    # --goal-report <format>：编排报告格式（json / md）
+    parser.add_argument(
+        '--goal-report',
+        type=str,
+        default=None,
+        choices=['json', 'md'],
+        help='多 Goal 编排完成后输出报告（json / md）',
+    )
+
     return parser.parse_args()
 
 
@@ -462,38 +601,38 @@ def _dispatch_via_trae(agent_type: str, task: str, task_id: Optional[str],
         return False
 
 
-def dispatch_agent(agent_type: str, task: str, project_root: str, 
+def dispatch_agent(agent_type: str, task: str, project_root: str,
                   task_file: str, use_v1: bool = False) -> bool:
     """
     调度智能体角色
-    
+
     Args:
         agent_type: 智能体角色类型
         task: 任务描述
         project_root: 项目根目录
         task_file: 任务文件路径
         use_v1: 是否使用 v1.0 版本
-        
+
     Returns:
         bool: 调度是否成功
     """
     log(f'🎯 开始调度智能体角色：{agent_type}', 'INFO')
     log(f'📝 任务：{task}', 'INFO')
     log(f'📁 项目根目录：{project_root}', 'INFO')
-    
+
     # 加载任务进度
     from trae_agent_dispatch import load_task_progress, update_task_status
     progress = load_task_progress(project_root)
-    
+
     # 提取任务 ID
     task_id = None
     task_parts = task.split(' - ')
     if len(task_parts) > 0:
         task_id = task_parts[0].strip()
-    
+
     if task_id:
         update_task_status(progress, task_id, '进行中', '任务已提交给智能体执行', project_root)
-    
+
     # 使用 v2.0 新组件
     if not use_v1 and NEW_COMPONENTS_AVAILABLE:
         log('🚀 使用 v2.0 双层上下文增强版', 'SUCCESS')
@@ -505,8 +644,378 @@ def dispatch_agent(agent_type: str, task: str, project_root: str,
         if task_id:
             update_task_status(progress, task_id, '✅ 已完成', '任务已完成', project_root)
         success = True
-    
+
     return success
+
+
+def dispatch_agent_v2_with_loop_goal(
+    agent_type: str,
+    task: str,
+    project_root: str,
+    loop_count: int = 1,
+    goal_id: Optional[str] = None,
+    goal_desc: Optional[str] = None,
+    criteria: Optional[list] = None,
+    convergence_window: int = 3,
+    task_file: Optional[str] = None,
+) -> bool:
+    """
+    Phase 11 新增：dispatch_agent_v2 的 /loop + /goal 包装器
+
+    串联 GoalRegistry / LoopGoalExecutor 与现有 dispatch_agent_v2，
+    实现"目标定义 → 循环迭代 → 收敛退出"的长程任务执行能力。
+
+    Args:
+        agent_type: 智能体角色类型
+        task: 任务描述
+        project_root: 项目根目录
+        loop_count: 循环执行次数（默认 1 = 不循环；范围 [1, 100]）
+        goal_id: 目标 ID（kebab-case）
+        goal_desc: 目标描述（创建新目标时必填）
+        criteria: 验收标准列表
+        convergence_window: 收敛窗口
+        task_file: 任务文件路径
+
+    Returns:
+        bool: 任务是否成功（达成 / 收敛 / 异常退出均返回布尔结果）
+    """
+    from loop_goal import (
+        Goal,
+        GoalRegistry,
+        GoalStatus,
+        LoopConfig,
+        LoopGoalError,
+        LoopGoalExecutor,
+    )
+
+    # 加载任务进度（与 dispatch_agent 一致）
+    from trae_agent_dispatch import load_task_progress, update_task_status
+    progress = load_task_progress(project_root)
+
+    # 提取任务 ID（与 dispatch_agent 一致）
+    task_id = None
+    task_parts = task.split(' - ')
+    if len(task_parts) > 0:
+        task_id = task_parts[0].strip()
+
+    # 初始化 Registry（持久化根：{project_root}/.trae/goals）
+    storage_root = os.path.join(str(project_root), '.trae', 'goals')
+    registry = GoalRegistry(storage_root=storage_root)
+
+    # 处理 Goal
+    goal: Optional[Goal] = None
+    if goal_id is not None:
+        existing = registry.get_goal(goal_id)
+        if existing is not None:
+            log(f'♻️  复用已存在目标：{goal_id} (status={existing.status.value})', 'INFO')
+            goal = existing
+        else:
+            # 创建新目标（必须提供 goal_desc）
+            if not goal_desc:
+                log(
+                    f'❌ 目标 {goal_id} 不存在且未提供 --goal-desc，无法创建',
+                    'ERROR',
+                )
+                return False
+            try:
+                goal = registry.create_goal(
+                    description=goal_desc,
+                    criteria=criteria or [],
+                    goal_id=goal_id,
+                    max_iterations=loop_count,
+                    convergence_window=convergence_window,
+                    created_by=agent_type,
+                    task_template=task,
+                )
+                log(
+                    f'✅ 目标已创建：{goal_id} (criteria={len(goal.success_criteria)}, '
+                    f'max_iterations={goal.max_iterations})',
+                    'SUCCESS',
+                )
+            except LoopGoalError as e:
+                log(f'❌ 创建目标失败：{e}', 'ERROR')
+                return False
+
+    # 构造 LoopConfig
+    loop_config = LoopConfig(
+        max_iterations=max(1, loop_count),
+        convergence_window=convergence_window,
+        stop_on_success=True,
+        inter_iteration_delay_seconds=0.0,
+    )
+
+    # 构造执行器
+    executor = LoopGoalExecutor(registry=registry)
+
+    # 单次 dispatch 函数（被 LoopGoalExecutor 多次调用）
+    def _single_dispatch(agent_type=agent_type, task=task, task_id=task_id,
+                         project_root=project_root, progress=progress):
+        return dispatch_agent_v2(
+            agent_type=agent_type,
+            task=task,
+            task_id=task_id,
+            project_root=project_root,
+            progress=progress,
+            cybernetics_enabled=True,
+        )
+
+    log(
+        f'🔁 启动 /loop 循环：max_iterations={loop_config.max_iterations}, '
+        f'goal_id={goal_id or "无"}',
+        'INFO',
+    )
+
+    # 执行循环
+    result = executor.execute_with_loop_goal(
+        task=task,
+        agent_type=agent_type,
+        dispatch_fn=_single_dispatch,
+        project_root=str(project_root),
+        loop_config=loop_config,
+        goal=goal,
+    )
+
+    log(
+        f'📊 循环结束：total_iterations={result["total_iterations"]}, '
+        f'converged_early={result["converged_early"]}, '
+        f'success_early={result["success_early"]}, '
+        f'status={result.get("status", "no-goal")}',
+        'INFO',
+    )
+
+    if task_id:
+        # 更新进度（与 dispatch_agent 一致）
+        final_status = '✅ 已完成' if result.get("success_early") else '⏸ 已停止'
+        update_task_status(
+            progress, task_id, final_status,
+            f'循环执行结束：{result["total_iterations"]} 次', project_root
+        )
+
+    return _is_overall_success(result)
+
+
+def _is_overall_success(result: Dict[str, Any]) -> bool:
+    """
+    判定整体成功语义（Phase 11 P0-1 + P1-1 修复）
+
+    明确区分"达成 / 收敛 / 跑满 / 失败"四种状态，避免"失败也返回 True"导致 CI 流水线误判。
+
+    判定规则：
+    - 无 goal（/loop 仅循环）：跑过 >= 1 次 → True（向后兼容）
+    - 有 goal + ACHIEVED：True
+    - 有 goal + FAILED：False
+    - 有 goal + IN_PROGRESS + converged_early：True（已达稳态）
+    - 有 goal + IN_PROGRESS + has_criteria=False 跑满：True（容错，无明确失败标准）
+    - 有 goal + IN_PROGRESS + has_criteria=True 跑满：False（未达成，跑满视为失败）
+
+    P1-1 修复：通过 result["has_criteria"] 准确判断"是否设了 criterion"
+    原 P0-1 修复兜底逻辑错误：无条件 return True 导致有 criterion 但未满足也返回 True
+
+    Args:
+        result: LoopGoalExecutor.execute_with_loop_goal 返回的字典
+
+    Returns:
+        bool: True 表示任务成功；False 表示任务失败
+    """
+    # /loop 无 /goal 模式：跑过 1 次就算成功（兼容旧 dispatch 行为）
+    if "status" not in result:
+        return result.get("total_iterations", 0) > 0
+
+    status = result["status"]
+    # 达成 → 成功
+    if status == GoalStatus.ACHIEVED.value:
+        return True
+    # 明确失败 → 失败
+    if status == GoalStatus.FAILED.value:
+        return False
+    # IN_PROGRESS：区分收敛提前退出 vs 跑满
+    if status == GoalStatus.IN_PROGRESS.value:
+        if result.get("converged_early"):
+            # 收敛 → 已达稳态，视为成功
+            return True
+        # P1-1 修复：基于 has_criteria 字段判定（避免兜底逻辑错误）
+        # has_criteria=True：用户设了 criterion 但跑满未满足 → 视为失败
+        # has_criteria=False：未设 criterion → 视为容错成功
+        if result.get("has_criteria"):
+            return False
+        return True
+    # ABANDONED / 其它终态 → 视为失败
+    return False
+
+
+# ============================================================================
+# Phase 13 新增：续跑 + 多 Goal 编排 dispatch 入口
+# ============================================================================
+
+def dispatch_agent_v2_with_goal_resume(
+    goal_id: str,
+    force: bool = False,
+    max_resume_count: int = 3,
+    project_root: str = ".",
+) -> bool:
+    """
+    Phase 13.2: 续跑模式 dispatch 入口。
+
+    通过 GoalResumeManager 续跑指定 goal：
+    - ACTIVE / IN_PROGRESS：直接返回（不递增计数）
+    - FAILED 且未超限：递增 resume_count + 置 IN_PROGRESS
+    - FAILED 超限 + force=True：重置 resume_count + 置 IN_PROGRESS
+    - FAILED 超限无 force：标记 ABANDONED + 抛错
+    - ABANDONED + force=True：重置 + 置 IN_PROGRESS
+    - ABANDONED 无 force：抛错
+
+    Args:
+        goal_id: 待续跑 Goal ID（kebab-case）
+        force: 强制续跑（覆盖 ABANDONED / FAILED 超限）
+        max_resume_count: 单 Goal 续跑上限（默认 3）
+        project_root: 项目根目录
+
+    Returns:
+        bool: True 表示续跑成功（或目标已活跃）；False 表示续跑失败
+    """
+    from goal_orchestrator import (
+        GoalResumeError,
+        GoalResumeManager,
+    )
+    from loop_goal import GoalRegistry, GoalStatus
+
+    storage_root = os.path.join(str(project_root), '.trae', 'goals')
+    registry = GoalRegistry(storage_root=storage_root)
+    mgr = GoalResumeManager(registry)
+
+    try:
+        resumed = mgr.resume(goal_id, force=force)
+    except GoalResumeError as e:
+        log(f'❌ 续跑失败：{e}', 'ERROR')
+        return False
+    except Exception as e:
+        log(f'❌ 续跑异常：{e}', 'ERROR')
+        return False
+
+    log(
+        f'✅ 续跑成功：goal={goal_id}, '
+        f'status={resumed.status.value if hasattr(resumed.status, "value") else resumed.status}, '
+        f'resume_count={resumed.resume_count}',
+        'SUCCESS',
+    )
+    return resumed.status in (
+        GoalStatus.ACTIVE,
+        GoalStatus.IN_PROGRESS,
+        GoalStatus.ACHIEVED,
+    )
+
+
+def dispatch_agent_v2_with_multi_goal(
+    root_goal_id: str,
+    max_concurrent: int = 10,
+    reuse_threshold: float = 0.85,
+    reuse_enabled: bool = True,
+    report_format: Optional[str] = None,
+    project_root: str = ".",
+) -> bool:
+    """
+    Phase 13.4: 多 Goal 编排 dispatch 入口。
+
+    通过 GoalOrchestrator 编排以 root_goal_id 为根的 DAG：
+    1. 加载 DAG（GoalGraph：拓扑 + 环检测）
+    2. 续跑检查（GoalResumeManager）
+    3. 跨 Goal 语义复用（GoalIterationReuser）
+    4. 并发执行（GoalScheduler + ProcessPoolExecutor）
+    5. 生成报告（GoalOrchestratorReport：JSON / MD）
+
+    Args:
+        root_goal_id: 根 Goal ID（kebab-case）
+        max_concurrent: DAG 并发 worker 数（默认 10）
+        reuse_threshold: 跨 Goal 复用相似度阈值（默认 0.85）
+        reuse_enabled: 是否启用跨 Goal 复用（默认 True）
+        report_format: 报告格式（json / md；None 表示不输出报告）
+        project_root: 项目根目录
+
+    Returns:
+        bool: True 表示根 Goal 达成；False 表示失败
+    """
+    from goal_orchestrator import (
+        GoalGraphCycleError,
+        GoalGraphDepthError,
+        GoalGraphIntegrityError,
+        GoalGraphSizeError,
+        GoalOrchestrator,
+        GoalNotFoundError as OrchestratorGoalNotFoundError,
+    )
+    from loop_goal import GoalRegistry, GoalStatus, LoopConfig
+
+    storage_root = os.path.join(str(project_root), '.trae', 'goals')
+    registry = GoalRegistry(storage_root=storage_root)
+
+    orchestrator = GoalOrchestrator(
+        registry=registry,
+        max_concurrent=max_concurrent,
+        reuse_threshold=reuse_threshold,
+        reuse_enabled=reuse_enabled,
+    )
+
+    # 单 Goal dispatch 函数（Pickle 兼容：仅引用本文件中的 dispatch_agent_v2）
+    def _single_dispatch(agent_type: str = 'goal_orchestrator',
+                         task: str = '',
+                         task_id: Optional[str] = None,
+                         project_root: str = str(project_root),
+                         progress: Optional[Dict] = None) -> bool:
+        return dispatch_agent_v2(
+            agent_type=agent_type,
+            task=task,
+            task_id=task_id,
+            project_root=project_root,
+            progress=progress or {},
+            cybernetics_enabled=True,
+        )
+
+    loop_config = LoopConfig(
+        max_iterations=10,
+        convergence_window=3,
+    )
+
+    try:
+        report = orchestrator.run(
+            root_goal_id=root_goal_id,
+            dispatch_fn=_single_dispatch,
+            loop_config=loop_config,
+            project_root=str(project_root),
+        )
+    except (GoalGraphCycleError, GoalGraphDepthError,
+            GoalGraphIntegrityError, GoalGraphSizeError) as e:
+        log(f'❌ DAG 校验失败：{e}', 'ERROR')
+        orchestrator.scheduler.shutdown()
+        return False
+    except OrchestratorGoalNotFoundError as e:
+        log(f'❌ Goal 不存在：{e}', 'ERROR')
+        orchestrator.scheduler.shutdown()
+        return False
+    except Exception as e:
+        log(f'❌ 编排执行异常：{e}', 'ERROR')
+        orchestrator.scheduler.shutdown()
+        return False
+
+    log(
+        f'📊 编排完成：root={root_goal_id}, '
+        f'total_elapsed={report.total_elapsed_seconds:.2f}s, '
+        f'reuse_count={report.iteration_reuse_count}, '
+        f'total_goals={report.resource_stats.get("total_goals", 0)}',
+        'INFO',
+    )
+
+    if report_format:
+        report_str = (
+            report.to_json() if report_format == 'json'
+            else report.to_markdown()
+        )
+        log(f'📄 编排报告（{report_format}）：\n{report_str}', 'INFO')
+
+    orchestrator.scheduler.shutdown()
+
+    root_status = report.goal_tree.status
+    if hasattr(root_status, 'value'):
+        root_status = root_status.value
+    return root_status == GoalStatus.ACHIEVED.value
 
 
 def main():
@@ -544,15 +1053,64 @@ def main():
         log('✅ 模拟完成', 'SUCCESS')
         sys.exit(0)
     
-    # 调度智能体
-    success = dispatch_agent(
-        args.agent,
-        args.task,
-        str(project_root),
-        str(task_file) if task_file else "",
-        use_v1=args.use_v1
-    )
-    
+    # 调度智能体（Phase 11：支持 /loop + /goal；Phase 13：多 Goal 编排）
+    # Phase 13 优先级 1：续跑模式（--goal-resume）
+    if args.goal_resume:
+        log(
+            f'♻️  Phase 13 检测到续跑模式：goal={args.goal_resume}, '
+            f'force={args.goal_resume_force}',
+            'INFO',
+        )
+        success = dispatch_agent_v2_with_goal_resume(
+            goal_id=args.goal_resume,
+            force=args.goal_resume_force,
+            max_resume_count=args.goal_max_resume_count,
+            project_root=str(project_root),
+        )
+    # Phase 13 优先级 2：多 Goal 编排模式（--multi-goal）
+    elif args.multi_goal:
+        log(
+            f'🌐 Phase 13 检测到多 Goal 编排：root={args.multi_goal}, '
+            f'max_concurrent={args.max_concurrent}, '
+            f'reuse_threshold={args.reuse_threshold}, '
+            f'disable_reuse={args.disable_iteration_reuse}',
+            'INFO',
+        )
+        success = dispatch_agent_v2_with_multi_goal(
+            root_goal_id=args.multi_goal,
+            max_concurrent=args.max_concurrent,
+            reuse_threshold=args.reuse_threshold,
+            reuse_enabled=not args.disable_iteration_reuse,
+            report_format=args.goal_report,
+            project_root=str(project_root),
+        )
+    # Phase 11：支持 /loop + /goal
+    elif args.loop > 1 or args.goal is not None:
+        log(
+            f'🔁 检测到 /loop + /goal 模式：loop={args.loop}, '
+            f'goal={args.goal or "无"}, criteria={args.criteria}',
+            'INFO',
+        )
+        success = dispatch_agent_v2_with_loop_goal(
+            agent_type=args.agent,
+            task=args.task,
+            project_root=str(project_root),
+            loop_count=args.loop,
+            goal_id=args.goal,
+            goal_desc=args.goal_desc,
+            criteria=args.criteria,
+            convergence_window=args.convergence_window,
+            task_file=str(task_file) if task_file else None,
+        )
+    else:
+        success = dispatch_agent(
+            args.agent,
+            args.task,
+            str(project_root),
+            str(task_file) if task_file else "",
+            use_v1=args.use_v1
+        )
+
     if success:
         log('✅ 任务调度成功', 'SUCCESS')
         sys.exit(0)
