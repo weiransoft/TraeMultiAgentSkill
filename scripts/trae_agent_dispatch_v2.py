@@ -80,10 +80,13 @@ def parse_arguments():
         description='Trae Agent 调度脚本 v2.0 - 调度不同的智能体角色来实现任务'
     )
     
+    # 修复 Phase 15 B-3：--task 改为非必需（--goal-graph / --goal-cancel 等
+    # 只读 / 状态变更模式不需要 --task）
     parser.add_argument(
         '--task',
         type=str,
-        required=True,
+        required=False,
+        default="",
         help='任务描述，例如："实现 SOUL-007 专注模式切换测试用例"'
     )
     
@@ -268,6 +271,45 @@ def parse_arguments():
         default=None,
         help='取消指定 root Goal 及其所有子 Goal（Phase 14 完善：'
              '终止运行中子进程 + 标记 ABANDONED + 释放资源）',
+    )
+
+    # Phase 15 新增：DAG 依赖图可视化（架构师 review 通过）
+    # 行为：
+    # 1. 通过 DagVisualizer 加载指定 root Goal 的 DAG
+    # 2. 渲染为 mermaid / json / dot 三种格式之一
+    # 3. 输出到 stdout 或文件（路径必须在 project_root 内，修复 H-3）
+    # 优先级 1（仅低于 --goal-cancel，破坏性 > 只读）
+    # 与其他 goal_* 模式互斥（main() 入口校验，修复 B-5）
+    parser.add_argument(
+        '--goal-graph',
+        type=str,
+        default=None,
+        help='可视化指定 root Goal 的 DAG（Phase 15 新增；只读，'
+             '不修改任何 Goal 状态）',
+    )
+    # --goal-graph-format <fmt>：输出格式（mermaid / json / dot）
+    parser.add_argument(
+        '--goal-graph-format',
+        type=str,
+        default='mermaid',
+        choices=['mermaid', 'json', 'dot'],
+        help='DAG 可视化格式（mermaid / json / dot；默认 mermaid）',
+    )
+    # --goal-graph-output <file>：写入文件（默认 stdout）
+    # 路径必须落在 project_root 之内（修复 H-3：防路径遍历）
+    parser.add_argument(
+        '--goal-graph-output',
+        type=str,
+        default=None,
+        help='DAG 可视化输出文件路径（默认 stdout；'
+             '路径必须在 project_root 内）',
+    )
+    # --goal-graph-desc-max <N>：description 截断长度（修复 M-1：默认 100）
+    parser.add_argument(
+        '--goal-graph-desc-max',
+        type=int,
+        default=100,
+        help='节点 description 截断长度（默认 100）',
     )
 
     return parser.parse_args()
@@ -1163,22 +1205,148 @@ def dispatch_agent_v2_with_goal_cancel(
             pass
 
 
+def dispatch_agent_v2_with_goal_graph(
+    root_goal_id: str,
+    project_root: str,
+    format: str = "mermaid",
+    output_file: Optional[str] = None,
+    desc_max_length: int = 100,
+) -> bool:
+    """Phase 15 新增：DAG 可视化 CLI 入口。
+
+    行为：
+    1. 初始化 GoalRegistry（公共 API）
+    2. 通过 DagVisualizer 加载 GoalGraph（公共 API）
+    3. 渲染为指定格式（mermaid / json / dot）
+    4. 输出到 stdout 或文件（路径安全校验在内部完成）
+    5. 返回是否成功
+
+    Args:
+        root_goal_id: 根 Goal ID
+        project_root: 项目根目录
+        format: 输出格式（mermaid / json / dot；默认 mermaid）
+        output_file: 输出文件路径（None → stdout；路径必须在 project_root 内）
+        desc_max_length: description 截断长度（默认 100）
+
+    Returns:
+        bool: True 表示成功渲染；False 表示失败
+    """
+    from dag_visualizer import (
+        DagVisualizer,
+        GoalGraphVisualizationError,
+        InvalidFormatError,
+    )
+    from loop_goal import (
+        GoalNotFoundError,
+        GoalRegistry,
+        GoalRegistryError,
+        LoopGoalError,
+    )
+
+    log(
+        f'🎨 Phase 15 DAG 可视化启动：root={root_goal_id}, '
+        f'format={format}, output={output_file or "stdout"}',
+        'INFO',
+    )
+
+    # 1. 初始化 Registry（公共 API）
+    storage_root = os.path.join(str(project_root), '.trae', 'goals')
+    try:
+        registry = GoalRegistry(storage_root=storage_root)
+    except Exception as e:
+        log(f'❌ 初始化 GoalRegistry 失败：{e}', 'ERROR')
+        return False
+
+    # 2. 初始化 DagVisualizer
+    visualizer = DagVisualizer(registry)
+
+    # 3. 渲染（捕获异常分类处理）
+    try:
+        if output_file:
+            # 写入文件（路径安全校验在 write_to_file 内部完成）
+            written_path = visualizer.write_to_file(
+                root_goal_id=root_goal_id,
+                output_file=output_file,
+                project_root=str(project_root),
+                format=format,
+                desc_max_length=desc_max_length,
+            )
+            log(
+                f'✅ DAG 可视化已写入文件：{written_path}',
+                'SUCCESS',
+            )
+        else:
+            # 输出到 stdout
+            content = visualizer.render(
+                root_goal_id=root_goal_id,
+                format=format,
+                desc_max_length=desc_max_length,
+            )
+            print(content)
+            log(
+                f'✅ DAG 可视化已输出到 stdout（{len(content)} 字符）',
+                'SUCCESS',
+            )
+        return True
+    except InvalidFormatError as e:
+        log(f'❌ format 非法：{e}', 'ERROR')
+        return False
+    except GoalGraphVisualizationError as e:
+        log(f'❌ DAG 可视化错误：{e}', 'ERROR')
+        return False
+    except GoalNotFoundError as e:
+        log(f'❌ 根 Goal 不存在：{e}', 'ERROR')
+        return False
+    except (GoalRegistryError, LoopGoalError) as e:
+        log(f'❌ Goal Graph 加载失败：{e}', 'ERROR')
+        return False
+    except Exception as e:
+        log(f'❌ DAG 可视化异常：{e}', 'ERROR')
+        return False
+
+
 def main():
     """
     主函数
     """
     args = parse_arguments()
-    
+
     log('🚀 Trae Agent 调度脚本 v2.0 启动', 'INFO')
-    
+
     # 检查项目根目录
     project_root = Path(args.project_root).resolve()
     if not project_root.exists():
         log(f'❌ 项目根目录不存在：{project_root}', 'ERROR')
         sys.exit(1)
-    
+
     log(f'📁 项目根目录：{project_root}', 'INFO')
-    
+
+    # 修复 Phase 15 B-5：CLI 入口互斥校验（在所有模式分发之前）
+    # 目的：--goal-graph 只读模式与状态变更模式互斥（用户意图模糊）
+    if args.goal_graph and (
+        args.goal_cancel or args.goal_resume or args.multi_goal
+        or args.loop > 1 or args.goal is not None
+    ):
+        log(
+            '❌ --goal-graph 与其他 goal_* 模式互斥（用户意图模糊）',
+            'ERROR',
+        )
+        sys.exit(1)
+
+    # 修复 Phase 15 B-3：--task 必填校验（仅在非只读 / 非状态变更模式下）
+    # 排除模式：goal_graph / goal_cancel / goal_resume / multi_goal /
+    #          loop > 1 / goal 不为 None
+    if not args.task and not (
+        args.goal_graph or args.goal_cancel or args.goal_resume
+        or args.multi_goal or args.loop > 1 or args.goal is not None
+    ):
+        log(
+            '❌ --task 必填（除非使用 --goal-graph / --goal-cancel / '
+            '--goal-resume / --multi-goal / --loop / --goal 模式）',
+            'ERROR',
+        )
+        sys.exit(1)
+
     # 检查任务文件
     if args.task_file:
         task_file = project_root / args.task_file
@@ -1210,7 +1378,24 @@ def main():
             goal_id=args.goal_cancel,
             project_root=str(project_root),
         )
-    # Phase 13 优先级 1：续跑模式（--goal-resume）
+    # Phase 15 优先级 1：DAG 可视化模式（--goal-graph）— 只读
+    # 原因：可视化是只读操作，应优先于状态变更（resume / multi-goal）
+    # 优先级 1（高于 resume / multi-goal；低于 cancel）
+    elif args.goal_graph:
+        log(
+            f'🎨 Phase 15 检测到 DAG 可视化模式：root={args.goal_graph}, '
+            f'format={args.goal_graph_format}, '
+            f'output={args.goal_graph_output or "stdout"}',
+            'INFO',
+        )
+        success = dispatch_agent_v2_with_goal_graph(
+            root_goal_id=args.goal_graph,
+            project_root=str(project_root),
+            format=args.goal_graph_format,
+            output_file=args.goal_graph_output,
+            desc_max_length=args.goal_graph_desc_max,
+        )
+    # Phase 13 优先级 2：续跑模式（--goal-resume）
     elif args.goal_resume:
         log(
             f'♻️  Phase 13 检测到续跑模式：goal={args.goal_resume}, '
@@ -1223,7 +1408,7 @@ def main():
             max_resume_count=args.goal_max_resume_count,
             project_root=str(project_root),
         )
-    # Phase 13 优先级 2：多 Goal 编排模式（--multi-goal）
+    # Phase 13 优先级 3：多 Goal 编排模式（--multi-goal）
     elif args.multi_goal:
         log(
             f'🌐 Phase 13 检测到多 Goal 编排：root={args.multi_goal}, '
@@ -1240,7 +1425,7 @@ def main():
             report_format=args.goal_report,
             project_root=str(project_root),
         )
-    # Phase 11：支持 /loop + /goal
+    # Phase 11 优先级 4：/loop + /goal
     elif args.loop > 1 or args.goal is not None:
         log(
             f'🔁 检测到 /loop + /goal 模式：loop={args.loop}, '
