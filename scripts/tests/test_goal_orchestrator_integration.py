@@ -180,27 +180,57 @@ class TestEndToEndIntegration(unittest.TestCase):
             orch.scheduler.shutdown()
 
     def test_03_e2e_50_node_perf_baseline(self):
-        """Phase 13.7 D2 性能基线：50 节点 DAG 报告生成 < 1s。"""
+        """Phase 13.7 D2 性能基线（B-4 修复：真实 DAG 调度）。
+
+        原 B-4 问题：原测试只调用 generate_report() 序列化现有数据，
+        测的是"序列化速度"而非"DAG 调度端到端时间"，不能反映真实性能。
+
+        修复（B-4）：使用真实 orchestrator.run() 调度 50 节点 DAG 端到端执行，
+        测量从入口到报告生成的完整耗时。
+
+        拓扑结构：1 root + 49 children（无 depends_on，全部可并行）
+        模拟负载：_fast_dispatch 返回 True，不做实际工作（避免 LLM/IO 抖动）
+        并发度：max_concurrent=10（默认）
+        性能基线：50 节点端到端 < 10s（足够 10x 余量覆盖子进程启动 + 锁竞争）
+        """
+        from functools import partial
         registry = GoalRegistry(storage_root=str(self.storage))
-        # 50 节点：root + 49 children
+        # 50 节点：root + 49 children（无 depends_on，全部可并行）
         _write_goal_file(self.storage, "perf-root", status="active", max_iterations=1)
         for i in range(49):
             _write_goal_file(
-                self.storage, f"perf-child-{i:02d}", status="achieved",
+                self.storage, f"perf-child-{i:02d}", status="active",
                 parent_goal_id="perf-root", max_iterations=1,
             )
-        orch = GoalOrchestrator(registry=registry, max_concurrent=2)
+        # 复用 B-1 修复后的 _module_level_single_dispatch（Pickle 兼容），
+        # 用 partial 绑定 project_root，让 orchestrator.run() 通过
+        # ProcessPoolExecutor.submit() 真正跨进程调度 50 个节点。
+        # 关键：B-4 修复不能简单地传一个 lambda 或闭包（pickle 失败），
+        # 必须传可序列化的可调用对象。
+        from trae_agent_dispatch_v2 import _module_level_single_dispatch
+        bound_dispatch = partial(
+            _module_level_single_dispatch,
+            project_root=str(self.tmp_dir),
+        )
+        orch = GoalOrchestrator(registry=registry, max_concurrent=10)
         try:
+            # 真实端到端测量：goal.json 加载 + 拓扑排序 + 跨 Goal 复用审计 +
+            # 进程池调度 + barrier 等待 + 报告生成
+            loop_config = LoopConfig(max_iterations=1, convergence_window=1)
             start = time.time()
-            report = orch.generate_report("perf-root", format="json")
+            report = orch.run(
+                root_goal_id="perf-root",
+                dispatch_fn=bound_dispatch,
+                loop_config=loop_config,
+                project_root=str(self.tmp_dir),
+            )
             elapsed = time.time() - start
-            parsed = json.loads(report)
-            # 50 节点 ≤ 50 → 完整序列化
-            self.assertNotIn("_truncated", parsed["goal_tree"])
-            # 性能基线 < 1s
+            # 验证：报告有 50 个 goal
+            self.assertEqual(report.resource_stats["total_goals"], 50)
+            # 性能基线 < 10s（10x 余量）
             self.assertLess(
-                elapsed, 1.0,
-                f"50 节点报告生成 {elapsed:.2f}s 超过 1s 阈值",
+                elapsed, 10.0,
+                f"50 节点端到端调度 {elapsed:.2f}s 超过 10s 阈值",
             )
         finally:
             orch.scheduler.shutdown()

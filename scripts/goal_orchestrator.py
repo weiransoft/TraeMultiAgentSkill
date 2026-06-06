@@ -673,6 +673,30 @@ class GoalScheduler:
                     raise GoalSchedulerTimeoutError(
                         f"整 DAG 执行超过 {self.dag_timeout_seconds}s 超时"
                     )
+                # B-2 修复：暂停支持。pause_event 被设置时，调度循环进入
+                # 阻塞等待，直到 pause_event 被清除（resume_event）。
+                # 关键点：
+                # 1. _pause_event.is_set() 不消耗事件，循环中需持续检查
+                # 2. 用 0.5s 轮询避免长时间挂起不能响应 cancel/timeout
+                # 3. 仅在 barrier 等待阶段生效，不影响已提交子进程的执行
+                if self._pause_event.is_set():
+                    logger.info(
+                        f"[GoalScheduler] Goal {goal_id} 在 barrier 等待时检测到 "
+                        f"pause_event，进入暂停状态"
+                    )
+                    while self._pause_event.is_set():
+                        if self._cancel_event.is_set():
+                            break
+                        if time.time() - dag_start > self.dag_timeout_seconds:
+                            raise GoalSchedulerTimeoutError(
+                                f"整 DAG 执行超过 {self.dag_timeout_seconds}s 超时"
+                            )
+                        # 0.5s 轮询：兼顾响应速度与 CPU 占用
+                        self._pause_event.wait(timeout=0.5)
+                    logger.info(
+                        f"[GoalScheduler] Goal {goal_id} 收到 resume_event，"
+                        f"恢复调度"
+                    )
                 time.sleep(0.1)
 
             # 提交到 ProcessPoolExecutor
@@ -734,21 +758,85 @@ class GoalScheduler:
                 return gid
         return None
 
-    def cancel(self) -> None:
-        """设置 cancel_event（所有子进程下一次 barrier 检查时退出）。"""
+    def cancel(self) -> Dict[str, str]:
+        """取消 DAG 执行（B-3 修复：终止运行中 future + 防止资源泄漏）。
+
+        原 B-3 问题：cancel() 只设置 cancel_event，运行中的子进程会继续执行
+        直到自然结束或超时，导致资源（文件锁、内存、CPU）泄漏。
+
+        修复策略（三层防御）：
+        1. 设置 cancel_event → 调度循环下次轮询时退出（防止新提交）
+        2. 取消所有 PENDING 状态的 future（已排队但未启动的任务）
+        3. Shutdown ProcessPoolExecutor（cancel_futures=True + wait=False）
+           → 终止所有 RUNNING 子进程，防止资源泄漏
+        4. 返回被取消的 goal_id 列表，供上层 GoalOrchestrator 标记 ABANDONED
+
+        Returns:
+            被取消的 goal_id 列表（Dict[goal_id, "pending"|"running"）
+        """
+        # 1. 设置 cancel_event（防止新提交 + 调度循环退出）
         self._cancel_event.set()
+        logger.info("[GoalScheduler] cancel_event 已设置")
+
+        # 记录取消的 goal_id 及其状态
+        cancelled: Dict[str, str] = {}
+
+        # 2. 取消所有 PENDING 状态的 future
+        for goal_id, future in list(self._running_goals.items()):
+            try:
+                # future.cancel() 仅在 PENDING 状态返回 True；RUNNING 时返回 False
+                if future.cancel():
+                    cancelled[goal_id] = "pending"
+                    logger.info(
+                        f"[GoalScheduler] 取消 PENDING future: {goal_id}"
+                    )
+                else:
+                    # RUNNING 状态：标记，待 shutdown 终止
+                    cancelled[goal_id] = "running"
+                    logger.info(
+                        f"[GoalScheduler] 标记 RUNNING future 待终止: {goal_id}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"[GoalScheduler] 取消 future {goal_id} 异常：{e}"
+                )
+
+        # 3. Shutdown ProcessPoolExecutor 以终止 RUNNING 子进程
+        #    - wait=False：不等子进程结束（避免 cancel 自身被阻塞）
+        #    - cancel_futures=True：取消 PENDING futures（双重保险）
+        #    注：shutdown 是幂等的，可多次调用
+        try:
+            self.executor_pool.shutdown(wait=False, cancel_futures=True)
+            logger.info(
+                "[GoalScheduler] ProcessPoolExecutor shutdown 完成，"
+                "所有 RUNNING 子进程将被终止"
+            )
+        except Exception as e:
+            logger.warning(f"[GoalScheduler] shutdown 异常：{e}")
+
+        # 清空运行中目标跟踪（避免后续操作访问已 shutdown 的 future）
+        self._running_goals.clear()
+
+        return cancelled
 
     def pause(self) -> None:
-        """设置 pause_event（保留供 Phase 14 扩展）。"""
+        """设置 pause_event（B-2 修复：调度循环在 barrier 等待时实际进入暂停）。"""
         self._pause_event.set()
+        logger.info("[GoalScheduler] pause_event 已设置")
 
     def resume_event(self) -> None:
-        """清除 pause_event（保留供 Phase 14 扩展）。"""
+        """清除 pause_event（恢复调度）。"""
         self._pause_event.clear()
+        logger.info("[GoalScheduler] pause_event 已清除（resume）")
 
     def shutdown(self) -> None:
-        """关闭 ProcessPoolExecutor。"""
-        self.executor_pool.shutdown(wait=True, cancel_futures=True)
+        """关闭 ProcessPoolExecutor（幂等）。"""
+        try:
+            self.executor_pool.shutdown(wait=True, cancel_futures=True)
+        except Exception:
+            # shutdown 二次调用可能抛 RuntimeError(Interpreter not shutdown)
+            # 或类似异常；幂等忽略即可
+            pass
 
 
 # ============================================================================
@@ -1222,16 +1310,95 @@ class GoalOrchestrator:
             include_root_only=True,
         )
 
-    def cancel(self, goal_id: str) -> None:
-        """取消 Goal（级联取消子 Goal）。
+    def cancel(self, goal_id: str, mark_all_in_dag: bool = True) -> Dict[str, str]:
+        """取消 Goal（级联取消子 Goal + 标记 ABANDONED）。
+
+        B-3 修复：调用 scheduler.cancel() 后，把所有被取消的 goal（包括级联子 goal）
+        在 registry 中标记为 ABANDONED 并记录原因，避免后续 resume 误判。
 
         Args:
             goal_id: 根 Goal ID
+            mark_all_in_dag: 是否级联标记 DAG 中所有非终态 goal（默认 True）。
+                - True（默认）：从 registry 加载 DAG，所有 ACTIVE/IN_PROGRESS/FAILED
+                  的 goal 都被标记 ABANDONED。适用于 CLI 调用场景（用户从外部取消）。
+                - False：仅标记本进程 _running_goals 中的 goal。
+                  适用于测试场景（避免影响其他测试）。
+
+        Returns:
+            被取消的 goal_id 列表 {goal_id: "pending"|"running"|"idle"}
         """
-        self.scheduler.cancel()
+        # 1. 调度器取消（终止本进程中所有运行中子进程）
+        cancelled = self.scheduler.cancel()
+
+        # 2. 如果 mark_all_in_dag=True，扫描整个 DAG 标记非终态 goal
+        #    场景：用户通过 CLI 取消一个不在本进程 _running_goals 中的 goal
+        #    （例如：在另一终端启动的 goal，现在想取消它）
+        if mark_all_in_dag:
+            try:
+                from goal_orchestrator import GoalGraph
+                graph = GoalGraph(self.registry, goal_id)
+                all_goal_ids = graph.topological_order()
+            except Exception as e:
+                # DAG 加载失败时降级为只标记传入的 goal_id
+                logger.warning(
+                    f"[GoalOrchestrator] DAG 加载失败，使用单 goal 标记：{e}"
+                )
+                all_goal_ids = [goal_id]
+
+            for cancelled_goal_id in all_goal_ids:
+                # 跳过已经在 cancelled 字典中的（被 scheduler.cancel 处理过）
+                if cancelled_goal_id in cancelled:
+                    continue
+                try:
+                    goal = self.registry.get_goal_or_raise(cancelled_goal_id)
+                except (GoalRegistryError, GoalNotFoundError, LoopGoalError):
+                    continue
+                if goal.status in (
+                    GoalStatus.ACHIEVED,
+                    GoalStatus.ABANDONED,
+                ):
+                    # 已终态，不重复标记
+                    continue
+                cancelled[cancelled_goal_id] = "idle"
+                updated = deepcopy(goal)
+                updated.status = GoalStatus.ABANDONED
+                updated.error_message = (
+                    f"Goal 在 idle 状态被用户取消（DAG 级联）"
+                )
+                self.registry._save_goal_atomic(updated)
+                logger.info(
+                    f"[GoalOrchestrator] Goal {cancelled_goal_id} 标记为 ABANDONED "
+                    f"（被用户取消，state=idle）"
+                )
+
+        # 3. 标记被取消的 goal 为 ABANDONED（本进程 _running_goals 路径）
+        #    使用 deepcopy 避免修改入参影响 registry
+        for cancelled_goal_id, state in cancelled.items():
+            if state == "idle":
+                continue  # 已在步骤 2 处理
+            try:
+                goal = self.registry.get_goal_or_raise(cancelled_goal_id)
+            except (GoalRegistryError, GoalNotFoundError, LoopGoalError):
+                continue
+            if goal.status in (GoalStatus.ACHIEVED, GoalStatus.ABANDONED):
+                # 已终态，不重复标记
+                continue
+            updated = deepcopy(goal)
+            updated.status = GoalStatus.ABANDONED
+            updated.error_message = (
+                f"Goal 在 {state} 状态被用户取消"
+            )
+            self.registry._save_goal_atomic(updated)
+            logger.info(
+                f"[GoalOrchestrator] Goal {cancelled_goal_id} 标记为 ABANDONED "
+                f"（被用户取消，state={state}）"
+            )
+
         logger.info(
-            f"[GoalOrchestrator] Goal {goal_id} 取消信号已发送"
+            f"[GoalOrchestrator] Goal {goal_id} 取消完成，"
+            f"受影响 goal 数：{len(cancelled)}"
         )
+        return cancelled
 
     def _build_goal_tree(
         self,

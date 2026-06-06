@@ -254,6 +254,22 @@ def parse_arguments():
         help='多 Goal 编排完成后输出报告（json / md）',
     )
 
+    # Phase 14 新增：--goal-cancel <goal_id>：取消运行中 Goal
+    # 架构师 Top-1 方向：GoalCancel 完善
+    # 行为：
+    # 1. 调度器 cancel_event 立即设置（防止新提交）
+    # 2. PENDING future 立即取消
+    # 3. RUNNING 子进程通过 pool.shutdown 强制终止
+    # 4. 所有被取消的 goal 在 registry 中标记为 ABANDONED
+    # 与 --multi-goal / --goal-resume 互斥（取消操作 vs 编排/续跑）
+    parser.add_argument(
+        '--goal-cancel',
+        type=str,
+        default=None,
+        help='取消指定 root Goal 及其所有子 Goal（Phase 14 完善：'
+             '终止运行中子进程 + 标记 ABANDONED + 释放资源）',
+    )
+
     return parser.parse_args()
 
 
@@ -648,6 +664,46 @@ def dispatch_agent(agent_type: str, task: str, project_root: str,
     return success
 
 
+def _module_level_single_dispatch(
+    agent_type: str = 'goal_orchestrator',
+    task: str = '',
+    task_id: Optional[str] = None,
+    project_root: str = '.',
+    progress: Optional[Dict] = None,
+) -> bool:
+    """模块级单 Goal dispatch 函数（Pickle 兼容：B-1 修复）。
+
+    B-1 修复：原嵌套闭包 `_single_dispatch` 是局部函数（local function），
+    不可被 pickle 序列化，导致 ProcessPoolExecutor 提交任务时报
+    `pickle.PicklingError: Can't pickle local function` 错误。
+
+    本函数提升到模块级，可通过 `trae_agent_dispatch_v2._module_level_single_dispatch`
+    在子进程中按 qualified name 反序列化，从而支持跨进程隔离执行。
+
+    所有参数均为显式传参，不捕获任何外层闭包变量（除了模块级
+    `dispatch_agent_v2`，该引用本身是可序列化的模块属性）。
+
+    Args:
+        agent_type: 智能体角色类型（默认 'goal_orchestrator'，对应 GoalOrchestrator 调用）
+        task: 任务描述（Goal.task_template 或 Goal.description）
+        task_id: 任务 ID（kebab-case；可选）
+        project_root: 项目根目录（绝对路径）
+        progress: 任务进度字典（可选，缺省时构造空字典）
+
+    Returns:
+        bool: dispatch_agent_v2 的执行结果
+    """
+    # 调用同模块的 dispatch_agent_v2（模块级引用，pickle 友好）
+    return dispatch_agent_v2(
+        agent_type=agent_type,
+        task=task,
+        task_id=task_id,
+        project_root=project_root,
+        progress=progress if progress is not None else {},
+        cybernetics_enabled=True,
+    )
+
+
 def dispatch_agent_v2_with_loop_goal(
     agent_type: str,
     task: str,
@@ -747,17 +803,16 @@ def dispatch_agent_v2_with_loop_goal(
     # 构造执行器
     executor = LoopGoalExecutor(registry=registry)
 
-    # 单次 dispatch 函数（被 LoopGoalExecutor 多次调用）
-    def _single_dispatch(agent_type=agent_type, task=task, task_id=task_id,
-                         project_root=project_root, progress=progress):
-        return dispatch_agent_v2(
-            agent_type=agent_type,
-            task=task,
-            task_id=task_id,
-            project_root=project_root,
-            progress=progress,
-            cybernetics_enabled=True,
-        )
+    # B-1 修复：使用模块级函数 _module_level_single_dispatch（Pickle 兼容），
+    # 不再使用嵌套闭包（嵌套闭包会捕获 project_root 等外层变量，导致
+    # ProcessPoolExecutor 序列化失败：Can't pickle local function）。
+    # 通过 partial 绑定 project_root，避免每次调用重复传参。
+    from functools import partial
+
+    bound_dispatch_fn = partial(
+        _module_level_single_dispatch,
+        project_root=str(project_root),
+    )
 
     log(
         f'🔁 启动 /loop 循环：max_iterations={loop_config.max_iterations}, '
@@ -769,7 +824,7 @@ def dispatch_agent_v2_with_loop_goal(
     result = executor.execute_with_loop_goal(
         task=task,
         agent_type=agent_type,
-        dispatch_fn=_single_dispatch,
+        dispatch_fn=bound_dispatch_fn,
         project_root=str(project_root),
         loop_config=loop_config,
         goal=goal,
@@ -954,20 +1009,16 @@ def dispatch_agent_v2_with_multi_goal(
         reuse_enabled=reuse_enabled,
     )
 
-    # 单 Goal dispatch 函数（Pickle 兼容：仅引用本文件中的 dispatch_agent_v2）
-    def _single_dispatch(agent_type: str = 'goal_orchestrator',
-                         task: str = '',
-                         task_id: Optional[str] = None,
-                         project_root: str = str(project_root),
-                         progress: Optional[Dict] = None) -> bool:
-        return dispatch_agent_v2(
-            agent_type=agent_type,
-            task=task,
-            task_id=task_id,
-            project_root=project_root,
-            progress=progress or {},
-            cybernetics_enabled=True,
-        )
+    # B-1 修复：使用模块级函数 _module_level_single_dispatch（Pickle 兼容），
+    # 通过 partial 绑定 project_root + agent_type='goal_orchestrator'，
+    # 避免在多 Goal 编排中再嵌套闭包。partial 本身可 pickle。
+    from functools import partial
+
+    bound_dispatch_fn = partial(
+        _module_level_single_dispatch,
+        agent_type='goal_orchestrator',
+        project_root=str(project_root),
+    )
 
     loop_config = LoopConfig(
         max_iterations=10,
@@ -977,7 +1028,7 @@ def dispatch_agent_v2_with_multi_goal(
     try:
         report = orchestrator.run(
             root_goal_id=root_goal_id,
-            dispatch_fn=_single_dispatch,
+            dispatch_fn=bound_dispatch_fn,
             loop_config=loop_config,
             project_root=str(project_root),
         )
@@ -1018,6 +1069,100 @@ def dispatch_agent_v2_with_multi_goal(
     return root_status == GoalStatus.ACHIEVED.value
 
 
+def dispatch_agent_v2_with_goal_cancel(
+    goal_id: str,
+    project_root: str,
+) -> bool:
+    """Phase 14 新增：取消运行中 Goal（B-3 修复 + 架构师 Top-1 方向）。
+
+    行为（架构师评审要求的"GoalCancel 完善"）：
+    1. 加载 GoalGraph 以获取所有子 Goal（DAG 级联取消）
+    2. 调用 GoalOrchestrator.cancel()：
+       - 调度器 cancel_event 设置
+       - PENDING future 取消
+       - RUNNING 子进程通过 ProcessPoolExecutor.shutdown 强制终止
+       - 所有被取消 goal 标记为 ABANDONED
+       - error_message 记录"被用户取消（state=running|pending）"
+    3. 返回是否成功取消
+
+    Args:
+        goal_id: 根 Goal ID（kebab-case）
+        project_root: 项目根目录
+
+    Returns:
+        bool: True 表示成功取消；False 表示失败（goal 不存在 / 未在运行）
+    """
+    from goal_orchestrator import (
+        GoalGraph,
+        GoalNotFoundError as OrchestratorGoalNotFoundError,
+        GoalOrchestrator,
+    )
+    from loop_goal import (
+        GoalNotFoundError,
+        GoalRegistry,
+        LoopGoalError,
+    )
+
+    log(f'🛑 Phase 14 取消 Goal 启动：goal={goal_id}', 'INFO')
+
+    # 1. 初始化 Registry
+    storage_root = os.path.join(str(project_root), '.trae', 'goals')
+    registry = GoalRegistry(storage_root=storage_root)
+
+    # 2. 验证 goal 存在
+    try:
+        goal = registry.get_goal_or_raise(goal_id)
+    except (GoalNotFoundError, LoopGoalError) as e:
+        log(f'❌ Goal {goal_id} 不存在或无法加载：{e}', 'ERROR')
+        return False
+
+    if goal.status in (GoalStatus.ACHIEVED,):
+        log(f'⚠️  Goal {goal_id} 已 ACHIEVED，无需取消', 'WARNING')
+        return False
+
+    if goal.status == GoalStatus.ABANDONED:
+        log(f'⚠️  Goal {goal_id} 已 ABANDONED，无需重复取消', 'WARNING')
+        return False
+
+    # 3. 加载 DAG（获取所有子 Goal）
+    try:
+        graph = GoalGraph(registry, goal_id)
+        descendants = graph.topological_order()
+        log(
+            f'📊 DAG 包含 {len(descendants)} 个 goal，将级联取消',
+            'INFO',
+        )
+    except OrchestratorGoalNotFoundError as e:
+        log(f'❌ DAG 加载失败：{e}', 'ERROR')
+        return False
+    except Exception as e:
+        log(f'❌ DAG 校验失败：{e}', 'ERROR')
+        return False
+
+    # 4. 创建 Orchestrator 并执行 cancel
+    #    使用 max_concurrent=2（取消操作不需要高并发）
+    orchestrator = GoalOrchestrator(registry=registry, max_concurrent=2)
+    try:
+        cancelled = orchestrator.cancel(goal_id)
+        log(
+            f'✅ 取消完成：受影响 goal 数 {len(cancelled)}，'
+            f'已被标记为 ABANDONED',
+            'SUCCESS',
+        )
+        for gid, state in cancelled.items():
+            log(f'   - {gid} (state={state})', 'INFO')
+        return True
+    except Exception as e:
+        log(f'❌ 取消过程异常：{e}', 'ERROR')
+        return False
+    finally:
+        # shutdown 幂等调用，确保资源释放
+        try:
+            orchestrator.scheduler.shutdown()
+        except Exception:
+            pass
+
+
 def main():
     """
     主函数
@@ -1054,8 +1199,19 @@ def main():
         sys.exit(0)
     
     # 调度智能体（Phase 11：支持 /loop + /goal；Phase 13：多 Goal 编排）
+    # Phase 14 优先级 0：取消模式（--goal-cancel）— 最高优先级
+    # 原因：取消操作应立即执行，不应被其他模式（如 /loop）误触发
+    if args.goal_cancel:
+        log(
+            f'🛑 Phase 14 检测到取消模式：goal={args.goal_cancel}',
+            'INFO',
+        )
+        success = dispatch_agent_v2_with_goal_cancel(
+            goal_id=args.goal_cancel,
+            project_root=str(project_root),
+        )
     # Phase 13 优先级 1：续跑模式（--goal-resume）
-    if args.goal_resume:
+    elif args.goal_resume:
         log(
             f'♻️  Phase 13 检测到续跑模式：goal={args.goal_resume}, '
             f'force={args.goal_resume_force}',

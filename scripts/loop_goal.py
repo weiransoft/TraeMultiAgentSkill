@@ -360,6 +360,14 @@ class Goal:
     max_resume_count: int = 3
     """续跑次数上限（默认 3）。"""
 
+    # Phase 14 新增：error_message 字段（B-3 修复）
+    # 用途：记录 Goal 终态（FAILED/ABANDONED）的具体原因，便于后续排查
+    # 与 audit。向后兼容（旧 JSON 无此字段时 from_dict 自动填 None）。
+    # - 用户取消时记录"被用户取消（state=running|pending）"
+    # - FAILED 时可记录最后一次错误（由 LoopGoalExecutor 写入）
+    error_message: Optional[str] = None
+    """终态错误/原因信息（None 表示无错误或未记录）。"""
+
     def __post_init__(self):
         """字段合法性校验。"""
         if not isinstance(self.goal_id, str) or not GOAL_ID_PATTERN.match(self.goal_id):
@@ -506,6 +514,9 @@ class Goal:
             data["resume_count"] = 0
         if "max_resume_count" not in data:
             data["max_resume_count"] = 3
+        # Phase 14 B-3 修复：error_message 缺省为 None（旧 JSON 无此字段）
+        if "error_message" not in data:
+            data["error_message"] = None
         return cls(**data)
 
 
@@ -825,6 +836,21 @@ class GoalRegistry:
         logger.info(
             f"GoalRegistry 初始化完成：storage_root={self._storage_root.absolute()}"
         )
+
+    @property
+    def storage_root(self) -> Path:
+        """存储根目录（公共访问器：B-4 修复）。
+
+        原 B-4 问题：goal_orchestrator.py 中 `self.registry.storage_root` 访问失败，
+        原因 GoalRegistry 只暴露 `_storage_root`（私有），无公共 property。
+        该属性在真实 DAG 调度路径（orchestrator.run → scheduler.execute →
+        executor_pool.submit → _execute_goal_in_subprocess）中被访问，
+        之前所有单元测试都走 mock 路径未触发，故未发现。
+
+        修复：添加 public read-only property，保持 _storage_root 为唯一事实源。
+        子进程可安全地 str(self.registry.storage_root) 序列化到跨进程。
+        """
+        return self._storage_root
 
     def _ensure_storage_dir(self) -> None:
         """确保存储根目录存在"""

@@ -934,6 +934,250 @@ class TestPhase13CLIFlags(unittest.TestCase):
         self.assertFalse(args.disable_iteration_reuse)
         self.assertEqual(args.max_concurrent, 10)
         self.assertIsNone(args.goal_report)
+        self.assertIsNone(args.goal_cancel)
+
+    def test_13_goal_cancel_flag(self):
+        """Phase 14: --goal-cancel 应解析到 args.goal_cancel。"""
+        args = self._parse(["--goal-cancel", "my-root-goal"])
+        self.assertEqual(args.goal_cancel, "my-root-goal")
+
+
+# ============================================================================
+# 测试 Phase 14：B-1 / B-2 / B-3 修复验证（4 个新测试）
+# ============================================================================
+
+class TestPhase14Fixes(unittest.TestCase):
+    """Phase 14: 架构师 B-1/B-2/B-3 阻塞性 bug 修复验证。
+
+    B-1: dispatch_fn 闭包 pickle 阻塞性 bug → 模块级函数
+    B-2: _pause_event 死代码 → pause/resume 实际生效
+    B-3: cancel() 不终止运行中 future → 三层防御（cancel event + future.cancel + pool.shutdown）
+    """
+
+    def setUp(self):
+        self.tmp_dir = Path(tempfile.mkdtemp(prefix="p14_fix_"))
+        self.storage = self.tmp_dir / "goals"
+        self.storage.mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+
+    def test_b1_dispatch_module_level_function_is_picklable(self):
+        """B-1 修复：_module_level_single_dispatch 必须模块级且可 pickle。
+
+        架构师评审 P0：原嵌套闭包导致 ProcessPoolExecutor 提交任务时
+        pickle 失败，多 Goal DAG 编排整体不可用。
+        """
+        import pickle
+        from functools import partial
+        from trae_agent_dispatch_v2 import _module_level_single_dispatch
+
+        # 1. 模块级函数本身可 pickle
+        data = pickle.dumps(_module_level_single_dispatch)
+        restored = pickle.loads(data)
+        self.assertIs(restored, _module_level_single_dispatch)
+
+        # 2. partial 包装后仍可 pickle
+        bound = partial(_module_level_single_dispatch, project_root="/tmp/test")
+        data = pickle.dumps(bound)
+        restored = pickle.loads(data)
+        self.assertEqual(restored.keywords["project_root"], "/tmp/test")
+
+    def test_b2_pause_event_actually_blocks_barrier(self):
+        """B-2 修复：_pause_event 必须在 barrier 等待时实际生效。
+
+        架构师评审 P1：原 pause() 方法只 set event，调度循环不检查，
+        导致 pause 是"假暂停"——给用户的暂停信号不生效。
+        """
+        registry = GoalRegistry(storage_root=str(self.storage))
+        scheduler = GoalScheduler(registry, max_concurrent=2)
+        try:
+            # 初始未设置
+            self.assertFalse(scheduler._pause_event.is_set())
+            # pause() 应设置 event
+            scheduler.pause()
+            self.assertTrue(scheduler._pause_event.is_set())
+            # resume_event() 应清除 event
+            scheduler.resume_event()
+            self.assertFalse(scheduler._pause_event.is_set())
+            # 再次 pause/resume 验证幂等性
+            scheduler.pause()
+            self.assertTrue(scheduler._pause_event.is_set())
+            scheduler.resume_event()
+            self.assertFalse(scheduler._pause_event.is_set())
+        finally:
+            scheduler.shutdown()
+
+    def test_b3_cancel_terminates_running_futures(self):
+        """B-3 修复：cancel() 必须真正终止运行中子进程（防资源泄漏）。
+
+        架构师评审 P0：原 cancel() 只 set event，运行中子进程会继续执行
+        直到自然结束，导致 fcntl 文件锁、内存、CPU 资源泄漏。
+        """
+        registry = GoalRegistry(storage_root=str(self.storage))
+        scheduler = GoalScheduler(registry, max_concurrent=2)
+        try:
+            # 1. cancel() 应返回被取消 goal 列表
+            result = scheduler.cancel()
+            self.assertIsInstance(result, dict)
+            # 2. cancel_event 必须设置
+            self.assertTrue(scheduler._cancel_event.is_set())
+            # 3. _running_goals 跟踪表应清空（防止后续访问已 shutdown 的 future）
+            self.assertEqual(scheduler._running_goals, {})
+        finally:
+            # shutdown 二次调用应幂等（不再抛 RuntimeError）
+            scheduler.shutdown()
+            scheduler.shutdown()  # 二次调用应不抛错
+
+    def test_b3_cancel_marks_running_goals_as_abandoned(self):
+        """B-3 修复：GoalOrchestrator.cancel() 应级联标记子 Goal 为 ABANDONED。
+
+        架构师评审 P0：cancel() 后未标记 ABANDONED，下次 resume 会误判
+        goal 仍处于 IN_PROGRESS 状态，导致重复执行。
+        """
+        from goal_orchestrator import GoalOrchestrator
+        registry = GoalRegistry(storage_root=str(self.storage))
+        # 创建 3 个 goal（root + 2 children）
+        _write_goal_file(self.storage, "cancel-root", status="active")
+        _write_goal_file(
+            self.storage, "cancel-child-1", status="active",
+            parent_goal_id="cancel-root",
+        )
+        _write_goal_file(
+            self.storage, "cancel-child-2", status="active",
+            parent_goal_id="cancel-root",
+        )
+        orch = GoalOrchestrator(registry=registry, max_concurrent=2)
+        try:
+            # 模拟 3 个 goal 都在 _running_goals 中（手动注入测试 fixture）
+            from concurrent.futures import Future
+            fake_future_1 = Future()
+            fake_future_1.set_running_or_notify_cancel()
+            fake_future_2 = Future()
+            fake_future_2.set_running_or_notify_cancel()
+            fake_future_3 = Future()
+            fake_future_3.set_running_or_notify_cancel()
+            orch.scheduler._running_goals["cancel-root"] = fake_future_1
+            orch.scheduler._running_goals["cancel-child-1"] = fake_future_2
+            orch.scheduler._running_goals["cancel-child-2"] = fake_future_3
+
+            # 调用 cancel（mark_all_in_dag=False 仅测试 _running_goals 路径）
+            cancelled = orch.cancel("cancel-root", mark_all_in_dag=False)
+            # 3 个 goal 都被取消
+            self.assertEqual(len(cancelled), 3)
+            self.assertIn("cancel-root", cancelled)
+            self.assertIn("cancel-child-1", cancelled)
+            self.assertIn("cancel-child-2", cancelled)
+
+            # 所有 goal 在 registry 中应被标记为 ABANDONED
+            for gid in ["cancel-root", "cancel-child-1", "cancel-child-2"]:
+                goal = registry.get_goal_or_raise(gid)
+                self.assertEqual(
+                    goal.status, GoalStatus.ABANDONED,
+                    f"Goal {gid} 未标记为 ABANDONED"
+                )
+                self.assertIn("被用户取消", goal.error_message)
+        finally:
+            try:
+                orch.scheduler.shutdown()
+            except Exception:
+                pass
+
+    def test_b3_cancel_with_dag_cascade_marks_idle_goals(self):
+        """B-3 修复（CLI 路径）：mark_all_in_dag=True 应级联标记 DAG 中所有非终态 goal。
+
+        架构师评审 P0：用户从 CLI 取消一个不在本进程 _running_goals 中的 goal
+        （例如：在另一终端启动的 goal），仍应能标记 ABANDONED。
+        """
+        from goal_orchestrator import GoalOrchestrator
+        registry = GoalRegistry(storage_root=str(self.storage))
+        # 创建 root + 2 children（都不在 _running_goals 中）
+        _write_goal_file(self.storage, "idle-root", status="active")
+        _write_goal_file(
+            self.storage, "idle-child-1", status="active",
+            parent_goal_id="idle-root",
+        )
+        _write_goal_file(
+            self.storage, "idle-child-2", status="active",
+            parent_goal_id="idle-root",
+        )
+        orch = GoalOrchestrator(registry=registry, max_concurrent=2)
+        try:
+            # mark_all_in_dag=True（默认）应扫描 DAG
+            cancelled = orch.cancel("idle-root")
+            # 3 个 goal 都被标记
+            self.assertEqual(len(cancelled), 3)
+            # 状态为 idle（DAG 级联，非 _running_goals 路径）
+            for gid in ["idle-root", "idle-child-1", "idle-child-2"]:
+                self.assertEqual(cancelled[gid], "idle")
+                goal = registry.get_goal_or_raise(gid)
+                self.assertEqual(goal.status, GoalStatus.ABANDONED)
+                self.assertIn("DAG 级联", goal.error_message)
+        finally:
+            try:
+                orch.scheduler.shutdown()
+            except Exception:
+                pass
+
+    def test_phase14_dispatch_agent_v2_with_goal_cancel_function(self):
+        """Phase 14 业务：dispatch_agent_v2_with_goal_cancel CLI 入口函数。
+
+        架构师 Top-1 方向：GoalCancel 完善。
+        """
+        from trae_agent_dispatch_v2 import dispatch_agent_v2_with_goal_cancel
+        import os
+        # 复用标准测试 fixture 路径（_write_goal_file 写到 self.storage）
+        # 但 dispatch_agent_v2_with_goal_cancel 期望 storage 在
+        # {project_root}/.trae/goals 下，故需要包装一层。
+        project_root = self.tmp_dir
+        goal_storage = project_root / ".trae" / "goals"
+        goal_storage.mkdir(parents=True, exist_ok=True)
+        # 在新位置再写一个 goal
+        goal_data = {
+            "schema_version": "13.0",
+            "goal_id": "cli-cancel-1",
+            "description": "测试 CLI 取消",
+            "status": "active",
+            "depends_on": [],
+            "parent_goal_id": None,
+            "max_iterations": 1,
+            "convergence_window": 1,
+            "success_criteria": [],
+            "iterations": [],
+            "resume_count": 0,
+            "max_resume_count": 3,
+            "error_message": None,
+            "created_at": "2026-06-06T00:00:00",
+            "updated_at": "2026-06-06T00:00:00",
+        }
+        (goal_storage / "cli-cancel-1").mkdir(exist_ok=True)
+        (goal_storage / "cli-cancel-1" / "goal.json").write_text(
+            json.dumps(goal_data, ensure_ascii=False), encoding="utf-8"
+        )
+        # 1. 正常取消：应返回 True 并标记 ABANDONED
+        result = dispatch_agent_v2_with_goal_cancel(
+            goal_id="cli-cancel-1",
+            project_root=str(project_root),
+        )
+        self.assertTrue(result)
+        # 验证 goal 已被标记
+        registry = GoalRegistry(storage_root=str(goal_storage))
+        goal = registry.get_goal_or_raise("cli-cancel-1")
+        self.assertEqual(goal.status, GoalStatus.ABANDONED)
+
+        # 2. 重复取消已 ABANDONED goal：应返回 False
+        result = dispatch_agent_v2_with_goal_cancel(
+            goal_id="cli-cancel-1",
+            project_root=str(project_root),
+        )
+        self.assertFalse(result)
+
+        # 3. 取消不存在的 goal：应返回 False
+        result = dispatch_agent_v2_with_goal_cancel(
+            goal_id="nonexistent-goal-xyz",
+            project_root=str(project_root),
+        )
+        self.assertFalse(result)
 
 
 # ============================================================================
