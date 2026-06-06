@@ -656,8 +656,10 @@ class TestDispatchV2LoopGoalWrapper(unittest.TestCase):
             sys.path.insert(0, SCRIPTS_DIR)
 
         # 替换 dispatch_agent_v2 为 mock（避免真实 Claude Code 调用）
+        # 风险-1 修复（V3）：patch 路径从 trae_agent_dispatch_v2 改为 dispatch.legacy
+        # 原因：dispatch_agent_v2 已迁出到 dispatch/legacy.py，薄壳仅 re-export
         with patch(
-            'trae_agent_dispatch_v2.dispatch_agent_v2', return_value=True
+            'dispatch.legacy.dispatch_agent_v2', return_value=True
         ) as mock_dispatch:
             success = dispatch_agent_v2_with_loop_goal(
                 agent_type="solo-coder",
@@ -677,8 +679,10 @@ class TestDispatchV2LoopGoalWrapper(unittest.TestCase):
             sys.path.insert(0, SCRIPTS_DIR)
 
         # 使用不匹配默认规则的 criterion（避免成功提前退出，确保跑满 2 次）
+        # 风险-1 修复（V3）：patch 路径从 trae_agent_dispatch_v2 改为 dispatch.legacy
+        # 原因：dispatch_agent_v2 已迁出到 dispatch/legacy.py，薄壳仅 re-export
         with patch(
-            'trae_agent_dispatch_v2.dispatch_agent_v2', return_value=True
+            'dispatch.legacy.dispatch_agent_v2', return_value=True
         ):
             success = dispatch_agent_v2_with_loop_goal(
                 agent_type="solo-coder",
@@ -726,8 +730,10 @@ class TestDispatchV2LoopGoalWrapper(unittest.TestCase):
         if SCRIPTS_DIR not in sys.path:
             sys.path.insert(0, SCRIPTS_DIR)
 
+        # 风险-1 修复（V3）：patch 路径从 trae_agent_dispatch_v2 改为 dispatch.legacy
+        # 原因：dispatch_agent_v2 已迁出到 dispatch/legacy.py，薄壳仅 re-export
         with patch(
-            'trae_agent_dispatch_v2.dispatch_agent_v2', return_value=True
+            'dispatch.legacy.dispatch_agent_v2', return_value=True
         ) as mock_dispatch:
             success = dispatch_agent_v2_with_loop_goal(
                 agent_type="solo-coder",
