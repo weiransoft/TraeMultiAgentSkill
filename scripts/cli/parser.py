@@ -6,8 +6,39 @@
 - 保持 --dry-run 行为
 - 风险-11：plugin 通过 `from plugins.X import X` 引用
   dispatcher 内部用 f"--{plugin.name}" 派生 CLI flag（B-4 修复）
+- Phase 17：hot-reload 互斥 group + --hot-reload-dir 路径校验
+  （P0-1 互斥 + P0-7 路径安全第一层防护）
 """
 import argparse
+from pathlib import Path
+
+
+def _validate_drop_in_dir(value: str) -> str:
+    """Phase 17 v3 P0-7 第一层：CLI 层早期校验 drop-in 目录路径。
+
+    拒绝：
+    - 绝对路径（任何操作系统均拒绝，强制相对路径）
+    - 包含 '..' 的相对路径（粗略检查；watcher 还会 resolve() 二次校验）
+
+    Args:
+        value: CLI 传入的字符串路径
+
+    Returns:
+        通过校验的原始字符串（保持 str 类型，避免 Path 转换的兼容性问题）
+
+    Raises:
+        argparse.ArgumentTypeError: 路径不安全
+    """
+    p = Path(value)
+    if p.is_absolute():
+        raise argparse.ArgumentTypeError(
+            f"--hot-reload-dir 必须为相对路径（绝对路径被拒绝）：{value}"
+        )
+    if ".." in p.parts:
+        raise argparse.ArgumentTypeError(
+            f"--hot-reload-dir 不能包含 '..'：{value}"
+        )
+    return value
 
 
 def parse_arguments():
@@ -222,7 +253,37 @@ def parse_arguments():
         '--goal-graph-desc-max',
         type=int,
         default=100,
-        help='节点 description 截断长度（默认 100）',
+        help='节点 description 截断长度（默认 100）'
+    )
+
+    # Phase 17 v3 新增：hot-reload 互斥 group + 路径校验 + 轮询间隔
+    # v3 P0-1：--hot-reload 与 --no-hot-reload 必须互斥（argparse 强制）
+    hot_reload_group = parser.add_mutually_exclusive_group()
+    hot_reload_group.add_argument(
+        '--hot-reload',
+        dest='hot_reload',
+        action='store_true',
+        default=True,
+        help='Phase 17 启用插件热加载（默认开启；与 --no-hot-reload 互斥）',
+    )
+    hot_reload_group.add_argument(
+        '--no-hot-reload',
+        dest='hot_reload',
+        action='store_false',
+        help='禁用插件热加载（生产环境推荐；与 --hot-reload 互斥）',
+    )
+    # v3 P0-7 第一层防护：CLI 校验路径（绝对 / '..' 拒绝）
+    parser.add_argument(
+        '--hot-reload-dir',
+        type=_validate_drop_in_dir,
+        default='plugins_extra',
+        help='drop-in 目录路径（相对 project_root；不含 ..；默认 plugins_extra/）',
+    )
+    parser.add_argument(
+        '--hot-reload-interval',
+        type=float,
+        default=5.0,
+        help='轮询间隔（秒；默认 5.0；范围 [0.5, 60.0]，由 watcher 钳制）',
     )
 
     return parser.parse_args()

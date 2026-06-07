@@ -139,7 +139,11 @@ class TestEndToEndDispatch(unittest.TestCase):
     """5 模式端到端 dispatch（mock dispatch.legacy）。"""
 
     def _make_args(self, **overrides):
-        """构造 args Namespace，缺省字段填充 V3 plugin 期望的所有字段。"""
+        """构造 args Namespace，缺省字段填充 V3 plugin 期望的所有字段。
+
+        Phase 17 v3 P1-5 修复：必须显式设置 hot_reload / hot_reload_dir /
+        hot_reload_interval，否则 facade.assert 兜底会失败。
+        """
         defaults = {
             "project_root": "/tmp",
             "agent": "auto",
@@ -159,6 +163,11 @@ class TestEndToEndDispatch(unittest.TestCase):
             "goal_graph_format": "mermaid",
             "goal_graph_output": None,
             "goal_graph_desc_max": 100,
+            # Phase 17 v3 新增：热加载相关字段（V3 测试场景使用 --no-hot-reload
+            # 避免启动 watcher 增加测试耗时；路径校验与 P0-7 一致）
+            "hot_reload": False,
+            "hot_reload_dir": "plugins_extra",
+            "hot_reload_interval": 5.0,
         }
         defaults.update(overrides)
         return argparse.Namespace(**defaults)

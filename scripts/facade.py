@@ -6,9 +6,15 @@
 - 旧 import 路径（from trae_agent_dispatch_v2 import ...）通过薄壳 re-export 工作
 - 风险-2 修正：恢复与 god module 同等 6 模式豁免的 --task 必填校验
 - 风险-5 修正：dry_run 短路在 dispatcher 内部实现（PluginContext.dry_run 字段驱动）
+- Phase 17：_start_hot_reload_if_enabled（v3 §2.9）— 启动 HotReloadWatcher
+  + atexit 清理 + weakref 防重复（v3 P1-8）
 """
+import atexit
+import logging
 import sys
+import weakref
 from pathlib import Path
+from threading import RLock
 
 # 1. re-export 11 个符号（B-2 完整列表）
 from dispatch.legacy import (  # noqa: F401
@@ -24,6 +30,12 @@ from dispatch.legacy import (  # noqa: F401
     _module_level_single_dispatch,  # 2 处 test_goal_orchestrator
 )
 from cli.parser import parse_arguments  # 4 处 test 引用  # noqa: F401
+
+
+# Phase 17 v3 P1-8：模块级跟踪所有已启动的 watcher（weakref 防泄漏）
+_watcher_refs: "set[weakref.ref]" = set()
+_watcher_tracking_lock: RLock = RLock()
+_facade_logger: logging.Logger = logging.getLogger("facade")
 
 
 # 2. 旧 main 入口（保证 19 处外部 import 站点继续工作）
@@ -77,6 +89,10 @@ def _dispatch_through_v3(args) -> int:
         log(f"❌ {e}", "ERROR")
         return 1
 
+    # Phase 17 v3 §2.9：启动 hot reload watcher（如启用）
+    # 关键：放在 validate_mutex 之后（避免无效 args 启动 watcher）
+    _start_hot_reload_if_enabled(dispatcher, args, project_root)
+
     # 风险-2 修正：--task 必填校验（与 god module line 1339-1348 行为一致）
     # 排除模式：goal_graph / goal_cancel / goal_resume / multi_goal /
     #          loop > 1 / goal 不为 None
@@ -122,6 +138,97 @@ def _dispatch_through_v3(args) -> int:
     return 0 if result.success else 1
 
 
+# === Phase 17 v3 §2.9：hot reload watcher 启动 + 清理 ===
+
+def _start_hot_reload_if_enabled(
+    dispatcher: "object",  # GoalDispatcher
+    args,
+    project_root: Path,
+) -> "Optional[object]":  # Optional[HotReloadWatcher]
+    """Phase 17 v3：根据 args 启动 hot reload watcher。
+
+    行为：
+    - args.hot_reload == False → 不启动，返回 None
+    - args.hot_reload == True → 启动 watcher + atexit 注册清理
+    - args.hot_reload is None → assert 兜底（v3 P1-5）
+
+    Args:
+        dispatcher: 已构造的 GoalDispatcher
+        args: parse_arguments() 结果
+        project_root: 项目根目录（Path；用于 drop-in 路径安全校验）
+
+    Returns:
+        HotReloadWatcher 实例 or None
+    """
+    # v3 P1-5 兜底
+    enabled = getattr(args, 'hot_reload', None)
+    assert enabled is not None, (
+        "args.hot_reload is None — parser 解析异常，"
+        "请检查 --hot-reload/--no-hot-reload 配置"
+    )
+    if not enabled:
+        _facade_logger.info(
+            "[facade] hot reload 显式禁用（--no-hot-reload）"
+        )
+        return None
+
+    # v3 P0-7 第三层：facade 串联（即使 parser 漏过 + watcher 兜底）
+    # 注解：args.hot_reload_dir 已被 parser type 校验（CLI 第一层）
+    drop_in_dir = Path(getattr(args, 'hot_reload_dir', 'plugins_extra'))
+    poll_interval = float(getattr(args, 'hot_reload_interval', 5.0))
+
+    try:
+        # 延迟 import：避免 HotReloadWatcher 自身 import 异常阻断 facade 加载
+        from dispatcher.hot_reload_watcher import HotReloadWatcher
+        watcher = HotReloadWatcher(
+            dispatcher=dispatcher,
+            drop_in_dir=drop_in_dir,
+            project_root=project_root,
+            poll_interval=poll_interval,
+        )
+    except Exception as e:
+        # watcher 构造失败不阻断 main 流程（生产友好）
+        _facade_logger.error(
+            f"[facade] watcher 启动失败：{e}"
+        )
+        return None
+
+    # 启动 + 等待首次扫描完成（v3 P0-4：避免 dispatch 早于首次扫描）
+    watcher.start()
+    if not watcher.wait_initial_scan(timeout=30.0):
+        _facade_logger.warning(
+            "[facade] watcher 初始扫描 30s 超时（drop-in 目录异常大？）"
+        )
+
+    # v3 P1-8：weakref 跟踪 + atexit 注册（多 dispatcher 防重复）
+    with _watcher_tracking_lock:
+        _watcher_refs.add(weakref.ref(watcher, _watcher_refs.discard))
+        # 只对第一个 watcher 注册 atexit（避免重复 cleanup）
+        if len(_watcher_refs) == 1:
+            atexit.register(_cleanup_all_watchers)
+    return watcher
+
+
+def _cleanup_all_watchers() -> None:
+    """Phase 17 v3 P1-8：atexit hook，清理所有活跃 watcher。"""
+    with _watcher_tracking_lock:
+        refs = list(_watcher_refs)
+    for ref in refs:
+        watcher = ref()
+        if watcher is not None:
+            _safe_watcher_stop(watcher)
+
+
+def _safe_watcher_stop(watcher) -> None:
+    """Phase 17 v3 P1-7：异常隔离的 stop，atexit 不能抛异常。"""
+    try:
+        watcher.stop(timeout=5.0)
+    except Exception as e:
+        _facade_logger.warning(
+            f"[facade] watcher.stop 异常：{e}"
+        )
+
+
 __all__ = [
     "main_compat",
     "_dispatch_through_v3",
@@ -136,4 +243,8 @@ __all__ = [
     "_is_overall_success",
     "_module_level_single_dispatch",
     "parse_arguments",
+    # Phase 17 v3 新增：hot reload 集成
+    "_start_hot_reload_if_enabled",
+    "_cleanup_all_watchers",
+    "_safe_watcher_stop",
 ]
