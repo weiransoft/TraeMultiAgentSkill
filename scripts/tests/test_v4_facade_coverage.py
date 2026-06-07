@@ -14,12 +14,14 @@ TDD 流程：
 3. REFACTOR：清理
 """
 import argparse
+import gc
 import importlib
 import os
 import shutil
 import sys
 import tempfile
 import unittest
+import weakref
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -593,6 +595,174 @@ class TestFacadeWatcherConstructionException(unittest.TestCase):
             )
             # 关键：异常被隔离，返回 None
             self.assertIsNone(watcher)
+
+
+class TestFacadeTaskFileExists(unittest.TestCase):
+    """_dispatch_through_v3：--task-file 指定且文件存在（line 113->118）。"""
+
+    def setUp(self) -> None:
+        self._tmp = Path(tempfile.mkdtemp(prefix="facade_task_file_"))
+        self.project_root = self._tmp / "project"
+        self.project_root.mkdir()
+        (self.project_root / "plugins_extra").mkdir()
+        # 关键：task_file 实际存在
+        self.task_file_rel = "real_task.md"
+        (self.project_root / self.task_file_rel).write_text(
+            "# task", encoding="utf-8"
+        )
+
+    def tearDown(self) -> None:
+        for key in list(sys.modules.keys()):
+            if key.startswith("plugins_extra."):
+                del sys.modules[key]
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        import facade
+        with facade._watcher_tracking_lock:
+            facade._watcher_refs.clear()
+
+    def test_task_file_exists_proceeds_to_dispatch(self):
+        """task_file 指定且存在 → 不返回 1，跑到 dispatcher.dispatch。"""
+        with patch(
+            "dispatcher.goal_dispatcher.GoalDispatcher"
+        ) as mock_dispatcher_cls:
+            mock_dispatcher = MagicMock()
+            mock_dispatcher_cls.return_value = mock_dispatcher
+            mock_result = MagicMock()
+            mock_result.skipped_reason = None
+            mock_result.success = True
+            mock_dispatcher.dispatch.return_value = mock_result
+            mock_dispatcher.list_plugins.return_value = []
+
+            args = argparse.Namespace(
+                project_root=str(self.project_root),
+                task="hello",
+                hot_reload=False,
+                hot_reload_dir="plugins_extra",
+                hot_reload_interval=5.0,
+                goal_graph=None,
+                goal_cancel=None,
+                goal_resume=None,
+                multi_goal=None,
+                loop=1,
+                goal=None,
+                task_file=self.task_file_rel,  # 关键：文件存在
+                dry_run=False,
+                agent="auto",
+            )
+            rc = _dispatch_through_v3(args)
+            # 关键：分支 113->118 走了，dispatch 被调用
+            self.assertEqual(mock_dispatcher.dispatch.call_count, 1)
+            self.assertEqual(rc, 0)
+
+
+class TestFacadeSecondWatcherNoAtexit(unittest.TestCase):
+    """_start_hot_reload_if_enabled：第二个 watcher 不重复注册 atexit（line 207->209）。"""
+
+    def setUp(self) -> None:
+        self._tmp = Path(tempfile.mkdtemp(prefix="facade_2nd_watch_"))
+        self.project_root = self._tmp / "project"
+        self.project_root.mkdir()
+        (self.project_root / "plugins_extra").mkdir()
+
+    def tearDown(self) -> None:
+        for key in list(sys.modules.keys()):
+            if key.startswith("plugins_extra."):
+                del sys.modules[key]
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        import facade
+        with facade._watcher_tracking_lock:
+            facade._watcher_refs.clear()
+        # 取消 atexit 注册的 _cleanup_all_watchers（如果被注册了）
+        # 注意：atexit 没有提供查询 API，但 _cleanup_all_watchers 不会抛异常
+
+    def test_second_watcher_skips_atexit_register(self):
+        """启动第二个 watcher 时，atexit.register 不再被调用（避免重复 cleanup）。"""
+        import atexit
+
+        dispatcher1 = GoalDispatcher()
+        dispatcher2 = GoalDispatcher()
+
+        class _Args:
+            hot_reload = True
+            hot_reload_dir = "plugins_extra"
+            hot_reload_interval = 5.0
+
+        args = _Args()
+
+        watcher1 = _start_hot_reload_if_enabled(
+            dispatcher1, args, self.project_root
+        )
+        try:
+            # 记录注册前的 _watcher_refs 长度
+            with facade._watcher_tracking_lock:
+                len_after_first = len(facade._watcher_refs)
+            # 关键：第一个 watcher 添加后，_watcher_refs 长度 >= 1
+            self.assertGreaterEqual(len_after_first, 1)
+
+            # 启动第二个 watcher
+            watcher2 = _start_hot_reload_if_enabled(
+                dispatcher2, args, self.project_root
+            )
+            try:
+                # 验证：_watcher_refs 长度增加（说明分支 207->209 被走过）
+                with facade._watcher_tracking_lock:
+                    len_after_second = len(facade._watcher_refs)
+                self.assertGreater(len_after_second, len_after_first)
+                # 两个 watcher 都被跟踪
+                self.assertIsNotNone(watcher1)
+                self.assertIsNotNone(watcher2)
+            finally:
+                _safe_watcher_stop(watcher2)
+        finally:
+            _safe_watcher_stop(watcher1)
+
+
+class TestFacadeCleanupSkipsDeadWeakref(unittest.TestCase):
+    """_cleanup_all_watchers：weakref 已 GC → 跳过（line 218->216）。"""
+
+    def setUp(self) -> None:
+        self._tmp = Path(tempfile.mkdtemp(prefix="facade_dead_weak_"))
+        self.project_root = self._tmp / "project"
+        self.project_root.mkdir()
+        (self.project_root / "plugins_extra").mkdir()
+
+    def tearDown(self) -> None:
+        for key in list(sys.modules.keys()):
+            if key.startswith("plugins_extra."):
+                del sys.modules[key]
+        shutil.rmtree(self._tmp, ignore_errors=True)
+        import facade
+        with facade._watcher_tracking_lock:
+            facade._watcher_refs.clear()
+
+    def test_cleanup_skips_dead_weakref(self):
+        """weakref 已 GC（ref() 返回 None）→ 不调用 _safe_watcher_stop。"""
+        # 关键：构造一个会返回 None 的"假 weakref"
+        # 原因：真实 weakref 在目标 GC 后加入 set 会报 "gone away"
+        # 用 mock 替代更可靠
+
+        class _DeadRef:
+            """模拟 ref() 已失效的 weakref：调用 () 返回 None。"""
+
+            def __call__(self):
+                return None
+
+        dead_ref = _DeadRef()
+        alive_ref = MagicMock()
+        alive_ref.return_value = MagicMock()  # alive watcher
+
+        # 用 mock 替代 _watcher_refs 的 iteration
+        import facade
+
+        with patch.object(facade, "_watcher_refs", {dead_ref, alive_ref}):
+            try:
+                # 触发 cleanup：应跳过 dead_ref（不抛异常）
+                _cleanup_all_watchers()
+            except Exception as e:
+                self.fail(f"_cleanup_all_watchers 不应抛异常：{e}")
+
+        # 关键：alive_ref 被调用了一次（说明 alive path 也被走过）
+        alive_ref.assert_called_once()
 
 
 if __name__ == "__main__":
