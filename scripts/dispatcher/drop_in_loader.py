@@ -53,7 +53,10 @@ class DropInLoader:
     def _sanitize_stem(stem: str) -> str:
         """将任意字符串 sanitize 为合法 Python identifier（P2-1）。
 
-        规则：非 [a-zA-Z0-9_] 字符 → "_"
+        规则：
+        - 非 [a-zA-Z0-9_] 字符 → "_"
+        - 首字符若是数字 → 前缀 "_"（Python identifier 不允许数字开头）
+        - 全部被替换为空 → 返回 "_"（避免 sys.modules key 为空）
 
         Args:
             stem: 原始字符串（通常是 path.stem，含中文/特殊字符）
@@ -62,18 +65,27 @@ class DropInLoader:
             sanitize 后的字符串（合法 Python identifier）
 
         边界：
-        - 空字符串 → ""
-        - 全部非合法字符 → 全部替换为 "_"
-        - 数字开头保留（sys.modules key 不强制字母开头，但 Python identifier 不允许）
-          这里不强制字母开头，因为仅作为 sys.modules key 使用（不是 module 标识符）
+        - 空字符串 → "_"
+        - 全部非合法字符 → "_"
+        - 数字开头 → 前缀 "_"
 
         示例：
             _sanitize_stem("hello") == "hello"
             _sanitize_stem("hello-world") == "hello_world"
             _sanitize_stem("hello@x") == "hello_x"
             _sanitize_stem("插件") == "__"
+            _sanitize_stem("123_numeric") == "_123_numeric"
+            _sanitize_stem("") == "_"
         """
-        return _SANITIZE_RE.sub("_", stem)
+        # 步骤 1：非合法字符 → "_"
+        sanitized: str = _SANITIZE_RE.sub("_", stem)
+        # 步骤 2：空字符串 → "_"（避免 sys.modules key 退化为 ".xxx"）
+        if not sanitized:
+            sanitized = "_"
+        # 步骤 3：首字符若为数字 → 前缀 "_"（确保合法 Python identifier）
+        if sanitized[0].isdigit():
+            sanitized = "_" + sanitized
+        return sanitized
 
     @staticmethod
     def load_from_file(path: Path) -> List[GoalCommandPlugin]:

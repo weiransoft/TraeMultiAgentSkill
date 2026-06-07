@@ -1,0 +1,33 @@
+# Phase 17 测试覆盖度配置
+# 范围：核心 dispatcher + plugins + facade + cli + dispatch
+[run]
+branch = True
+source =
+    scripts
+omit =
+    scripts/__pycache__/*
+    scripts/tests/*
+    scripts/tests/scripts/*
+    scripts/.trae/*
+    scripts/logs/*
+    */__pycache__/*
+
+[report]
+# 显示缺失覆盖率行号
+show_missing = True
+# 跳过 100% 覆盖的文件
+skip_covered = False
+# 排序：覆盖率升序（最差的在前）
+sort = Cover
+# 排除精确匹配（不计入分母）
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    def __repr__
+    except ImportError
+    @abstractmethod
+
+[html]
+directory = scripts/tests/coverage_html
+title = Phase 17 测试覆盖度报告
