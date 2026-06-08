@@ -1,4 +1,4 @@
-"""5 个内置 plugin 单元测试。"""
+"""内置 plugin 单元测试。"""
 import unittest
 import argparse
 from pathlib import Path
@@ -8,6 +8,7 @@ from plugins.graph import GoalGraphPlugin
 from plugins.resume import GoalResumePlugin
 from plugins.multi_goal import MultiGoalPlugin
 from plugins.loop import LoopGoalPlugin
+from plugins.autonomous import RalphAutonomousPlugin
 
 
 def noop_log(message, level="INFO"): pass
@@ -36,9 +37,10 @@ class TestGoalCancelPlugin(unittest.TestCase):
         self.assertEqual(self.plugin.priority, 0)
 
     def test_mutex_with(self):
+        # Phase 18：autonomous 加入互斥集
         self.assertEqual(
             self.plugin.mutex_with,
-            {"goal-graph", "goal-resume", "multi-goal", "loop"},
+            {"goal-graph", "goal-resume", "multi-goal", "loop", "autonomous"},
         )
 
     def test_requires_task(self):
@@ -68,9 +70,10 @@ class TestGoalGraphPlugin(unittest.TestCase):
         self.assertEqual(self.plugin.priority, 10)
 
     def test_mutex_with(self):
+        # Phase 18：autonomous 加入互斥集
         self.assertEqual(
             self.plugin.mutex_with,
-            {"goal-cancel", "goal-resume", "multi-goal", "loop"},
+            {"goal-cancel", "goal-resume", "multi-goal", "loop", "autonomous"},
         )
 
     def test_requires_task(self):
@@ -103,9 +106,10 @@ class TestGoalResumePlugin(unittest.TestCase):
         self.assertEqual(self.plugin.priority, 20)
 
     def test_mutex_with(self):
+        # Phase 18：autonomous 加入互斥集
         self.assertEqual(
             self.plugin.mutex_with,
-            {"goal-cancel", "goal-graph", "multi-goal", "loop"},
+            {"goal-cancel", "goal-graph", "multi-goal", "loop", "autonomous"},
         )
 
     def test_requires_task(self):
@@ -135,9 +139,10 @@ class TestMultiGoalPlugin(unittest.TestCase):
         self.assertEqual(self.plugin.priority, 30)
 
     def test_mutex_with(self):
+        # Phase 18：autonomous 加入互斥集
         self.assertEqual(
             self.plugin.mutex_with,
-            {"goal-cancel", "goal-graph", "goal-resume", "loop"},
+            {"goal-cancel", "goal-graph", "goal-resume", "loop", "autonomous"},
         )
 
     def test_requires_task(self):
@@ -167,9 +172,10 @@ class TestLoopGoalPlugin(unittest.TestCase):
         self.assertEqual(self.plugin.priority, 40)
 
     def test_mutex_with(self):
+        # Phase 18：autonomous 加入互斥集
         self.assertEqual(
             self.plugin.mutex_with,
-            {"goal-cancel", "goal-graph", "goal-resume", "multi-goal"},
+            {"goal-cancel", "goal-graph", "goal-resume", "multi-goal", "autonomous"},
         )
 
     def test_requires_task(self):
@@ -193,3 +199,50 @@ class TestLoopGoalPlugin(unittest.TestCase):
         )
         self.assertTrue(result)
         mock_legacy.assert_called_once()
+
+
+class TestRalphAutonomousPlugin(unittest.TestCase):
+    """Phase 18 新增：RalphAutonomousPlugin 单元测试。"""
+
+    def setUp(self):
+        self.plugin = RalphAutonomousPlugin()
+
+    def test_name(self):
+        self.assertEqual(self.plugin.name, "autonomous")
+
+    def test_priority(self):
+        # priority=5（DESTROY-like）
+        self.assertEqual(self.plugin.priority, 5)
+
+    def test_mutex_with(self):
+        # 与 goal-cancel/goal-graph/goal-resume/multi-goal/loop 互斥
+        self.assertEqual(
+            self.plugin.mutex_with,
+            {"goal-cancel", "goal-graph", "goal-resume", "multi-goal", "loop"},
+        )
+
+    def test_requires_task(self):
+        # resume 模式可无 task
+        self.assertFalse(self.plugin.requires_task)
+
+    def test_matches_with_autonomous_flag(self):
+        self.assertTrue(self.plugin.matches(make_args(autonomous=True)))
+
+    def test_matches_with_auto_resume(self):
+        self.assertTrue(self.plugin.matches(make_args(auto_resume="r-abc")))
+
+    def test_matches_with_auto_resume_latest(self):
+        self.assertTrue(self.plugin.matches(make_args(auto_resume_latest=True)))
+
+    def test_matches_without_any_flag(self):
+        self.assertFalse(self.plugin.matches(
+            make_args(autonomous=False, auto_resume=None, auto_resume_latest=False)
+        ))
+
+    def test_dry_run_short_circuits(self):
+        """dry_run 模式应短路返回 True（不执行 autonomous）。"""
+        from dispatcher.plugin_context import PluginContext
+        ctx = PluginContext(project_root=Path("/tmp"), log=noop_log, dry_run=True)
+        args = make_args(autonomous=True, task="test")
+        result = self.plugin.execute(args, ctx)
+        self.assertTrue(result)

@@ -286,6 +286,140 @@ def parse_arguments():
         help='轮询间隔（秒；默认 5.0；范围 [0.5, 60.0]，由 watcher 钳制）',
     )
 
+    # Phase 18 新增：Ralph 风格 autonomous 模式
+    # --autonomous：启用自主迭代执行器
+    parser.add_argument(
+        '--autonomous',
+        action='store_true',
+        default=False,
+        help='Phase 18 启用 Ralph 风格 autonomous 模式（与 --loop / --multi-goal '
+             '/ --goal-cancel / --goal-graph / --goal-resume 互斥）。'
+             'autonomous 模式让多角色团队在用户睡眠时自动完成全部任务'
+             '（自动运行、自动确认、自动使用 skill、自动测试、自动提交）。',
+    )
+    parser.add_argument(
+        '--auto-max-iterations',
+        type=int,
+        default=50,
+        help='autonomous 模式最大迭代次数（硬上限；默认 50，范围 [1, 1000]）',
+    )
+    parser.add_argument(
+        '--auto-max-tokens',
+        type=int,
+        default=500000,
+        help='autonomous 模式 token 预算（默认 500000）',
+    )
+    parser.add_argument(
+        '--auto-stop-when',
+        type=str,
+        default='',
+        help='autonomous 模式自然语言停止条件（如 "all tests pass"）',
+    )
+    parser.add_argument(
+        '--auto-test-command',
+        type=str,
+        default='python3 -m unittest discover -s tests -p "test_*.py"',
+        help='autonomous 模式测试命令（默认：python3 -m unittest discover）',
+    )
+    parser.add_argument(
+        '--auto-stage-order',
+        type=str,
+        default='plan,dev,verify,fix',
+        help='autonomous 模式阶段顺序（CSV；默认 plan,dev,verify,fix）',
+    )
+    parser.add_argument(
+        '--auto-backoff-base',
+        type=float,
+        default=1.0,
+        help='autonomous 模式失败退避基数（秒；默认 1.0）',
+    )
+    parser.add_argument(
+        '--auto-backoff-max',
+        type=float,
+        default=60.0,
+        help='autonomous 模式退避上限（秒；默认 60.0）',
+    )
+    parser.add_argument(
+        '--auto-failure-abort',
+        type=int,
+        default=3,
+        help='autonomous 模式连续失败 abort 阈值（默认 3）',
+    )
+    parser.add_argument(
+        '--auto-resume',
+        type=str,
+        default=None,
+        help='autonomous 模式 resume 指定 run_id（None = 新建）',
+    )
+    parser.add_argument(
+        '--auto-resume-latest',
+        action='store_true',
+        default=False,
+        help='autonomous 模式 resume 最新可续跑的 run（与 --auto-resume 互斥）',
+    )
+    parser.add_argument(
+        '--auto-no-caffeinate',
+        action='store_true',
+        default=False,
+        help='autonomous 模式禁用 caffeinate / systemd-inhibit（CI 环境）',
+    )
+    parser.add_argument(
+        '--auto-no-commit',
+        action='store_true',
+        default=False,
+        help='autonomous 模式禁用自动 git commit（仅记录，不提交）',
+    )
+    parser.add_argument(
+        '--auto-confirm-mode',
+        type=str,
+        default='smart',
+        choices=['smart', 'whitelist-only', 'blacklist-only'],
+        help='autonomous 模式确认模式（smart/whitelist-only/blacklist-only；默认 smart）',
+    )
+    parser.add_argument(
+        '--auto-run-dir',
+        type=str,
+        default='.gnhf/runs',
+        help='autonomous 模式 run 状态目录（相对 project_root；默认 .gnhf/runs）',
+    )
+    parser.add_argument(
+        '--auto-git-author-name',
+        type=str,
+        default='Ralph Autonomous Agent',
+        help='autonomous 模式 git commit 作者名（默认 "Ralph Autonomous Agent"）',
+    )
+    parser.add_argument(
+        '--auto-git-author-email',
+        type=str,
+        default='ralph@trae-multi-agent.local',
+        help='autonomous 模式 git commit 作者邮箱（默认 ralph@trae-multi-agent.local）',
+    )
+    parser.add_argument(
+        '--auto-security-analyzer',
+        type=str,
+        default='builtin',
+        choices=['builtin', 'bandit', 'semgrep'],
+        help='autonomous 模式安全分析器（builtin/bandit/semgrep；默认 builtin）',
+    )
+    parser.add_argument(
+        '--auto-notes-path',
+        type=str,
+        default='notes.md',
+        help='autonomous 模式 notes 文件名（默认 notes.md）',
+    )
+    parser.add_argument(
+        '--auto-max-size-kb',
+        type=int,
+        default=1024,
+        help='autonomous 模式 notes.md 最大大小（KB；超过则 trim；默认 1024）',
+    )
+    parser.add_argument(
+        '--auto-trim-keep-last-n',
+        type=int,
+        default=20,
+        help='autonomous 模式 trim 时保留最近 N 段（默认 20）',
+    )
+
     return parser.parse_args()
 
 

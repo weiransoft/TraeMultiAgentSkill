@@ -18,7 +18,8 @@ class LoopGoalPlugin(GoalCommandPlugin):
 
     @property
     def mutex_with(self) -> Set[str]:
-        return {"goal-cancel", "goal-graph", "goal-resume", "multi-goal"}
+        # Phase 18：与 autonomous 互斥
+        return {"goal-cancel", "goal-graph", "goal-resume", "multi-goal", "autonomous"}
 
     @property
     def requires_task(self) -> bool:

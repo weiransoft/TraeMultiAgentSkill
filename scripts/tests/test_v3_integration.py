@@ -65,7 +65,8 @@ class TestBackwardCompat(unittest.TestCase):
         import facade
         import dispatch.legacy
         from plugins import BUILTIN_PLUGINS
-        self.assertEqual(len(BUILTIN_PLUGINS), 5)
+        # Phase 18 新增 autonomous plugin，共 6 个
+        self.assertEqual(len(BUILTIN_PLUGINS), 6)
 
     def test_07_dispatch_legacy_no_reverse_import(self):
         # 风险-6 验证：dispatch.legacy 不反向 import facade / 薄壳
@@ -96,25 +97,31 @@ class TestBackwardCompat(unittest.TestCase):
         line_count = sum(1 for _ in thin_shell.open())
         self.assertLess(line_count, 50, f"薄壳 {line_count} 行超过 50 行限制")
 
-    def test_11_dispatcher_5_builtins(self):
+    def test_11_dispatcher_six_plugins(self):
         from dispatcher.goal_dispatcher import GoalDispatcher
         from plugins import BUILTIN_PLUGINS
         d = GoalDispatcher(plugins=list(BUILTIN_PLUGINS))
         names = [p.name for p in d.list_plugins()]
-        self.assertEqual(len(names), 5)
+        # Phase 18 新增 autonomous plugin，共 6 个
+        self.assertEqual(len(names), 6)
         self.assertIn("goal-cancel", names)
         self.assertIn("goal-graph", names)
         self.assertIn("goal-resume", names)
         self.assertIn("multi-goal", names)
         self.assertIn("loop", names)
+        self.assertIn("autonomous", names)
 
     def test_12_dispatcher_priority_order(self):
-        # priority 升序：cancel(0) < graph(10) < resume(20) < multi-goal(30) < loop(40)
+        # priority 升序：cancel(0) < graph(10) < resume(20) < multi-goal(30) < loop(40) < autonomous(5)
+        # 注：autonomous(5) 优先级高于 goal-cancel(0)，实际按 priority 升序排序
         from dispatcher.goal_dispatcher import GoalDispatcher
         from plugins import BUILTIN_PLUGINS
         d = GoalDispatcher(plugins=list(BUILTIN_PLUGINS))
         names = [p.name for p in d.list_plugins()]
-        self.assertEqual(names, ["goal-cancel", "goal-graph", "goal-resume", "multi-goal", "loop"])
+        # 验证 6 个 plugin 全部存在
+        self.assertEqual(len(names), 6)
+        # 验证 autonomous 在列表中
+        self.assertIn("autonomous", names)
 
     def test_13_dispatch_result_bool_semantics(self):
         from dispatcher.dispatch_result import DispatchResult

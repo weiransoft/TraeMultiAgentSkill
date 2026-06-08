@@ -1,4 +1,4 @@
-"""Plugin 契约测试（H-8 修复：保证 5 个内置 plugin 满足 ABC 接口）。"""
+"""Plugin 契约测试（H-8 修复：保证内置 plugin 满足 ABC 接口）。"""
 import unittest
 import re
 from plugins.base import GoalCommandPlugin
@@ -8,6 +8,7 @@ from plugins.graph import GoalGraphPlugin
 from plugins.resume import GoalResumePlugin
 from plugins.multi_goal import MultiGoalPlugin
 from plugins.loop import LoopGoalPlugin
+from plugins.autonomous import RalphAutonomousPlugin
 
 
 class TestABCContract(unittest.TestCase):
@@ -19,7 +20,7 @@ class TestABCContract(unittest.TestCase):
 
 
 class TestBuiltinPluginsContract(unittest.TestCase):
-    """5 个内置 plugin 满足契约。"""
+    """内置 plugin 满足契约。"""
 
     def test_all_builtins_are_goal_command_plugin(self):
         for plugin in BUILTIN_PLUGINS:
@@ -60,24 +61,26 @@ class TestBuiltinPluginsContract(unittest.TestCase):
                 self.assertIn(mutex_name, names, f"Plugin {p.name!r} mutex_with 引用不存在 {mutex_name!r}")
 
     def test_builtin_plugin_classes_importable(self):
-        # 5 个 plugin class 全部可 import
+        # 6 个 plugin class 全部可 import
         self.assertIsNotNone(GoalCancelPlugin)
         self.assertIsNotNone(GoalGraphPlugin)
         self.assertIsNotNone(GoalResumePlugin)
         self.assertIsNotNone(MultiGoalPlugin)
         self.assertIsNotNone(LoopGoalPlugin)
+        self.assertIsNotNone(RalphAutonomousPlugin)
 
 
 class TestBuiltinPluginsStateless(unittest.TestCase):
     """plugin 必须 stateless（风险-9 修正）。"""
 
     def test_plugin_instances_independent(self):
-        # 验证 5 个 plugin 是 5 个不同 class
+        # 验证内置 plugin 是多个不同 class
         from plugins import BUILTIN_PLUGINS as builtin1
         plugin_classes = set()
         for p in builtin1:
             plugin_classes.add(type(p))
-        self.assertEqual(len(plugin_classes), 5, "5 个 plugin 应该是 5 个不同 class")
+        self.assertEqual(len(plugin_classes), 6, "内置 plugin 应该是 6 个不同 class")
 
-    def test_builtins_count_is_5(self):
-        self.assertEqual(len(BUILTIN_PLUGINS), 5)
+    def test_builtins_count_is_6(self):
+        # Phase 18：autonomous 加入后共 6 个内置 plugin
+        self.assertEqual(len(BUILTIN_PLUGINS), 6)
