@@ -142,6 +142,52 @@
       ]
     }
   },
+
+  "lazy_load": {
+    "enabled": true,
+    "resources": {
+      "karpathy_principles": {
+        "path": "docs/guides/KARPATHY_PRINCIPLES.md",
+        "description": "Karpathy 四大核心原则详细说明和示例",
+        "trigger": "需要详细解释 Karpathy 原则时"
+      },
+      "role_architect": {
+        "path": "docs/roles/architect/prompt.md",
+        "description": "架构师角色详细 prompt",
+        "trigger": "任务匹配到架构师角色时"
+      },
+      "role_product_manager": {
+        "path": "docs/roles/product-manager/prompt.md",
+        "description": "产品经理角色详细 prompt",
+        "trigger": "任务匹配到产品经理角色时"
+      },
+      "role_test_expert": {
+        "path": "docs/roles/test-expert/prompt.md",
+        "description": "测试专家角色详细 prompt",
+        "trigger": "任务匹配到测试专家角色时"
+      },
+      "role_solo_coder": {
+        "path": "docs/roles/solo-coder/prompt.md",
+        "description": "独立开发者角色详细 prompt",
+        "trigger": "任务匹配到独立开发者角色时"
+      },
+      "role_ui_designer": {
+        "path": "docs/roles/ui-designer/prompt.md",
+        "description": "UI 设计师角色详细 prompt",
+        "trigger": "任务匹配到 UI 设计师角色时"
+      },
+      "visualization": {
+        "path": "docs/guides/VISUALIZATION.md",
+        "description": "3D 代码地图和任务可视化详细说明",
+        "trigger": "使用可视化功能时"
+      },
+      "autonomous_mode": {
+        "path": "docs/guides/AUTONOMOUS_MODE_GUIDE.md",
+        "description": "自主模式（gnhf Ralph 风格）使用指南",
+        "trigger": "启用 autonomous 模式时"
+      }
+    }
+  },
   
   "usage_examples": {
     "architecture": "设计系统架构：包括模块划分、技术选型、部署方案",
