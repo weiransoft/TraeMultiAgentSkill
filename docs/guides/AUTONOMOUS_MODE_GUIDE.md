@@ -1,737 +1,521 @@
 # Autonomous 模式使用指南
 
-> **目标**：让多角色团队在你睡觉时也一直在干活 —— 不再需要频繁点击"运行"或"确认"，自主完成 plan → dev → verify → fix 四阶段，自动测试、自动提交、自动恢复。
+> 让多角色团队在你睡觉时自动完成全部任务 —— 自动运行、自动确认、自动使用 skill、自动测试、自动提交。
 
-本指南基于 [kunchenguid/gnhf](https://github.com/kunchenguid/gnhf)（Ralph 风格自主循环）的核心理念，落地在 trae-multi-agent Phase 18 自主模式。
+本文档面向 trae-multi-agent 的 Autonomous 模式（Phase 18，借鉴 [gnhf](https://github.com/kunchenguid/gnhf) 的 Ralph 风格自主迭代思想）。读者应当已经熟悉 trae-multi-agent 的基本调度、CLI、角色机制。
 
----
+## 1. 概述
 
-## 1. 5 分钟上手
+### 1.1 什么是 Autonomous 模式
 
-### 1.1 一行命令启动自主模式
+Autonomous 模式（内部代号 `Ralph`）是一种"无人值守迭代"工作流：给定一个目标后，多角色团队（架构师 / 产品经理 / 独立开发者 / 测试专家 / UI 设计师）会按照 `plan → dev → verify → fix` 四阶段循环执行，直到满足停止条件或触发硬上限（max iterations / max tokens）。
+
+适合的场景：
+
+- 夜间长跑需求（例如补齐测试、重构大型模块、批量迁移）
+- 需要反复重试直到全绿的任务
+- 用户希望"挂上后不必再点确认"的场景
+
+不适合的场景：
+
+- 涉及生产数据库写操作（建议手动）
+- 涉及不可逆硬件操作（同样建议手动）
+- 跨主机的强一致性同步（建议走专用工具）
+
+### 1.2 核心组件一览
+
+| 组件 | 路径 | 职责 |
+| --- | --- | --- |
+| `RalphAutonomousPlugin` | `scripts/plugins/autonomous.py` | 插件入口（priority=5，CLI flag `--autonomous`） |
+| `RalphLoopController` | `scripts/autonomous/loop_controller.py` | 主循环（Plan / Dev / Verify / Fix） |
+| `RunState` | `scripts/autonomous/run_state.py` | 状态持久化（SHA256 校验、备份恢复） |
+| `NotesMemory` | `scripts/autonomous/notes_memory.py` | 跨轮 `notes.md` 累积 |
+| `GitDriver` | `scripts/autonomous/git_driver.py` | 原子 commit / 滚动回滚 |
+| `SleepGuard` | `scripts/autonomous/sleep_guard.py` | 跨平台防休眠（caffeinate / systemd-inhibit） |
+| `SmartConfirmation` | `scripts/autonomous/smart_confirmation.py` | 三态确认（白名单 + 风险评分 + 黑名单） |
+| `AutoSkillLoader` | `scripts/autonomous/auto_skill_loader.py` | 自动按任务特征加载相关 skill |
+| `DispatcherAdapter` | `scripts/autonomous/dispatcher_adapter.py` | 与 V3 dispatcher 解耦适配 |
+| `load_config` | `scripts/autonomous/config_loader.py` | YAML 配置加载（用户级 + 项目级） |
+
+### 1.3 与其他 V3 插件的互斥
+
+Autonomous 模式与下列插件互斥（`mutex_with={"autonomous"}`）：
+
+- `loop`（`--loop`）
+- `multi-goal`（`--multi-goal`）
+- `cancel`（`--goal-cancel`）
+- `graph`（`--goal-graph`）
+- `resume`（`--goal-resume`）
+
+互斥检查在 `GoalDispatcher` 启动时执行：若同时启用多个，会拒绝并提示。
+
+## 2. 快速上手
+
+### 2.1 最小化启动
 
 ```bash
-python3 -m scripts.cli --autonomous --task "实现 X 功能并补全测试"
+# 在项目根目录执行：让 Ralph 自动完成"实现一个 LRU 缓存"
+python -m cli.main \
+    --autonomous \
+    --task "实现一个线程安全的 LRU 缓存" \
+    --project-root .
 ```
 
-执行后，CLI 会：
-
-1. 调度 `RalphAutonomousPlugin`（与 `--loop / --multi-goal / --goal-cancel / --goal-graph / --goal-resume` 互斥）。
-2. 创建一个 `run_id`（如 `r-20260607-153012-abc123`），状态写入 `.gnhf/runs/<run_id>/state.json`。
-3. 启用 `caffeinate`（macOS）/ `systemd-inhibit`（Linux）防止系统休眠。
-4. 循环执行四阶段：`plan → dev → verify → fix`，直到命中 `stop_when` / `max_iterations` / 致命错误。
-
-### 1.2 默认行为
-
-| 维度 | 默认值 | 含义 |
-| --- | --- | --- |
-| `max_iterations` | 50 | 硬上限，超过即停 |
-| `max_tokens` | 500000 | 累计 token 预算 |
-| `stage_order` | plan,dev,verify,fix | 阶段顺序 |
-| `test_command` | `python3 -m unittest discover -s tests -p "test_*.py"` | 测试命令 |
-| `auto_commit` | True | 每轮自动 commit |
-| `sleep_guard_enabled` | True | caffeinate / systemd-inhibit |
-| `confirm_mode` | smart | 黑/白名单 + 风险评分 |
-| `risk_threshold` | 5 | 评分 ≤ 阈值自动批准 |
-| `consecutive_failure_abort` | 3 | 连续失败 3 次 abort |
-| `notes_path` | `notes.md` | 跨轮记忆文件 |
-| `run_dir` | `.gnhf/runs` | run 状态目录 |
-
-### 1.3 退出码
+退出码含义：
 
 | 退出码 | 含义 |
 | --- | --- |
-| `0` | 全部成功 |
-| `1` | 部分失败（达到 `max_iterations` 仍有失败） |
-| `2` | 致命错误 abort |
-| `3` | 命中 `stop_when` 条件 |
+| `0` | 全部迭代成功（`consecutive_failures == 0`） |
+| `1` | 部分迭代失败，但未达 fatal 阈值 |
+| `2` | fatal 错误（达到 `consecutive_failure_abort`） |
+| `3` | 命中 `stop_when`，主动停止 |
 
----
-
-## 2. 17 个 CLI 标志详解
-
-> 所有 `--auto-*` 标志仅在 `--autonomous` 同时启用时生效。
-
-### 2.1 启用开关
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--autonomous` | flag | False | 启用 Ralph 风格自主模式 |
-
-### 2.2 循环控制
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--auto-max-iterations N` | int | 50 | 最大迭代次数（1-1000） |
-| `--auto-max-tokens N` | int | 500000 | 累计 token 预算 |
-| `--auto-stop-when "phrase"` | str | `""` | 自然语言停止条件（如 `"all tests pass"`） |
-| `--auto-stage-order "a,b,c"` | CSV | `plan,dev,verify,fix` | 阶段顺序（支持任意排列） |
-
-### 2.3 测试与重试
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--auto-test-command CMD` | str | `python3 -m unittest discover` | 测试命令 |
-| `--auto-backoff-base SEC` | float | 1.0 | 失败退避基数 |
-| `--auto-backoff-max SEC` | float | 60.0 | 退避上限 |
-| `--auto-failure-abort N` | int | 3 | 连续失败 abort 阈值 |
-
-### 2.4 Run 生命周期
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--auto-resume RUN_ID` | str | None | resume 指定 run |
-| `--auto-resume-latest` | flag | False | resume 最新可续跑的 run |
-
-### 2.5 系统行为
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--auto-no-caffeinate` | flag | False | 禁用 caffeinate / systemd-inhibit（CI 环境） |
-| `--auto-no-commit` | flag | False | 禁用自动 commit（仅记录，不提交） |
-
-### 2.6 确认与安全
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--auto-confirm-mode MODE` | enum | smart | smart / whitelist-only / blacklist-only |
-
-### 2.7 路径与作者
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--auto-run-dir PATH` | str | `.gnhf/runs` | run 状态目录（相对 project_root） |
-| `--auto-git-author-name NAME` | str | `Ralph Autonomous Agent` | commit 作者名 |
-| `--auto-git-author-email EMAIL` | str | `ralph@trae-multi-agent.local` | commit 作者邮箱 |
-
-### 2.8 安全与 notes
-
-| 标志 | 类型 | 默认 | 说明 |
-| --- | --- | --- | --- |
-| `--auto-security-analyzer NAME` | enum | builtin | builtin / bandit / semgrep |
-| `--auto-notes-path FILE` | str | `notes.md` | notes 文件名 |
-| `--auto-max-size-kb N` | int | 1024 | notes.md 最大 KB |
-| `--auto-trim-keep-last-n N` | int | 20 | trim 时保留段落数 |
-
-### 2.9 完整示例
+### 2.2 完整推荐启动命令
 
 ```bash
-python3 -m scripts.cli \
-  --autonomous \
-  --task "实现用户登录接口并补全单测" \
-  --auto-max-iterations 20 \
-  --auto-stop-when "all tests pass" \
-  --auto-test-command "python3 -m unittest discover -s tests -p 'test_*.py'" \
-  --auto-backoff-base 2.0 \
-  --auto-backoff-max 120.0 \
-  --auto-failure-abort 5 \
-  --auto-confirm-mode whitelist-only \
-  --auto-run-dir .gnhf/runs \
-  --auto-git-author-name "Night Owl" \
-  --auto-git-author-email "owl@example.com" \
-  --auto-notes-path log.md
+python -m cli.main \
+    --autonomous \
+    --task "为 parser 模块补齐边界测试" \
+    --project-root . \
+    --auto-max-iterations 30 \
+    --auto-stop-when "all tests pass" \
+    --auto-test-command "python3 -m unittest discover -s tests -p 'test_*.py'" \
+    --auto-confirm-mode smart \
+    --auto-git-author-name "Ralph Bot" \
+    --auto-git-author-email "ralph@example.com"
 ```
 
----
+## 3. CLI Flags 全参考
 
-## 3. 配置文件（YAML）
+所有 autonomous 专属 flag 都以 `--auto-` 前缀命名，避免与其它插件冲突。
 
-### 3.1 路径与覆盖
+### 3.1 主开关
 
-| 路径 | 范围 | 优先级 |
-| --- | --- | --- |
-| `~/.trae/autonomous.yml` | 用户级 | 低 |
-| `<project_root>/.trae/autonomous.yml` | 项目级 | **高**（覆盖用户级） |
+| Flag | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `--autonomous` | bool | `False` | 启用 autonomous 模式 |
 
-项目级同名键会覆盖用户级；嵌套 dict 递归合并。
+### 3.2 运行时硬上限
 
-### 3.2 完整 schema
+| Flag | 类型 | 默认 | 范围 | 说明 |
+| --- | --- | --- | --- | --- |
+| `--auto-max-iterations` | int | `50` | `[1, 1000]` | 最大迭代次数 |
+| `--auto-max-tokens` | int | `500000` | `>=0` | token 预算 |
+| `--auto-stop-when` | str | `""` | — | 自然语言停止条件（按空格拆分做 substring 命中） |
+| `--auto-failure-abort` | int | `3` | `>=1` | 连续失败 abort 阈值 |
+
+### 3.3 阶段与节奏
+
+| Flag | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `--auto-stage-order` | CSV str | `plan,dev,verify,fix` | 阶段顺序（CSV 解析为 list） |
+| `--auto-test-command` | str | `python3 -m unittest discover -s tests -p "test_*.py"` | 每轮 verify 阶段跑的测试命令 |
+| `--auto-backoff-base` | float | `1.0` | 退避基数（秒；指数退避基数） |
+| `--auto-backoff-max` | float | `60.0` | 退避上限（秒） |
+
+### 3.4 续跑 / 状态
+
+| Flag | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `--auto-resume` | str | `None` | resume 指定 `run_id` |
+| `--auto-resume-latest` | bool | `False` | resume 最新可续跑的 run（与 `--auto-resume` 互斥） |
+| `--auto-run-dir` | str | `.gnhf/runs` | run 状态目录（相对 `project_root`） |
+
+### 3.5 安全与防休眠
+
+| Flag | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `--auto-no-caffeinate` | bool | `False` | 禁用 `caffeinate` / `systemd-inhibit`（CI 环境） |
+| `--auto-no-commit` | bool | `False` | 禁用自动 git commit（只跑不交） |
+| `--auto-confirm-mode` | str | `smart` | `smart` / `whitelist-only` / `blacklist-only` |
+| `--auto-security-analyzer` | str | `builtin` | `builtin` / `bandit` / `semgrep` |
+
+### 3.6 Git 与作者
+
+| Flag | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `--auto-git-author-name` | str | `Ralph Autonomous Agent` | commit 作者名 |
+| `--auto-git-author-email` | str | `ralph@trae-multi-agent.local` | commit 作者邮箱 |
+
+### 3.7 Notes（跨轮记忆）
+
+| Flag | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `--auto-notes-path` | str | `notes.md` | notes 文件名（相对 `project_root`） |
+| `--auto-max-size-kb` | int | `1024` | notes.md 最大大小（KB；超过则 trim） |
+| `--auto-trim-keep-last-n` | int | `20` | trim 时保留最近 N 段 |
+
+## 4. 配置文件（autonomous.yml）
+
+Autonomous 配置采用两级合并：用户级 `~/.trae/autonomous.yml` + 项目级 `<project_root>/.trae/autonomous.yml`，项目级覆盖用户级。
+
+### 4.1 完整示例
+
+`./.trae/autonomous.yml`
 
 ```yaml
-# ~/.trae/autonomous.yml 或 <project_root>/.trae/autonomous.yml
+# 运行时硬上限
+max_iterations: 30
+max_tokens: 200000
+stop_when: "all tests pass"
+consecutive_failure_abort: 5
 
-# 循环控制
-max_iterations: 50              # int, [1, 1000]
-max_tokens: 500000              # int
-stop_when: "all tests pass"     # str（自然语言）
-stage_order:                    # list[str]
+# 阶段与节奏
+stage_order:
   - plan
   - dev
   - verify
   - fix
-
-# 重试
-backoff_base_sec: 1.0           # float
-backoff_max_sec: 60.0           # float
-consecutive_failure_abort: 3    # int
-
-# 测试
 test_command: "python3 -m unittest discover -s tests -p 'test_*.py'"
-test_timeout_sec: 600.0
-
-# 安全
-security_analyzer: builtin      # builtin | bandit | semgrep
-confirm_mode: smart             # smart | whitelist-only | blacklist-only
-risk_threshold: 5               # int, 0-100
+test_timeout_sec: 600
+backoff_base_sec: 2.0
+backoff_max_sec: 120.0
 
 # Git
-git_author_name: "Ralph Autonomous Agent"
-git_author_email: "ralph@trae-multi-agent.local"
+git_author_name: "Ralph Bot"
+git_author_email: "ralph@example.com"
 auto_commit: true
 
-# 系统
+# 防休眠
 sleep_guard_enabled: true
+
+# run 状态
 run_dir: ".gnhf/runs"
 
 # notes
+max_size_kb: 512
+trim_keep_last_n: 15
 notes_path: "notes.md"
-max_size_kb: 1024
-trim_keep_last_n: 20
 
-# 未知字段会落入 .extra（不会丢失，便于后续扩展）
-custom_flag: 42
+# 安全
+confirm_mode: smart   # smart / whitelist-only / blacklist-only
+risk_threshold: 5
+security_analyzer: builtin   # builtin / bandit / semgrep
 ```
 
-### 3.3 YAML 解析能力
+### 4.2 字段说明
 
-内置 `SimpleYAMLParser`，**不依赖 PyYAML**：
+详见 [`AutonomousConfig`](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/scripts/autonomous/config_loader.py#L18-L66)。未识别的字段会落入 `extra` dict，不影响主流程。
 
-- ✅ 键值对（`key: value`）
-- ✅ 嵌套 dict（2 空格缩进）
-- ✅ 列表（`- item`）
-- ✅ 标量：int / float / bool / null / string
-- ❌ 不支持：anchor/alias、多行 block scalar、复杂 mapping
+### 4.3 优先级
 
-如需 anchor/alias，请把配置写入 JSON（通过 `extra` 字段或扩展 config loader）。
+CLI flag > 项目级 `autonomous.yml` > 用户级 `autonomous.yml` > 默认值（`AutonomousConfig()` 字段默认值）
 
----
+## 5. 四阶段工作流
 
-## 4. 四阶段工作流
-
-### 4.1 阶段顺序
+每轮迭代按以下顺序执行 4 个阶段，每阶段有独立 handler，可在 `scripts/autonomous/handlers/` 下扩展。
 
 ```
-┌───────┐    ┌─────┐    ┌─────────┐    ┌─────┐
-│ PLAN  │───▶│ DEV │───▶│ VERIFY  │───▶│ FIX │──┐
-└───────┘    └─────┘    └─────────┘    └─────┘  │
-                                               │
-                              ┌────────────────┘
-                              ▼
-                       （进入下一轮 iter）
++-------------------+    +-------------------+    +-------------------+    +-------------------+
+|       PLAN        | -> |        DEV        | -> |      VERIFY       | -> |        FIX        |
+| 规划本轮要做的子任务 |    | 实施子任务（写代码）|    | 跑 test_command   |    | 修复 verify 失败项 |
++-------------------+    +-------------------+    +-------------------+    +-------------------+
 ```
 
-每轮迭代都会跑完所有四个阶段。任意阶段产出 `fatal` 错误 → 整轮 abort。
-
-### 4.2 各阶段职责
-
-| 阶段 | 任务 | 输出 |
-| --- | --- | --- |
-| **PLAN** | 拆解目标、识别依赖、生成执行计划 | `plan.md` / `artifacts["plan"]` |
-| **DEV** | 写代码、跑测试 skill 改写 | `patches` / diff |
-| **VERIFY** | 执行 `test_command`、安全分析 | `pass/fail` + 测试日志 |
-| **FIX** | 根据 verify 失败修复 | 修复后的 patches |
-
-### 4.3 自定义 stage_order
-
-```bash
-# 只要 dev + verify
-python3 -m scripts.cli --autonomous --task "X" --auto-stage-order "dev,verify"
-```
-
-注意：空 `stage_order` 会 raise `ValueError`。
-
----
-
-## 5. 安全：智能确认（SmartConfirmation）
-
-### 5.1 三种确认模式
-
-| 模式 | 行为 |
-| --- | --- |
-| `smart` | 默认。黑名单 + 白名单 + 风险评分；低风险自动批准，高风险拒绝 |
-| `whitelist-only` | 仅白名单命令自动批准；其他一律 ASK |
-| `blacklist-only` | 仅黑名单命令拒绝；其他自动批准 |
-
-### 5.2 决策结果
+### 5.1 阶段返回值（StageResult）
 
 ```python
-from autonomous.smart_confirmation import SmartConfirmation
-sc = SmartConfirmation()
-result = sc.check("rm -rf /")  # → Decision.DENY（黑名单）
-result = sc.check("git status")  # → Decision.AUTO（白名单/低风险）
-result = sc.check("npm install foo")  # → Decision.ASK（未知，询问用户）
+@dataclass
+class StageResult:
+    kind: str          # "success" / "retriable" / "fatal" / "ask"
+    summary: str       # 简短描述（会写进 notes.md 与 state）
+    artifacts: dict    # 阶段产物（diff stats / test output / 等）
 ```
 
-### 5.3 风险评分（0-100）
+### 5.2 阶段间短路
 
-- `0`：完全安全（白名单）
-- `1-5`（默认阈值）：低风险，自动批准
-- `6-30`：中等风险，ASK
-- `31-100`：高风险，DENY
+- 若 `plan` 返回 `ask`（需用户确认），整个迭代暂停等待。
+- 若 `dev` 返回 `fatal`，直接 abort，退出码 = 2。
+- 若 `verify` 返回 `retriable` 但本轮 `dev` 没产出 diff，自动跳到下一阶段（避免空跑）。
+- `fix` 总是最后一阶段，调用 dispatcher adapter 让 LLM 看 verify 输出做最小修改。
 
-可通过 `--auto-risk-threshold` 调整（需修改 config_loader；CLI 当前不暴露）。
+## 6. 安全机制
 
-### 5.4 黑名单示例
+### 6.1 SmartConfirmation 三态决策
 
-内置黑名单包括但不限于：
+`SmartConfirmation.check(cmd)` 返回 `ConfirmationResult`，决策如下：
 
-- `rm -rf /`、`rm -rf /*`
-- `DROP DATABASE`、`TRUNCATE TABLE`
-- `git push --force origin main`
-- `mkfs`、`dd if=`、`shutdown`、`reboot`
-- `chmod 777 /` 等
-
-详见 [smart_confirmation.py](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/scripts/autonomous/smart_confirmation.py) 的 `_DEFAULT_BLACKLIST`。
-
----
-
-## 6. 防休眠：SleepGuard
-
-### 6.1 平台适配
-
-| 平台 | 机制 | 命令 |
+| 命令特征 | 决策 | 含义 |
 | --- | --- | --- |
-| macOS | `caffeinate -di` | `caffeinate -di -w $$ sleep infinity` |
-| Linux | `systemd-inhibit` | `systemd-inhibit --what=sleep:idle --why=...` |
-| Windows / 其他 | noop | 直接返回 |
+| 命中黑名单（`rm -rf /`、`DROP DATABASE`、`git push --force` 等） | `DENY` | 立即拒绝，不会执行 |
+| 风险分 ≤ 30 | `AUTO` | 自动放行 |
+| 风险分 31-70 且命中白名单 | `AUTO` | 放行 |
+| 风险分 31-70 且未命中白名单 | `ASK` | 暂停迭代等待用户 |
+| 风险分 ≥ 71 | `ASK` | 强制人工确认 |
 
-### 6.2 模式
+### 6.2 风险评分（0-100）
 
-- `AUTO`：自动检测平台（默认）
-- `ON`：强制启用
-- `OFF`：禁用（CI / 远程服务器）
+- 黑名单命令 → `CRITICAL`（直接 DENY）
+- 删除/格式化/重置 → +60
+- 网络写操作（push、deploy） → +40
+- 大范围查找/扫描（find /、grep -r） → +20
+- 状态查询（git status、ls、cat） → -30
+- 写测试文件且在 `tests/` 目录 → -20
 
-### 6.3 禁用方法
+### 6.3 自动加载 Skill
 
-```bash
-# CI 环境推荐
-python3 -m scripts.cli --autonomous --task "X" --auto-no-caffeinate
-```
+`AutoSkillLoader.detect_for_task(task_text)` 根据任务文本中的关键词匹配 `~/.trae/skills/*/skills-index.json`，返回优先级排序的 skill 列表。匹配规则：
 
-或配置文件：
+- 文件路径类（`tests/`、`docs/`、`scripts/`）→ 加载对应领域 skill
+- 关键词类（"安全"、"性能"、"重构"）→ 加载专题 skill
+- 默认加载：`trae-multi-agent` 自身 + `multi-agent-team` 协调
 
-```yaml
-sleep_guard_enabled: false
-```
+每轮 dev 阶段会把命中的 skill 注入 dispatcher 的 prompt，从而实现"自动使用 skill"。
 
----
+## 7. 状态持久化与续跑
 
-## 7. 跨轮记忆：notes.md
-
-### 7.1 文件结构
-
-```markdown
-# Autonomous Run Notes
-
-> Generated by Ralph Autonomous Agent
-> Run ID: r-20260607-153012
-> Objective: 实现 X 功能
-
----
-
-## Iteration 1: 初始化项目结构
-<!-- iter=1 tags=plan,success -->
-- 拆解任务：创建 ... 
-- 识别依赖：...
-
-## Iteration 2: 实现核心逻辑
-<!-- iter=2 tags=dev,success -->
-- 新增 module foo.py
-- 修复 bar.py 中 NPE
-
-## Final Summary
-- 成功完成 5/5 子任务
-- 测试全部通过
-- 提交 12 次 commit
-```
-
-### 7.2 关键能力
-
-| 能力 | 说明 |
-| --- | --- |
-| 段落追踪 | 每轮一个 `## ` 段，标题含 `iter_index` |
-| 原子写入 | 先写 `.tmp` + `fsync` + `rename`（避免半写） |
-| 自动 trim | 超过 `max_size_kb` 时按 `trim_keep_last_n` 裁剪 |
-| 元数据注释 | `<!-- iter=N tags=... -->`，可被 LLM 直接解析 |
-| token 估算 | 粗略 `chars/4`，不依赖 tiktoken |
-
-详见 [notes_memory.py](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/scripts/autonomous/notes_memory.py)。
-
----
-
-## 8. Run 状态与恢复
-
-### 8.1 状态文件布局
+### 7.1 RunState 文件结构
 
 ```
 <project_root>/.gnhf/runs/<run_id>/
-├── state.json           # 当前状态（含 SHA256 校验和）
-├── state.json.bak       # 上一次成功持久化的备份
-└── notes.md             # 该 run 的 notes（可选；默认在 project_root）
+├── state.json         # 当前状态
+├── state.json.bak     # 最近一次备份
+├── notes.md           # 跨轮 notes（每个 run 独立）
+└── manifest.json      # 列出 uncommitted files
 ```
 
-### 8.2 state.json 字段
+`state.json` 字段：
 
 ```json
 {
-  "run_id": "r-20260607-153012-abc123",
-  "objective": "实现 X 功能",
-  "status": "running",          // pending | running | success | failed | aborted
-  "iter_index": 5,
-  "commits_made": 3,
+  "schema_version": 1,
+  "run_id": "r-20260607-xxx",
+  "objective": "实现 LRU 缓存",
+  "status": "running",
+  "iter_index": 3,
   "consecutive_failures": 0,
+  "commits_made": 3,
   "cumulative_tokens": 12345,
-  "uncommitted_paths": [],       // 上一轮未提交的路径（用于 rollback 后恢复）
-  "stop_when": "all tests pass",
-  "started_at": "2026-06-07T15:30:12Z",
-  "updated_at": "2026-06-07T15:45:33Z"
+  "created_at": "2026-06-07T01:23:45Z",
+  "updated_at": "2026-06-07T01:25:11Z",
+  "integrity_sha256": "abc123...",
+  "stop_when": "all tests pass"
 }
 ```
 
-### 8.3 完整性保护
+### 7.2 完整性校验
 
-- **SHA256 校验**：每次 `persist()` 写入 `checksum` 字段；加载时 `verify_integrity()` 校验。
-- **backup + restore**：`state.json.bak` 保留上一次成功状态。若 `state.json` 损坏，调用 `restore_from_backup()` 自动恢复。
+`RunState.verify_integrity()` 用 SHA256 校验内存中缓存的摘要与磁盘上的 `state.json` 是否一致。**不通过**会自动从 `state.json.bak` 恢复（`restore_from_backup()`）。
 
-### 8.4 Resume 流程
+### 7.3 Resume
+
+两种方式续跑：
 
 ```bash
-# 1) 查看所有 run
-ls .gnhf/runs/
+# 指定 run_id
+python -m cli.main --autonomous --auto-resume r-20260607-xxx ...
 
-# 2) resume 指定 run
-python3 -m scripts.cli --autonomous --auto-resume r-20260607-153012-abc123 --task "继续 X"
-
-# 3) resume 最新可续跑的 run
-python3 -m scripts.cli --autonomous --auto-resume-latest --task "继续 X"
+# 续最新一个
+python -m cli.main --autonomous --auto-resume-latest ...
 ```
 
-**Resume 上下文**：
+可续跑的前提：`get_resume_context().can_resume == True`，即状态非 `pending` / `completed` / `aborted`。
 
-- ✅ iter_index：已完成的轮次
-- ✅ 累计 commits
-- ✅ uncommitted 路径列表（避免 rollback 时丢失未提交 work）
-- ❌ 不在 pending 状态：pending 不能 resume（需先启动）
+### 7.4 Crash Recovery
 
----
+若进程被 SIGKILL 或机器断电，下次启动时：
 
-## 9. Git 集成与回滚
+1. 加载 `state.json`（或 backup）
+2. 校验 SHA256；不通过则用 backup
+3. 续跑：跳过已完成 stage（`manifest.json` 中记录 uncommitted files）
 
-### 9.1 自动 commit
+## 8. 防休眠（Slee pGuard）
 
-- 每轮 dev/fix 完成后，若 `auto_commit=true`，执行 `git commit -m "..." --author "..."`。
-- 失败时不抛异常，状态标记为 `committed=False` 继续下一轮。
+`SleepGuard` 在主循环入口 `acquire()`，出口 `release()`：
 
-### 9.2 安全回滚
+| 系统 | 后端 | 说明 |
+| --- | --- | --- |
+| macOS | `caffeinate -i -s` | 阻止 idle 与系统睡眠 |
+| Linux | `systemd-inhibit` | 阻止 idle / sleep / shutdown |
+| Windows / 其它 | `noop` | 不做事（仅记录） |
 
-当 SmartConfirmation DENY 某个高危命令时：
+可通过 `--auto-no-caffeinate` 关闭（CI 环境必关）。
 
-1. `git_driver.rollback()` 还原到上一轮 commit。
-2. `state.json` 中 `uncommitted_paths` 字段记录被还原的文件路径。
-3. 下一轮 iter 启动时，`dispatcher_adapter` 读取 `uncommitted_paths` 并重新注入上下文。
+## 9. Notes（跨轮记忆）
 
-详见 [git_driver.py](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/scripts/autonomous/git_driver.py)。
+`NotesMemory` 维护 `notes.md`：
 
-### 9.3 非 git 项目
+- 每轮结束追加一个 `## Iteration N` 段落
+- 段落中包含：`<!-- iter=N tags=... -->` 元注释
+- 原子写入：先 `.tmp`、fsync、`rename`（避免半写）
+- 自动 trim：超过 `--auto-max-size-kb` 时保留最近 N 段
 
-- `is_git_repo() == False` 时，所有 `commit/rollback/diff_stats` 返回 `success=True, stdout=""`，不抛异常。
-- 此时仅靠 `notes.md` + `state.json` 记录工作流。
+LLM 在下一轮 dev 阶段会被 prompt 读取 `notes.md` 末尾段，从而"记得"上一轮做了什么。
 
----
+## 10. 常见场景
 
-## 10. 自动技能加载（AutoSkillLoader）
+### 10.1 夜间跑回归测试
 
-### 10.1 工作原理
+```bash
+python -m cli.main --autonomous \
+    --task "把 tests/ 下所有失败用例修到通过" \
+    --auto-stop-when "all tests pass" \
+    --auto-max-iterations 100 \
+    --auto-failure-abort 5
+```
 
-每轮 plan 阶段前，扫描 `~/.trae/skills/` 与 `<project_root>/.trae/skills/`，根据任务关键词匹配相关 skill。
+### 10.2 批量重构 + 自动 commit
 
-### 10.2 优先级
+```bash
+python -m cli.main --autonomous \
+    --task "把所有 print 替换为 logging.info" \
+    --auto-test-command "python3 -m unittest discover" \
+    --auto-stage-order "plan,dev,verify"
+```
 
-| 来源 | 优先级 |
+每轮 dev 完成后会自动 `git add` + `git commit -m "Iteration N: ..."`（前提：当前是 git 仓库）。
+
+### 10.3 Resume 续跑
+
+第一次跑崩了：
+
+```bash
+python -m cli.main --autonomous --auto-resume-latest ...
+```
+
+### 10.4 CI 集成
+
+```bash
+# CI 环境：禁用防休眠、关闭自动 commit、降低 token 预算
+python -m cli.main --autonomous \
+    --auto-no-caffeinate \
+    --auto-no-commit \
+    --auto-max-iterations 5 \
+    --auto-failure-abort 2
+```
+
+## 11. 故障排查
+
+| 现象 | 排查方向 |
 | --- | --- |
-| 项目内 `.trae/skills/` | **高**（覆盖用户级） |
-| 用户 `~/.trae/skills/` | 低 |
-| 内置 skill（trae-multi-agent 自带） | 最低 |
+| 启动时直接 abort | 检查 `--auto-failure-abort` 是否过小；查看 `state.json.status` |
+| 每轮都 `ASK` | 风险分偏高 → 改 `--auto-confirm-mode whitelist-only` |
+| 不写 commit | `--auto-no-commit` 是否为 True；当前目录是否 git 仓库 |
+| `stop_when` 永远不命中 | 关键字用空格分隔的 substring 匹配；确认 LLM 输出的 summary 包含这些词 |
+| notes.md 暴涨 | 调小 `--auto-max-size-kb`；或调小 `--auto-trim-keep-last-n` |
+| resume 失败 | `state.json` 损坏 → 看 `state.json.bak`；backup 都没了则需 `--auto-resume` 新 run |
+| macOS 仍然睡眠 | 确认 `caffeinate` 可执行；`pmset -g` 查看 assertions |
 
-### 10.3 匹配规则
-
-- skill 的 `SKILL.md` / `skill.yml` 中声明的 `keywords` 与任务描述做大小写不敏感子串匹配。
-- 按命中数排序，**最多返回 5 个 skill**。
-
-详见 [auto_skill_loader.py](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/scripts/autonomous/auto_skill_loader.py)。
-
----
-
-## 11. Dispatcher 适配
-
-### 11.1 架构关系
+## 12. 架构概览
 
 ```
-RalphAutonomousPlugin
-        ↓
-DispatcherAdapter
-        ↓
-GoalDispatcher (V3 现有调度器)
-        ↓
-角色 plugins: architect / pm / solo-coder / test-expert / ui-designer
+                  +--------------------+
+   --autonomous   |  RalphAutonomous-  |
+   ----------->   |       Plugin       |  priority=5
+                  +---------+----------+
+                            |
+                            v
+                  +--------------------+
+                  |  RalphLoopController|
+                  +----+----+----+-----+
+                       |    |    |
+       +---------------+    |    +----------------+
+       |                    |                     |
+       v                    v                     v
+  +---------+         +-----------+         +-----------+
+  |  PLAN   |  --->   |    DEV    |  --->   |  VERIFY   |  --->  FIX
+  +---------+         +-----------+         +-----------+
+       |                    |                     |
+       +-- StageHandler ----+-- StageHandler -----+-- StageHandler
+                            |
+                            v
+                    +---------------+
+                    | Dispatcher-   |   <-- 注入 autonomous=True
+                    |   Adapter     |       + 自动加载 skills
+                    +-------+-------+
+                            |
+                            v
+                    +---------------+
+                    |   V3 Goal     |
+                    |  Dispatcher   |
+                    +---------------+
 ```
 
-Autonomous 是**上层编排**，不替代 V3 dispatcher。
+每轮迭代内：
 
-### 11.2 注入字段
+1. `LoopController.run_one_iteration(iter_index)`
+2. 依次调用 4 个 stage handler
+3. 每个 handler 通过 `DispatcherAdapter.invoke()` 调用 V3 dispatcher
+4. 阶段返回 `StageResult` → 聚合 → `RunState.record_iteration()` 持久化
+5. 触发 `GitDriver.commit()`（若 dev 阶段有 diff）
+6. 追加 `NotesSection` 到 `notes.md`
+7. 检查 `stop_when` / 硬上限 → 决定是否继续下一轮
 
-`dispatcher_adapter` 在每次 invoke 时自动注入：
+## 13. 进阶：扩展自定义 Stage
 
 ```python
-{
-  "autonomous": True,
-  "run_id": "r-xxx",
-  "iter_index": 3,
-  "loop": False,        # 关闭内层 V3 --loop（避免双重循环）
-  "max_iterations": 1,  # V3 dispatcher 单次
-  "uncommitted_paths": [...],
+# scripts/autonomous/handlers/my_handler.py
+from autonomous.handlers.base import StageHandler, StageResult, StageContext
+
+class MyHandler(StageHandler):
+    name = "my"
+    kind = "my-stage"
+
+    def handle(self, ctx: StageContext) -> StageResult:
+        # 你的逻辑
+        return StageResult(kind="success", summary="done", artifacts={})
+```
+
+注册（在 `RalphAutonomousPlugin._build_handlers` 中）：
+
+```python
+from autonomous.handlers.my_handler import MyHandler
+
+handlers = {
+    StageKind.PLAN: ...,
+    StageKind.DEV: ...,
+    StageKind.VERIFY: MyHandler(),  # 覆盖默认
+    StageKind.FIX: ...,
 }
 ```
 
-详见 [dispatcher_adapter.py](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/scripts/autonomous/dispatcher_adapter.py)。
+## 14. 进阶：自定义风险规则
 
-### 11.3 错误分类
+```python
+from autonomous.smart_confirmation import SmartConfirmation, RiskLevel
 
-| 类型 | 行为 |
-| --- | --- |
-| `success` | 本轮 OK，进入下一轮 |
-| `retriable` | 触发 `backoff_sleep(attempt)`，consecutive_failures+1 |
-| `fatal` | 整轮 abort，exit_code=2 |
+sc = SmartConfirmation()
 
----
+# 加入自定义白名单
+sc.whitelist_patterns.add(r"^my-safe-cmd\s+--dry-run$")
 
-## 12. 完整运行示例
-
-### 12.1 准备工作
-
-```bash
-# 1. 克隆 trae-multi-agent 技能
-git clone <repo-url> .trae/skills/trae-multi-agent
-cd .trae/skills/trae-multi-agent
-
-# 2. 安装依赖
-pip install -r requirements.txt
-
-# 3. （可选）创建项目级配置
-mkdir -p .trae
-cat > .trae/autonomous.yml <<'EOF'
-max_iterations: 30
-test_command: "python3 -m unittest discover -s tests -p 'test_*.py'"
-auto_commit: true
-sleep_guard_enabled: true
-EOF
+# 检查
+result = sc.check("my-safe-cmd --dry-run")
+assert result.decision.value == "auto"
 ```
 
-### 12.2 启动自主模式
+详见 [`SmartConfirmation`](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/scripts/autonomous/smart_confirmation.py)。
 
-```bash
-# 启动并跑过夜
-python3 -m scripts.cli \
-  --autonomous \
-  --project-root /path/to/your/project \
-  --task "为项目添加 OpenAPI 文档生成、补全所有 API 的单元测试、修复 lint 错误" \
-  --auto-stop-when "all tests pass"
+## 15. 与 V3 Dispatcher 的对接
+
+`DispatcherAdapter` 把 autonomous 的"轮次上下文"翻译成 V3 dispatcher 期望的输入：
+
+```python
+adapter.invoke(
+    task=objective,
+    project_root=project_root,
+    loop=False,            # autonomous 自己跑循环，dispatcher 不再 loop
+    max_iterations=1,      # 单次 invoke 不递归
+    autonomous=True,       # 注入 autonomous 上下文（让 LLM 知道自己在 autonomous 中）
+    skills=auto_skill_loader.detect_for_task(objective),
+    iter_index=iter_index,
+    notes=notes_memory.tail(n=3),  # 最近 3 段 notes
+    prior_summary=state.last_summary,
+)
 ```
 
-### 12.3 查看进度
+返回的 `AdapterInvokeResult` 会被翻译成 `StageResult`，从而供下一阶段使用。
 
-```bash
-# 1. 查看 run_id
-ls .gnhf/runs/
+## 16. 版本与兼容
 
-# 2. 查看 state.json
-cat .gnhf/runs/r-xxx/state.json
+- 引入版本：Phase 18（v2.5+）
+- 状态 schema：`schema_version = 1`（后续可能升级，向后兼容）
+- 配置文件：YAML 子集（不支持 anchor/alias、多行 block scalar）
+- Python：3.10+（依赖 `dataclasses`、`match/case`、`typing.ParamSpec`）
 
-# 3. 查看 notes.md
-cat notes.md
-```
+## 17. 相关文档
 
-### 12.4 中断后恢复
-
-```bash
-# 第二天早上接着跑
-python3 -m scripts.cli \
-  --autonomous \
-  --project-root /path/to/your/project \
-  --auto-resume-latest
-```
-
-### 12.5 关闭自主模式
-
-- 正常退出：完成 `stop_when` 或达到 `max_iterations`。
-- 强制停止：`Ctrl-C` → sleep_guard 释放 → state 持久化为 `aborted`。
-- 紧急 abort：连续失败达到 `consecutive_failure_abort` → 退出码 `2`。
-
----
-
-## 13. 测试与验证
-
-### 13.1 单元测试
-
-```bash
-cd .trae/skills/trae-multi-agent/scripts
-
-# Phase 18 单元测试（约 100+ 用例）
-python3 -m unittest tests.test_phase18_config \
-                   tests.test_phase18_git_driver \
-                   tests.test_phase18_notes_memory \
-                   tests.test_phase18_run_state \
-                   tests.test_phase18_sleep_guard \
-                   tests.test_phase18_smart_confirmation \
-                   tests.test_phase18_auto_skill_loader \
-                   tests.test_phase18_handlers \
-                   tests.test_phase18_dispatcher_adapter \
-                   tests.test_phase18_loop_controller \
-                   tests.test_phase18_autonomous_plugin \
-                   tests.test_phase18_cli \
-                   -v
-```
-
-### 13.2 集成测试（12 个端到端场景）
-
-```bash
-python3 -m unittest tests.test_phase18_integration -v
-```
-
-### 13.3 测试脚本
-
-```bash
-# 一键运行
-bash tests/scripts/run_phase18_all.sh
-# 包含：unit、integration、e2e basic、e2e resume、e2e safety、regression
-```
-
-### 13.4 回归测试
-
-```bash
-# V3 现有插件测试
-bash tests/scripts/run_v3_plugin_tests.sh
-
-# V2 回归
-bash tests/scripts/run_v2_regression.sh
-```
-
-### 13.5 覆盖率
-
-```bash
-python3 -m coverage run --source=autonomous -m unittest discover tests
-python3 -m coverage report
-python3 -m coverage html  # → htmlcov/index.html
-```
-
-详见 `tests/coverage_analysis.py`。
-
----
-
-## 14. 故障排查
-
-| 现象 | 排查 |
-| --- | --- |
-| `--autonomous` 启动后立刻退出 | 检查 `state.json` 状态：是否处于 `aborted/failed` 且不可 resume |
-| 一直停在同一轮 | `consecutive_failures` 累计达到 `consecutive_failure_abort` → 检查 test_command 是否正确 |
-| notes.md 增长失控 | 调小 `--auto-max-size-kb`（默认 1024KB）或增大 `--auto-trim-keep-last-n` |
-| 远程仓库 push 失败 | 检查 `git_author_name/email`；非 git 仓库时 `is_git_repo` 判定 |
-| macOS caffeinate 报权限 | 在系统设置 → 隐私与安全 → 允许 caffeinate 终端控制 |
-| 调度器死锁 | 检查 `GoalDispatcher` 的 `mutex_with` 是否对称；`autonomous` 必须与 `loop / multi-goal / goal-cancel / goal-graph / goal-resume` 互斥 |
-| Resume 失败：`can_resume=False` | 状态为 `pending` 时不可 resume；需用 `--auto-resume RUN_ID` 而不是 `--auto-resume-latest` |
-
----
-
-## 15. 架构与扩展
-
-### 15.1 模块清单
-
-```
-scripts/autonomous/
-├── __init__.py                # 公共导出
-├── loop_controller.py         # RalphLoopController（主循环）
-├── config_loader.py           # AutonomousConfig + SimpleYAMLParser
-├── git_driver.py              # GitDriver（commit/rollback/diff_stats）
-├── notes_memory.py            # NotesMemory（跨轮记忆）
-├── run_state.py               # RunState（持久化 + 完整性 + 恢复）
-├── sleep_guard.py             # SleepGuard（caffeinate/systemd-inhibit）
-├── smart_confirmation.py      # SmartConfirmation（黑/白名单 + 风险评分）
-├── auto_skill_loader.py       # AutoSkillLoader（自动加载 skill）
-├── dispatcher_adapter.py      # DispatcherAdapter（适配 V3 dispatcher）
-└── handlers/                  # 4 阶段 handler
-    ├── base.py                # StageHandler / StageResult / StageContext
-    ├── plan_handler.py
-    ├── dev_handler.py
-    ├── verify_handler.py
-    └── fix_handler.py
-```
-
-### 15.2 与 V3 plugin 体系集成
-
-- 入口：`plugins/autonomous.py: RalphAutonomousPlugin`（`priority=5`）
-- 注册：`plugins/__init__.py: PLUGINS` 列表追加
-- 互斥：所有 V3 插件的 `mutex_with` 已包含 `"autonomous"`
-
-### 15.3 扩展点
-
-| 想做什么 | 改哪里 |
-| --- | --- |
-| 新增 CLI flag | `cli/parser.py` + `plugins/autonomous.py: _apply_args` |
-| 新增配置字段 | `config_loader.py: AutonomousConfig` + `SimpleYAMLParser` |
-| 替换 stage handler | `plugins/autonomous.py: _build_handlers` |
-| 新增 sleep backend | `sleep_guard.py: SleepGuard._acquire_<platform>` |
-| 新增 security analyzer | `security/` 目录（builtin/bandit/semgrep） |
-| 自定义风险评分 | `smart_confirmation.py: SmartConfirmation.score` |
-
-### 15.4 不修改现有代码的边界
-
-Autonomous 模式**不修改** V3 dispatcher、V2 workflow engine、任何现有 plugin。V3 插件的 `mutex_with` 是通过测试脚本验证的最小改动（追加一个字符串）。
-
----
-
-## 16. 最佳实践
-
-1. **必设 `stop_when`**：明确结束条件，避免无限循环。
-2. **CI 环境关闭 caffeinate**：`--auto-no-caffeinate`。
-3. **小步迭代**：把大任务拆为多个 `--task` 调用，每次只跑 autonomous 模式处理一段。
-4. **定期查看 notes.md**：避免最后才发现方向偏了。
-5. **保留 `state.json.bak`**：完整 state 在 resume 时可避免丢失上下文。
-6. **设置 `consecutive_failure_abort` 较小值**（如 3-5）：避免无意义重试烧 token。
-7. **不要在 autonomous 模式下手动改文件**：会破坏 git 状态和 uncommitted_paths 追踪。
-8. **始终用项目级 `.trae/autonomous.yml`**：避免污染用户级配置。
-
----
-
-## 17. 常见问答（FAQ）
-
-**Q: 和 `--loop` 的区别？**
-A: `--loop` 是 V3 dispatcher 内的循环（单角色重复）；`--autonomous` 是四阶段（plan→dev→verify→fix）的全流程循环 + 跨轮记忆 + 自动 commit + 安全确认。
-
-**Q: 跑过夜会不会烧很多 token？**
-A: 默认 `max_tokens=500_000`。可在 YAML 中调小，或通过 `stop_when` 提前结束。
-
-**Q: 必须用 git 吗？**
-A: 不必须。`GitDriver` 在非 git 仓库下退化为 no-op，仍能跑完整工作流（只不自动 commit）。
-
-**Q: 如何看每轮发生了什么？**
-A: `notes.md`（人类/LLM 可读） + `state.json`（程序可读） + git log（如果开了 commit）。
-
-**Q: 能跑多个 autonomous run 并行吗？**
-A: 不建议。每个 run 有自己的 `run_id` + 独立 `state.json`，但 `notes_path` 默认共享，可能产生写入竞争。如需并行，可为每个 run 指定不同的 `--auto-run-dir` 和 `--auto-notes-path`。
-
-**Q: resume 是精确恢复还是近似？**
-A: 精确恢复 `iter_index / commits / uncommitted_paths`；LLM 上下文由 `notes.md` 重建。
-
----
-
-## 18. 参考资料
-
-- 原始设计：[kunchenguid/gnhf](https://github.com/kunchenguid/gnhf)（Ralph 风格自主循环）
-- 开发计划：[PHASE18_PLAN.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/dev/PHASE18_PLAN.md)
-- 架构对比：[ARCHITECTURE_COMPARISON.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/dev/ARCHITECTURE_COMPARISON.md)
-- V3 插件集成：[DYNAMIC_WORKFLOWS_INTEGRATION.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md)
-- 整体使用：[USAGE_GUIDE.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/guides/USAGE_GUIDE.md)
-
----
-
-> **最后更新**：2026-06-07 · Phase 18
+- [PHASE18_PLAN.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/dev/PHASE18_PLAN.md) - Phase 18 设计文档
+- [USAGE_GUIDE.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/guides/USAGE_GUIDE.md) - 总使用指南
+- [DYNAMIC_WORKFLOWS_INTEGRATION.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md) - 与动态工作流的集成
+- [gnhf (GitHub)](https://github.com/kunchenguid/gnhf) - 借鉴的设计灵感
