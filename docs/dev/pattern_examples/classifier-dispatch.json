@@ -1,0 +1,128 @@
+{
+  "pattern_id": "classifier-dispatch",
+  "name": "分类并行动",
+  "version": "1.0",
+  "description": "用分类器判断任务类型 → 路由到不同子流程或子智能体。",
+  "metadata": {
+    "phase": "0'",
+    "priority": "P0",
+    "isolation_requirement": "none",
+    "default_token_budget": 4000,
+    "applicable_roles": ["product-manager", "test-expert", "architect", "solo-coder"]
+  },
+  "parameters_schema": {
+    "classifier_role": {
+      "type": "string",
+      "required": true,
+      "description": "执行分类的智能体角色",
+      "enum": ["product-manager", "test-expert", "architect", "solo-coder"]
+    },
+    "route_table": {
+      "type": "object",
+      "required": true,
+      "description": "分类标签到目标流程的路由表",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "target_pattern": { "type": "string" },
+          "target_role": { "type": "string" },
+          "priority": { "type": "integer", "default": 0 }
+        }
+      }
+    },
+    "fallback_route": {
+      "type": "string",
+      "required": true,
+      "description": "未知分类时的兜底路由"
+    },
+    "classification_confidence_threshold": {
+      "type": "number",
+      "required": false,
+      "default": 0.7,
+      "minimum": 0.0,
+      "maximum": 1.0
+    }
+  },
+  "example_input": {
+    "task_description": "客服系统今日收到 200 条工单，需要自动分类并分发到对应处理流程",
+    "task_features": {
+      "type_variants": 4,
+      "subtask_count": 200,
+      "subtask_homogeneous": false,
+      "risk_level": "low"
+    }
+  },
+  "example_parameters": {
+    "classifier_role": "test-expert",
+    "route_table": {
+      "bug": {
+        "target_pattern": "sequential",
+        "target_role": "solo-coder",
+        "priority": 1
+      },
+      "feature_request": {
+        "target_pattern": "sequential",
+        "target_role": "product-manager",
+        "priority": 1
+      },
+      "question": {
+        "target_pattern": "sequential",
+        "target_role": "architect",
+        "priority": 1
+      },
+      "incident": {
+        "target_pattern": "adversarial-verify",
+        "target_role": "solo-coder",
+        "priority": 0
+      }
+    },
+    "fallback_route": "solo-coder",
+    "classification_confidence_threshold": 0.7
+  },
+  "example_selection_output": {
+    "pattern_id": "classifier-dispatch",
+    "applicable": true,
+    "confidence": 0.92,
+    "rationale": "任务存在 4 种异构类型（bug / feature_request / question / incident），且子任务数高达 200，单一流程无法高效处理；incident 类高风险任务额外启用 adversarial-verify 强化验证。",
+    "parameters": {
+      "classifier_role": "test-expert",
+      "route_table": {
+        "bug": { "target_pattern": "sequential", "target_role": "solo-coder", "priority": 1 },
+        "feature_request": { "target_pattern": "sequential", "target_role": "product-manager", "priority": 1 },
+        "question": { "target_pattern": "sequential", "target_role": "architect", "priority": 1 },
+        "incident": { "target_pattern": "adversarial-verify", "target_role": "solo-coder", "priority": 0 }
+      },
+      "fallback_route": "solo-coder",
+      "classification_confidence_threshold": 0.7
+    },
+    "estimated_token_budget": 4000,
+    "fallback_pattern": "sequential"
+  },
+  "failure_modes": [
+    {
+      "name": "分类不准确",
+      "trigger": "训练样本不足 / 任务表达歧义",
+      "mitigation": "保留 fallback 路由 + 反馈回流到 PerformanceFingerprint"
+    },
+    {
+      "name": "路由死循环",
+      "trigger": "route_table 中目标互指形成环",
+      "mitigation": "静态校验禁止环（PatternLibrary 加载时检测）"
+    },
+    {
+      "name": "分类开销过大",
+      "trigger": "任务量极大（>10000）",
+      "mitigation": "引入分类缓存（LRU 1000 条）"
+    }
+  ],
+  "success_criteria": [
+    "分类器对 4 种工单类型准确率 ≥ 90%",
+    "路由到目标流程的成功率 ≥ 95%",
+    "整体处理时间 < 顺序执行的 80%"
+  ],
+  "not_applicable_scenarios": [
+    "任务类型单一（直接顺序执行即可）",
+    "分类器本身准确率 < 70%（错误分类比不分类更糟）",
+    "子任务数 < 5（分类开销大于收益）"
+  ]
+}

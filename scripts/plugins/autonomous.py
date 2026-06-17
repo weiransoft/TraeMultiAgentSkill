@@ -305,12 +305,12 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         run_dir: Path,
         config,
     ) -> Optional[dict]:
-        """构造 8 个 autonomous 组件。
+        """构造 8 个 autonomous 组件（v2 修订：新增 ponytail_engine）。
 
         Returns:
             dict 包含 keys: notes_memory / git_driver / auto_skill_loader /
             smart_confirmation / dispatcher_adapter / sleep_guard /
-            sleep_guard_enabled
+            sleep_guard_enabled / ponytail_engine / debt_collector
 
             失败返回 None
         """
@@ -349,6 +349,48 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
             SleepGuardMode.ON if sleep_guard_enabled else SleepGuardMode.OFF
         )
         sleep_guard = SleepGuard(mode=sleep_guard_mode, log=lambda m: None)
+
+        # 【新增】7. PonytailRulesetEngine（决策梯引擎，线程安全，无状态修改）
+        # 从用户输入解析模式（支持 /ponytail lite/full/ultra/off 命令）
+        ponytail_engine = None
+        ponytail_mode = None
+        try:
+            from ponytail.ruleset import PonytailRulesetEngine, PonytailMode
+            from ponytail.mode_tracker import ModeTracker
+
+            # 解析用户输入中的 /ponytail 命令（如果有）
+            user_task = getattr(args, "task", "") or ""
+            parsed_mode = ModeTracker.parse_user_command(user_task)
+            if parsed_mode in ModeTracker.VALID_MODES:
+                ponytail_mode = PonytailMode(parsed_mode)
+                # ultra 模式安全加固：autonomous 模式下禁止 ultra（强制降级为 full）
+                # 架构师评审 P0：无人值守 + 激进删除 = 高风险
+                if ponytail_mode == PonytailMode.ULTRA:
+                    ctx.log(
+                        "[Ponytail] ultra 模式在 autonomous 下被禁用，降级为 full",
+                        "WARNING",
+                    )
+                    ponytail_mode = PonytailMode.FULL
+
+            # 构造决策梯引擎（始终构造，由 handler 按角色选择是否注入）
+            ponytail_engine = PonytailRulesetEngine(
+                skill_root=str(ctx.project_root / ".trae" / "skills" / "trae-multi-agent")
+            )
+        except ImportError as e:
+            # ponytail 模块不可用时，不注入决策梯（向后兼容）
+            ctx.log(f"[Ponytail] 模块不可用，跳过决策梯注入：{e}", "WARNING")
+            ponytail_engine = None
+            ponytail_mode = None
+
+        # 【新增】8. DebtCollector（债务台账收割，供 VerifyHandler 使用）
+        debt_collector = None
+        try:
+            from ponytail.debt_collector import DebtCollector
+            debt_collector = DebtCollector()
+        except ImportError:
+            # debt_collector 模块不可用时，不检测债务（向后兼容）
+            pass
+
         return {
             "notes_memory": notes_memory,
             "git_driver": git_driver,
@@ -357,6 +399,10 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
             "dispatcher_adapter": dispatcher_adapter,
             "sleep_guard": sleep_guard,
             "sleep_guard_enabled": sleep_guard_enabled,
+            # 【新增】Ponytail 决策梯组件
+            "ponytail_engine": ponytail_engine,
+            "ponytail_mode": ponytail_mode,
+            "debt_collector": debt_collector,
         }
 
     def _build_stage_handlers(
@@ -364,7 +410,13 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         components: dict,
         config=None,
     ) -> dict:
-        """构造 4 阶段 handler 字典（stateless：使用传入 config 而非 self）。"""
+        """构造 4 阶段 handler 字典（v2 修订：注入 ponytail_engine）。
+
+        v2 核心变更：
+        - 所有 handler 注入 ponytail_engine（按角色差异化）
+        - DevHandler/FixHandler 注入 project_root（_dispatch_via_claude_code 需要）
+        - VerifyHandler 注入 debt_collector（债务台账检测）
+        """
         from autonomous.loop_controller import StageKind
         from autonomous.handlers.plan_handler import PlanHandler
         from autonomous.handlers.dev_handler import DevHandler
@@ -373,24 +425,49 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         # 从 config 读取 test_command 和 security_analyzer（stateless 契约）
         test_command = config.test_command if config is not None else "python3 -m unittest discover -s tests -p 'test_*.py'"
         security_analyzer = config.security_analyzer if config is not None else "builtin"
+
+        # 【新增】Ponytail 组件（从 components 读取，可能为 None）
+        ponytail_engine = components.get("ponytail_engine")
+        ponytail_mode = components.get("ponytail_mode")
+        debt_collector = components.get("debt_collector")
+        # project_root 从 git_driver 获取（GitDriver 已有 repo_root）
+        project_root = "."
+        git_driver = components.get("git_driver")
+        if git_driver is not None and hasattr(git_driver, "repo_root"):
+            project_root = str(git_driver.repo_root)
+
         return {
             StageKind.PLAN: PlanHandler(
                 auto_skill_loader=components["auto_skill_loader"],
                 notes_memory=components["notes_memory"],
+                # 【新增】注入 ponytail_engine（architect 角色 = FULL 强度）
+                ponytail_engine=ponytail_engine,
             ),
             StageKind.DEV: DevHandler(
                 dispatcher_adapter=components["dispatcher_adapter"],
                 smart_confirmation=components["smart_confirmation"],
                 auto_skill_loader=components["auto_skill_loader"],
+                # 【新增】注入 ponytail_engine + project_root + ponytail_mode
+                ponytail_engine=ponytail_engine,
+                project_root=project_root,
+                ponytail_mode=ponytail_mode,
             ),
             StageKind.VERIFY: VerifyHandler(
                 git_driver=components["git_driver"],
                 test_command=test_command,
                 security_analyzer=security_analyzer,
+                # 【新增】注入 ponytail_engine + debt_collector + project_root
+                ponytail_engine=ponytail_engine,
+                debt_collector=debt_collector,
+                project_root=project_root,
             ),
             StageKind.FIX: FixHandler(
                 dispatcher_adapter=components["dispatcher_adapter"],
                 max_fix_attempts=2,
+                # 【新增】注入 ponytail_engine + project_root + ponytail_mode
+                ponytail_engine=ponytail_engine,
+                project_root=project_root,
+                ponytail_mode=ponytail_mode,
             ),
         }
 

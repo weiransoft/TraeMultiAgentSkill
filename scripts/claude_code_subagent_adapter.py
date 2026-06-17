@@ -203,20 +203,41 @@ class ClaudeCodeSubAgentAdapter:
     
     def _build_agent_prompt(self, agent_type: str, task: str,
                            context: Optional[Dict] = None) -> str:
-        """
-        构建 agent 提示词
-        
+        """构建 agent 提示词（v2 修订：按角色注入 Ponytail 决策梯）。
+
+        v2 核心变更：
+        - 参数化注入决策梯（非改私有字段，线程安全）
+        - 优先使用 context 中的 ponytail_decision_ladder（由 DevHandler/Legacy 注入）
+        - 兜底：从 context 中的 _ponytail_engine 按角色生成
+        - 决策梯作为 Karpathy Simplicity First 的可执行步骤，不替换 Karpathy 原则
+
         Args:
             agent_type: agent 类型
             task: 任务
-            context: 上下文
-            
+            context: 上下文（可能包含 ponytail_decision_ladder 或 _ponytail_engine）
+
         Returns:
             str: 完整的提示词
         """
         # 加载角色定义
         role_prompt = self._get_role_prompt(agent_type)
-        
+
+        # 【新增】按角色注入决策梯（参数化，非改私有字段，线程安全）
+        # 优先级：context['ponytail_decision_ladder'] > context['_ponytail_engine'] > 空
+        ponytail_injection = ""
+        if context and isinstance(context, dict):
+            if context.get('ponytail_decision_ladder'):
+                # context 中已有决策梯（由 DevHandler/Legacy 注入）
+                ponytail_injection = context['ponytail_decision_ladder']
+            elif context.get('_ponytail_engine') is not None:
+                # 兜底：从 engine 按角色生成（线程安全：get_injection_prompt 是纯函数）
+                try:
+                    engine = context['_ponytail_engine']
+                    ponytail_injection = engine.get_injection_prompt(role=agent_type)
+                except Exception:
+                    # engine 调用失败不阻塞 prompt 构建
+                    ponytail_injection = ""
+
         # 构建完整提示词
         prompt = f"""{role_prompt}
 
@@ -237,11 +258,17 @@ class ClaudeCodeSubAgentAdapter:
    - 验证标准
 
 3. 如果有不确定的地方，请先澄清再继续。
+
+{ponytail_injection}
 """
-        
         if context:
-            prompt += f"\n## 上下文\n{json.dumps(context, indent=2, ensure_ascii=False)}\n"
-        
+            # 【修复】context 中可能包含非 JSON 序列化对象（如 _ponytail_engine），
+            # 使用 default=str 兜底，避免 TypeError 中断 prompt 构建
+            prompt += (
+                f"\n## 上下文\n"
+                f"{json.dumps(context, indent=2, ensure_ascii=False, default=str)}\n"
+            )
+
         return prompt
     
     def _get_role_prompt(self, agent_type: str) -> str:

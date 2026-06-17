@@ -1,7 +1,7 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）。
 ---
 
 # Multi-Agent Team Dispatcher (AI-Enhanced)
@@ -355,6 +355,53 @@ python3 scripts/spec_tools.py init
 python3 scripts/spec_tools.py analyze
 python3 scripts/spec_tools.py update --spec-file SPEC.md
 ```
+
+### Ponytail 决策梯（v2.6 新增 — 少写多余代码）
+
+> **来源**: Ponytail 项目（6 步决策梯）+ 项目规则（16 条不可简化红线）
+> **目的**: 在 Karpathy Simplicity First 原则之上，提供可执行的"写代码前先停一停"决策梯
+
+**6 步决策梯**（按顺序停在第一个满足的台阶）:
+1. **YAGNI** — 这东西真的需要存在吗？→ 推测性需求 = 跳过
+2. **标准库优先** — 语言标准库能搞定？→ 直接用
+3. **平台原生** — 运行时平台自带功能能覆盖？→ 用平台特性
+4. **复用现有** — 已安装的依赖能解决？→ 复用，不新增依赖
+5. **一行优先** — 能写成一行？→ 写成一行（不牺牲可读性）
+6. **最小可行** — 以上都不行 → 写最少能做工作的代码
+
+**三种强度模式**:
+| 模式 | 说明 | 适用角色 |
+|------|------|---------|
+| `lite` | 精简版决策梯 | test_expert, ui_designer |
+| `full`（默认） | 完整 6 步 + 16 条红线 | solo_coder, architect |
+| `ultra` | YAGNI 极端主义（autonomous 模式自动降级为 full） | 手动指定 |
+
+**16 条不可简化红线**:
+- 原始 Ponytail 6 条（输入校验、错误处理、安全、无障碍、用户要求、硬件校准）
+- 项目规则 10 条（真实业务逻辑、需求文档功能、非平凡逻辑检查、并发安全、错误处理、日志审计、配置密钥、事务边界、API 契约、隐私数据）
+
+**使用方式**:
+```bash
+# 在 autonomous 模式中自动注入（默认 full 模式）
+# 手动切换模式
+/ponytail ultra    # 切换到 ULTRA 模式
+/ponytail lite     # 切换到 LITE 模式
+/ponytail off      # 关闭决策梯
+/ponytail          # 查看当前模式
+```
+
+**债务台账**:
+- 代码中标记 `# ponytail: <说明>` 或 `# ponytail: <上限>, <升级路径>` 记录故意简化
+- `DebtCollector` 自动扫描，识别无升级路径的债务（`no_trigger`）超过阈值时告警
+- `RequirementTracer` 追踪需求文档 `[REQ-XXX]` 标记到代码实现的覆盖情况
+
+**测试**:
+```bash
+# 运行全部 Ponytail 测试（10 个文件，98 个测试用例）
+bash scripts/tests/scripts/run_ponytail_tests.sh
+```
+
+详细指南见 `docs/guides/PONYTAIL_GUIDE.md`。
 
 ## 文档结构
 

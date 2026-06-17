@@ -157,8 +157,22 @@ def dispatch_agent_v2(agent_type: str, task: str, task_id: Optional[str] = None,
 # _dispatch_via_claude_code (搬迁自 line 419-502)
 # ============================================================
 def _dispatch_via_claude_code(agent_type: str, task: str, task_id: Optional[str],
-                             project_root: str, progress: Dict) -> bool:
-    """通过 Claude Code SubAgent 调度。"""
+                             project_root: str, progress: Dict,
+                             ponytail_prompt: str = "") -> bool:
+    """通过 Claude Code SubAgent 调度。
+
+    v2 修订：新增 ponytail_prompt 参数，支持 DevHandler/FixHandler 注入决策梯。
+    ponytail_prompt 非空时，追加到 context dict 的 ponytail_decision_ladder 字段，
+    被 _build_agent_prompt 用 json.dumps 拼到 LLM prompt 末尾。
+
+    Args:
+        agent_type: agent 类型
+        task: 任务描述
+        task_id: 任务 ID
+        project_root: 项目根目录
+        progress: 进度字典
+        ponytail_prompt: Ponytail 决策梯 prompt 片段（可选，由 DevHandler/FixHandler 注入）
+    """
     try:
         # 1. 初始化 Claude Code SubAgent 适配器
         adapter = ClaudeCodeSubAgentAdapter(skill_root=project_root)
@@ -170,7 +184,7 @@ def _dispatch_via_claude_code(agent_type: str, task: str, task_id: Optional[str]
             if len(task_parts) > 0:
                 actual_task_id = task_parts[0].strip()
 
-        # 3. 构建上下文
+        # 3. 构建上下文（v2 修订：追加 ponytail_decision_ladder 字段）
         context = {
             'task_id': actual_task_id,
             'project_root': project_root,
@@ -180,7 +194,11 @@ def _dispatch_via_claude_code(agent_type: str, task: str, task_id: Optional[str]
                 'simplicity_first': '最小代码、无 speculative features',
                 'surgical_changes': '只改必要的、不改无关的',
                 'goal_driven': '定义成功标准、验证检查点'
-            }
+            },
+            # 【新增】Ponytail 决策梯注入（作为 Karpathy Simplicity First 的可执行步骤）
+            # 由 DevHandler/FixHandler 通过 ponytail_prompt 参数传入
+            # _build_agent_prompt 会把 context 用 json.dumps 拼到 prompt 末尾
+            'ponytail_decision_ladder': ponytail_prompt,
         }
 
         # 4. 调用 subagent

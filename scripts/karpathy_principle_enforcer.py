@@ -121,6 +121,10 @@ class KarpathyPrincipleEnforcer:
     """
 
     # 违规模式定义
+    # v2 修订：追加 Ponytail 决策梯相关检测模式
+    # - SIMPLICITY_FIRST: 追加 YAGNI 违规检测（未要求的抽象类、新增不必要依赖）
+    # - SURGICAL_CHANGES: 追加占位代码检测（带白名单，避免误报合法 pass）
+    # - 新增 file_whitelist 字段：白名单内的文件不检测该模式
     VIOLATION_PATTERNS = {
         PrincipleType.THINK_BEFORE_CODING: [
             {
@@ -154,7 +158,21 @@ class KarpathyPrincipleEnforcer:
                 "severity": ViolationSeverity.LOW,
                 "description": "发现抽象类或接口，评估是否必要",
                 "suggestion": "确保抽象有实际用途，避免为抽象而抽象"
-            }
+            },
+            # 【新增】Ponytail YAGNI 违规：创建了未被要求的抽象类（带 ponytail 标记的除外）
+            {
+                "pattern": r"class\s+\w*(Manager|Handler|Controller|Service)\b.*#\s*ponytail",
+                "severity": ViolationSeverity.MEDIUM,
+                "description": "疑似 YAGNI 违规：创建了未被要求的抽象类（带 ponytail 标记）",
+                "suggestion": "评估是否真的需要这个抽象类，如果不需要则删除"
+            },
+            # 【新增】Ponytail 新增不必要依赖检测
+            {
+                "pattern": r"(import|from)\s+\w+.*#\s*ponytail:\s*new\s+dep",
+                "severity": ViolationSeverity.HIGH,
+                "description": "疑似新增不必要依赖（ponytail: new dep 标记）",
+                "suggestion": "复用现有依赖，绝不为几行能搞定的事新增依赖"
+            },
         ],
         PrincipleType.SURGICAL_CHANGES: [
             {
@@ -167,14 +185,35 @@ class KarpathyPrincipleEnforcer:
                 "pattern": r"mock|Mock|stub|Stub",
                 "severity": ViolationSeverity.HIGH,
                 "description": "发现 mock/stub 代码，可能不是真实实现",
-                "suggestion": "在生产代码中移除 mock，使用真实实现"
+                "suggestion": "在生产代码中移除 mock，使用真实实现",
+                # 【新增】文件白名单：测试文件中的 mock 是合法的
+                "file_whitelist": ["tests/", "test_", "_test.py", "conftest.py"]
             },
             {
                 "pattern": r"#.*顺手|#.*顺便|#.*改.*其他",
                 "severity": ViolationSeverity.MEDIUM,
                 "description": "发现可能涉及无关修改的注释",
                 "suggestion": "只修改直接相关的代码，不碰无关功能"
-            }
+            },
+            # 【新增】Ponytail 占位代码检测（无 ponytail 标记的 pass）
+            # 带白名单：class/def/except/try 上下文中的 pass 是合法的
+            {
+                "pattern": r"^\s*pass\s*$",
+                "severity": ViolationSeverity.LOW,
+                "description": "疑似占位代码（pass 无 ponytail 标记）",
+                "suggestion": "如果是故意简化，标记 # ponytail: <说明>；否则实现真实逻辑",
+                # 【新增】上下文白名单：这些上下文中的 pass 是合法的
+                "context_whitelist": ["class ", "def ", "except", "try:"]
+            },
+            # 【新增】Ponytail 红线违规：真实业务逻辑被 mock 替代
+            {
+                "pattern": r"from\s+unittest\.mock\s+import\s+Mock",
+                "severity": ViolationSeverity.CRITICAL,
+                "description": "真实业务逻辑被 mock 替代（红线违规）",
+                "suggestion": "生产代码禁止用 mock/占位/stub 替代真实业务逻辑",
+                # 【新增】文件白名单：测试文件中的 mock 是合法的
+                "file_whitelist": ["tests/", "test_", "_test.py", "conftest.py"]
+            },
         ],
         PrincipleType.GOAL_DRIVEN: [
             {
@@ -283,6 +322,10 @@ class KarpathyPrincipleEnforcer:
         """
         扫描单个文件的违规情况
 
+        v2 修订：支持 file_whitelist 和 context_whitelist 字段
+        - file_whitelist: 文件路径包含这些字符串时不检测该模式（如 tests/）
+        - context_whitelist: 匹配行的上下文包含这些字符串时不报告（如 class/def/except）
+
         Args:
             file_path: 文件路径
 
@@ -300,15 +343,33 @@ class KarpathyPrincipleEnforcer:
                 content = f.read()
                 lines = content.split('\n')
 
+            file_path_str = str(path)
+
             for principle, patterns in self.VIOLATION_PATTERNS.items():
                 for pattern_def in patterns:
                     pattern = pattern_def["pattern"]
                     severity = pattern_def["severity"]
                     description = pattern_def["description"]
                     suggestion = pattern_def["suggestion"]
+                    # 【新增】读取白名单字段（可选）
+                    file_whitelist = pattern_def.get("file_whitelist", [])
+                    context_whitelist = pattern_def.get("context_whitelist", [])
+
+                    # 【新增】文件白名单检查：如果文件路径包含白名单字符串，跳过该模式
+                    if file_whitelist:
+                        if any(wl in file_path_str for wl in file_whitelist):
+                            continue
 
                     for line_num, line in enumerate(lines, 1):
                         if re.search(pattern, line, re.IGNORECASE):
+                            # 【新增】上下文白名单检查：检查匹配行前后 5 行是否包含白名单字符串
+                            if context_whitelist:
+                                ctx_start = max(0, line_num - 5)
+                                ctx_end = min(len(lines), line_num + 5)
+                                context_text = '\n'.join(lines[ctx_start:ctx_end])
+                                if any(wl in context_text for wl in context_whitelist):
+                                    continue
+
                             # 获取上下文（前后各2行）
                             start = max(0, line_num - 3)
                             end = min(len(lines), line_num + 2)

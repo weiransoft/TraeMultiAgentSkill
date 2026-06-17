@@ -1,0 +1,152 @@
+{
+  "pattern_id": "fan-out-aggregate",
+  "name": "扇出与聚合",
+  "version": "1.0",
+  "description": "任务拆 N 份并行处理 → 屏障等待 → 聚合为单一结果。每个子任务拥有独立 context，规避单 context 下的 Agentic laziness 痛点。",
+  "metadata": {
+    "phase": "0'",
+    "priority": "P0",
+    "isolation_requirement": "worktree",
+    "default_token_budget": 12000,
+    "applicable_roles": ["test-expert", "solo-coder", "architect", "product-manager"]
+  },
+  "parameters_schema": {
+    "fanout_count": {
+      "type": "integer",
+      "required": true,
+      "minimum": 1,
+      "maximum": 10,
+      "description": "并行度（Phase 0 硬上限 10）"
+    },
+    "fanout_strategy": {
+      "type": "string",
+      "required": false,
+      "default": "static",
+      "enum": ["static", "dynamic"]
+    },
+    "subagent_role": {
+      "type": "string",
+      "required": true,
+      "description": "每个子任务的执行角色"
+    },
+    "subagent_isolation": {
+      "type": "string",
+      "required": false,
+      "default": "worktree",
+      "enum": ["worktree", "context", "full"]
+    },
+    "barrier_timeout_seconds": {
+      "type": "integer",
+      "required": false,
+      "default": 3600
+    },
+    "aggregator_role": {
+      "type": "string",
+      "required": true,
+      "description": "聚合者角色（汇总所有 subagent 结果）"
+    },
+    "aggregation_strategy": {
+      "type": "string",
+      "required": true,
+      "enum": ["concat", "vote", "rank", "merge"]
+    },
+    "partial_failure_policy": {
+      "type": "string",
+      "required": false,
+      "default": "skip",
+      "enum": ["fail", "skip", "retry"]
+    },
+    "input_chunking": {
+      "type": "object",
+      "required": true,
+      "description": "如何把大任务拆分为子任务",
+      "properties": {
+        "strategy": { "type": "string", "enum": ["by_file", "by_module", "by_record", "by_range"] },
+        "chunks": { "type": "array" }
+      }
+    }
+  },
+  "example_input": {
+    "task_description": "对项目 50 个源文件进行安全审查，每个文件独立审查后合并报告",
+    "task_features": {
+      "type_variants": 1,
+      "subtask_count": 50,
+      "subtask_homogeneous": true,
+      "risk_level": "high",
+      "estimated_total_tokens": 50000
+    }
+  },
+  "example_parameters": {
+    "fanout_count": 10,
+    "fanout_strategy": "static",
+    "subagent_role": "test-expert",
+    "subagent_isolation": "worktree",
+    "barrier_timeout_seconds": 3600,
+    "aggregator_role": "architect",
+    "aggregation_strategy": "merge",
+    "partial_failure_policy": "skip",
+    "input_chunking": {
+      "strategy": "by_file",
+      "chunks": [
+        "src/module-a/file1.py",
+        "src/module-a/file2.py",
+        "src/module-b/file3.java",
+        "src/module-b/file4.java"
+      ]
+    }
+  },
+  "example_selection_output": {
+    "pattern_id": "fan-out-aggregate",
+    "applicable": true,
+    "confidence": 0.95,
+    "rationale": "50 个文件审查是典型的大量子任务场景，且子任务同质（都是安全审查）、可独立 context。Agentic laziness 痛点明显：单 context 下 LLM 通常只审查前 20 个就宣布完成。扇出 + 屏障可保证 100% 覆盖。",
+    "parameters": {
+      "fanout_count": 10,
+      "fanout_strategy": "static",
+      "subagent_role": "test-expert",
+      "subagent_isolation": "worktree",
+      "barrier_timeout_seconds": 3600,
+      "aggregator_role": "architect",
+      "aggregation_strategy": "merge",
+      "partial_failure_policy": "skip",
+      "input_chunking": {
+        "strategy": "by_file",
+        "chunks": ["file1.py", "file2.py", "file3.java", "..."]
+      }
+    },
+    "estimated_token_budget": 12000,
+    "fallback_pattern": "sequential"
+  },
+  "failure_modes": [
+    {
+      "name": "屏障超时",
+      "trigger": "部分子任务死锁或处理过慢",
+      "mitigation": "barrier_timeout_seconds 硬超时 + partial_failure_policy 兜底"
+    },
+    {
+      "name": "资源耗尽",
+      "trigger": "fanout_count 过大（本机资源不足）",
+      "mitigation": "Phase 0 硬上限 10 + WorktreeManager 资源监控"
+    },
+    {
+      "name": "聚合冲突",
+      "trigger": "子结果 schema 不一致",
+      "mitigation": "聚合前 schema 校验，不通过则丢弃"
+    },
+    {
+      "name": "subagent 崩溃污染 worktree",
+      "trigger": "异常隔离不完整",
+      "mitigation": "worktree 隔离 + finally 块清理 + WorktreeManager 路径白名单"
+    }
+  ],
+  "success_criteria": [
+    "50 个文件 100% 全部审查（无 Agentic laziness）",
+    "扇出 + 聚合总耗时 < 顺序执行的 50%",
+    "聚合结果 schema 100% 一致"
+  ],
+  "not_applicable_scenarios": [
+    "子任务间强依赖（必须等前一个完成）",
+    "子任务数过少（< 3，扇出开销大于收益）",
+    "目标环境非 Git 仓库（worktree 隔离不可用）"
+  ]
+}

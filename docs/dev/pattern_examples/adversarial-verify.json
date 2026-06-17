@@ -1,0 +1,150 @@
+{
+  "pattern_id": "adversarial-verify",
+  "name": "对抗性验证",
+  "version": "1.0",
+  "description": "生成者产出 → 独立 context 验证者对照评估准则验证。解决 self-preferential bias 痛点：模型验证自己产出时倾向于放行。",
+  "metadata": {
+    "phase": "0'",
+    "priority": "P0",
+    "isolation_requirement": "context",
+    "default_token_budget": 8000,
+    "applicable_roles": ["architect", "test-expert", "solo-coder"]
+  },
+  "parameters_schema": {
+    "generator_role": {
+      "type": "string",
+      "required": true,
+      "description": "生成者角色"
+    },
+    "verifier_role": {
+      "type": "string",
+      "required": true,
+      "description": "验证者角色（**必须与生成者独立 context**）"
+    },
+    "verifier_isolation": {
+      "type": "string",
+      "required": true,
+      "default": "context",
+      "enum": ["context", "full"],
+      "description": "至少 context 隔离；高风险场景必须 full（context + worktree）"
+    },
+    "evaluation_criteria": {
+      "type": "array",
+      "required": true,
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "评估准则列表（必填，必须可机器/人工验证）"
+    },
+    "verification_depth": {
+      "type": "string",
+      "required": false,
+      "default": "shallow",
+      "enum": ["shallow", "deep"],
+      "description": "浅验证（单轮）vs 多轮对抗"
+    },
+    "max_rounds": {
+      "type": "integer",
+      "required": false,
+      "default": 3,
+      "minimum": 1,
+      "maximum": 5
+    },
+    "pass_threshold": {
+      "type": "number",
+      "required": false,
+      "default": 0.8,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "fallback_on_reject": {
+      "type": "string",
+      "required": false,
+      "enum": ["regenerate", "human_review", "abort"],
+      "description": "不通过时的兜底策略"
+    }
+  },
+  "example_input": {
+    "task_description": "为新功能设计架构方案，需要高可靠验证（性能 + 安全 + 兼容性）",
+    "task_features": {
+      "type_variants": 1,
+      "subtask_count": 1,
+      "subtask_homogeneous": true,
+      "risk_level": "high",
+      "has_evaluation_criteria": true,
+      "estimated_total_tokens": 6000
+    }
+  },
+  "example_parameters": {
+    "generator_role": "architect",
+    "verifier_role": "test-expert",
+    "verifier_isolation": "full",
+    "evaluation_criteria": [
+      "满足性能需求（P99 < 200ms）",
+      "无单点故障",
+      "符合现有代码规范",
+      "通过 OWASP Top 10 安全检查",
+      "可测试性（依赖注入可替换）"
+    ],
+    "verification_depth": "deep",
+    "max_rounds": 3,
+    "pass_threshold": 0.8,
+    "fallback_on_reject": "regenerate"
+  },
+  "example_selection_output": {
+    "pattern_id": "adversarial-verify",
+    "applicable": true,
+    "confidence": 0.88,
+    "rationale": "架构方案是高风险产出（影响后续 3-6 个月代码），且已定义 5 项可验证评估准则。Self-preferential bias 痛点突出：让架构师自己验证自己的方案，通过率虚高 30%+。启用对抗验证，使用 test-expert 作为独立 context 验证者。",
+    "parameters": {
+      "generator_role": "architect",
+      "verifier_role": "test-expert",
+      "verifier_isolation": "full",
+      "evaluation_criteria": [
+        "满足性能需求（P99 < 200ms）",
+        "无单点故障",
+        "符合现有代码规范",
+        "通过 OWASP Top 10 安全检查",
+        "可测试性（依赖注入可替换）"
+      ],
+      "verification_depth": "deep",
+      "max_rounds": 3,
+      "pass_threshold": 0.8,
+      "fallback_on_reject": "regenerate"
+    },
+    "estimated_token_budget": 8000,
+    "fallback_pattern": "sequential"
+  },
+  "failure_modes": [
+    {
+      "name": "验证者与生成者共享偏见",
+      "trigger": "verifier_isolation 失效（共享 context）",
+      "mitigation": "🔴 强约束：GuardCoordinator 启动前校验 isolation 字段，强制 context 隔离"
+    },
+    {
+      "name": "评估准则不明确",
+      "trigger": "evaluation_criteria 是模糊描述（如'性能要好'）",
+      "mitigation": "schema 校验：每条 criteria 必须含可测量指标（数字/标准/测试名）"
+    },
+    {
+      "name": "对抗无限循环",
+      "trigger": "生成者和验证者不断找理由",
+      "mitigation": "max_rounds 硬上限 3-5"
+    },
+    {
+      "name": "验证者过度严苛",
+      "trigger": "通过率 < 10%（验证标准脱离实际）",
+      "mitigation": "pass_threshold 动态调整（基于历史 50 次执行的 P50）"
+    }
+  ],
+  "success_criteria": [
+    "通过率（人工确认）≥ 80%",
+    "平均对抗轮次 ≤ 2",
+    "验证发现的关键缺陷数 ≥ 顺序评审的 1.5x"
+  ],
+  "not_applicable_scenarios": [
+    "主观性强的任务（设计审美）",
+    "没有评估准则的任务",
+    "简单任务（如修复 typo，引入对抗成本不划算）",
+    "verifier 角色与 generator 角色能力差距过大"
+  ]
+}

@@ -18,3 +18,15 @@ fingerprints/
 *.swp
 *.swo
 *~
+
+# 运行时状态目录（IDE / 任务上下文 / 日志）
+.trae/
+context/tasks/
+logs/
+scripts/.trae/
+scripts/logs/
+
+# 覆盖度报告
+scripts/tests/coverage.json
+.coveragerc
+
