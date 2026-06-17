@@ -374,6 +374,17 @@ task = """
 
 ## 版本历史
 
+### v2.6 (2026-06-17)
+- ✅ 新增 Ponytail 决策梯注入（参数化，线程安全）
+- ✅ `_build_agent_prompt` 支持从 context 读取决策梯（优先 `ponytail_decision_ladder`，兜底 `_ponytail_engine`）
+- ✅ 修复 `json.dumps` 非 serializable 对象崩溃（添加 `default=str`）
+- ✅ 100 并发调用线程安全测试通过
+- ✅ 不同角色注入不同强度决策梯（solo_coder=FULL, test_expert=LITE, product_manager=OFF）
+
+### v2.5 (2026-05-20)
+- ✅ 集成 Cybernetics 工程控制论（反馈控制环 + 性能画像）
+- ✅ 支持 Dynamic Workflows 6 大模式调用
+
 ### v2.4.1 (2026-04-14)
 - ✅ 新增 Claude Code SubAgent 适配器
 - ✅ 自动检测运行环境
@@ -386,13 +397,51 @@ task = """
 
 ---
 
-## 参考资料
+## Ponytail 决策梯注入（v2.6 新增）
 
-- [Karpathy 四大核心原则](README.md#karpathy-四大核心原则行为准则)
-- [角色介绍](README.md#角色介绍)
-- [使用示例](EXAMPLES.md)
+### 注入机制
+
+`ClaudeCodeSubAgentAdapter._build_agent_prompt()` 在构建 prompt 时，会从 `context` 字典中读取 Ponytail 决策梯：
+
+```python
+# 优先级 1: context['ponytail_decision_ladder']（预生成的决策梯文本）
+# 优先级 2: context['_ponytail_engine']（engine 实例，按角色生成）
+# 优先级 3: 不注入（向后兼容）
+```
+
+### 角色强度映射
+
+| 角色 | 默认强度 | 说明 |
+|------|---------|------|
+| solo_coder | FULL | 完整 6 步决策梯 + 16 条红线 |
+| architect | FULL | 完整 6 步决策梯 + 16 条红线 |
+| test_expert | LITE | 精简版决策梯 |
+| ui_designer | LITE | 精简版决策梯 |
+| product_manager | OFF | 不注入决策梯 |
+
+### 线程安全保证
+
+- `get_injection_prompt()` 是纯函数，不修改实例状态
+- `_build_agent_prompt()` 通过参数接收决策梯，不修改实例字段
+- 100 并发调用测试验证无竞争条件
+
+### Autonomous Mode 下的调用
+
+在 Autonomous Mode 中，`DevHandler` 和 `FixHandler` 直接调用 `_dispatch_via_claude_code`，并通过 `context['ponytail_decision_ladder']` 传递预生成的决策梯文本，避免递归调用 `DispatcherAdapter.invoke()`。
+
+详细指南见 `PONYTAIL_GUIDE.md`。
 
 ---
 
-**最后更新**: 2026-04-14
+## 参考资料
+
+- [Karpathy 四大核心原则](KARPATHY_PRINCIPLES.md)
+- [Ponytail 决策梯指南](PONYTAIL_GUIDE.md)
+- [Autonomous Mode 指南](AUTONOMOUS_MODE_GUIDE.md)
+- [角色介绍](../../README.md#角色介绍)
+- [使用示例](../../EXAMPLES.md)
+
+---
+
+**最后更新**: 2026-06-17
 **作者**: Claw Team

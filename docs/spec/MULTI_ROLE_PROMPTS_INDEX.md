@@ -1,18 +1,39 @@
 # 多角色代码走读 Prompt 模板
 
+> **版本**: v2.6 | **更新日期**: 2026-06-17
+
 ## 概述
 
-本目录包含用于多角色代码分析的 prompt 模板。每个角色（架构师、产品经理、独立开发者、UI设计师、测试专家）都有专属的分析视角和输出格式。
+本目录包含用于多角色代码分析的 prompt 模板。每个角色（架构师、产品经理、独立开发者、UI设计师、测试专家）都有专属的分析视角和输出格式。v2.6 新增逻辑漏洞审查专家角色和 Ponytail 决策梯评审清单。
 
 ## 角色列表
 
+### 5 个核心角色
+
+| 角色 | Prompt 模板 | 关注点 | Ponytail 强度 |
+|------|-------------|--------|--------------|
+| 架构师 | [architect-code-analysis.md](architect-code-analysis.md) | 系统架构、模块划分、技术选型 | FULL |
+| 产品经理 | [pm-code-analysis.md](pm-code-analysis.md) | 业务功能、用户流程、需求完整性 | OFF |
+| 独立开发者 | [coder-code-analysis.md](coder-code-analysis.md) | 代码实现、函数逻辑、错误处理 + Ponytail 决策梯评审 | FULL |
+| UI设计师 | [ui-code-analysis.md](ui-code-analysis.md) | 界面组件、交互流程、用户体验 | LITE |
+| 测试专家 | [test-code-analysis.md](test-code-analysis.md) | 测试覆盖、边界条件、质量风险 | LITE |
+
+### 扩展角色
+
 | 角色 | Prompt 模板 | 关注点 |
 |------|-------------|--------|
-| 架构师 | [architect-code-analysis.md](architect-code-analysis.md) | 系统架构、模块划分、技术选型 |
-| 产品经理 | [pm-code-analysis.md](pm-code-analysis.md) | 业务功能、用户流程、需求完整性 |
-| 独立开发者 | [coder-code-analysis.md](coder-code-analysis.md) | 代码实现、函数逻辑、错误处理 |
-| UI设计师 | [ui-code-analysis.md](ui-code-analysis.md) | 界面组件、交互流程、用户体验 |
-| 测试专家 | [test-code-analysis.md](test-code-analysis.md) | 测试覆盖、边界条件、质量风险 |
+| 逻辑漏洞审查专家 | [logic-vulnerability-analysis.md](logic-vulnerability-analysis.md) | 逻辑漏洞、业务漏洞、权限授权、数据一致性、竞态条件 |
+
+## Ponytail 决策梯评审清单（v2.6 新增）
+
+独立开发者（solo_coder）的代码分析模板已包含 Ponytail 决策梯评审清单（第 6 节），涵盖：
+
+- **6.1 决策梯合规检查**: YAGNI / 标准库优先 / 平台原生 / 复用现有 / 一行优先 / 最小可行
+- **6.2 16 条红线检查**: 输入校验 / 错误处理 / 安全 / 无障碍 / 用户要求 / 硬件校准 / 真实业务逻辑 / 需求文档功能 / 非平凡逻辑 / 并发安全 / 真实错误处理 / 日志审计 / 配置密钥 / 事务边界 / API 契约 / 隐私数据
+- **6.3 债务台账检查**: 债务标记 / 升级路径 / 债务腐烂
+- **6.4 需求追踪检查**: 需求标记 / 实现覆盖 / 无幽灵代码
+
+详细指南见 `docs/guides/PONYTAIL_GUIDE.md`。
 
 ## 使用方法
 

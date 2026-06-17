@@ -1,6 +1,46 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载。
+
+## 🎉 2026 年 6 月最新更新 (v2.6)
+
+> 来源：Ponytail 项目决策梯、gnhf Ralph 自主迭代思想、Anthropic Dynamic Workflows（Claude Opus 4.8）、Phase 17 插件热加载方案
+> 理论依据：YAGNI 原则、Karpathy Simplicity First、Ashby 必要多样性定律、控制论反馈闭环
+
+- ✅ **Ponytail 决策梯 (v2.6)** - 在 Karpathy Simplicity First 原则之上，提供可执行的"写代码前先停一停"决策梯
+  - 🪜 **6 步决策梯**：YAGNI → 标准库优先 → 平台原生 → 复用现有 → 一行优先 → 最小可行，停在第一个能解决问题的台阶上
+  - 🚫 **16 条不可简化红线**：6 条原始 Ponytail 红线（输入校验、错误处理、安全、无障碍等）+ 10 条项目规则红线（真实业务逻辑、并发安全、API 契约等）
+  - 🎚️ **三种强度模式**：`lite`（精简，测试/UI 角色）/ `full`（默认，开发者/架构师）/ `ultra`（YAGNI 极端主义，autonomous 自动降级为 full）
+  - 📒 **债务台账**：`# ponytail:` 注释标记故意简化，`DebtCollector` 自动扫描区分"有升级路径"与"腐烂风险"债务
+  - 🔍 **需求追踪**：`RequirementTracer` 解析 `[REQ-XXX]` 标记，中文关键词提取 + 实现检测
+  - 💬 **使用方式**：`/ponytail ultra|full|lite|off` 命令切换，环境变量 / 配置文件覆盖
+  - 🧪 **测试**：10 个测试文件，98 个测试用例全部通过
+  - 核心组件：`scripts/ponytail/ruleset.py`、`scripts/ponytail/mode_tracker.py`、`scripts/ponytail/debt_collector.py`、`scripts/ponytail/requirement_tracer.py`
+  - 📄 详细指南：[docs/guides/PONYTAIL_GUIDE.md](docs/guides/PONYTAIL_GUIDE.md)
+
+- ✅ **Autonomous 自主迭代模式 (v2.6)** - 借鉴 gnhf Ralph 风格，让多角色团队在你睡觉时自动完成全部任务
+  - 🔄 **4 阶段循环**：`plan → dev → verify → fix`，直到满足停止条件或触发硬上限
+  - 🧩 **9 个核心组件**：`RalphAutonomousPlugin`、`RalphLoopController`、`RunState`、`NotesMemory`、`GitDriver`、`SleepGuard`、`SmartConfirmation`、`AutoSkillLoader`、`DispatcherAdapter`
+  - 🚩 **17 个 CLI flag**：以 `--auto-` 前缀命名，覆盖运行时上限、阶段节奏、续跑状态、安全防休眠、Git 作者、Notes 记忆
+  - 🤖 **智能确认三态决策**：`smart`（白名单 + 风险评分 + 黑名单）/ `whitelist-only` / `blacklist-only`
+  - 💾 **断点续跑**：`--auto-resume` / `--auto-resume-latest`，SHA256 校验 + 备份恢复
+  - ☕ **跨平台防休眠**：`caffeinate`（macOS）/ `systemd-inhibit`（Linux），CI 环境可关闭
+  - 📄 详细指南：[docs/guides/AUTONOMOUS_MODE_GUIDE.md](docs/guides/AUTONOMOUS_MODE_GUIDE.md)
+
+- ✅ **Dynamic Workflows 6 大模式 (v2.6)** - 融合 Anthropic Dynamic Workflows 思想，沉淀为可复用的声明式模式库
+  - 🎯 **6 大模式**：分类并行动（classifier-dispatch）/ 扇出与聚合（fan-out-aggregate）/ 对抗性验证（adversarial-verify）/ 生成与筛选（generate-filter）/ 锦标赛（tournament）/ 循环直到完成（loop-until-done）
+  - 📦 **12 个实现模块**：`guard`、`interruption_recovery`、`model_router`、`pattern_composer`、`pattern_executor`、`pattern_tier_resolver`、`semantic_embedder`、`skill_injector`、`subagent_sandbox`、`token_budget_guard`、`workflow_step_adapter`、`worktree_manager`
+  - 🧠 **三大痛点应对**：Agentic Laziness（智能体懒惰）/ Self-preferential Bias（自我偏好偏差）/ Goal Drift（目标漂移）
+  - 🔀 **模型路由层**：分类器决定 Sonnet/Opus 路由，成本 vs 质量动态权衡
+  - 🌲 **worktree 隔离**：子智能体在独立 worktree 中执行，避免相互干扰、并行安全
+  - 📄 详细文档：[docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md](docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md)
+
+- ✅ **插件热加载 (v2.6)** - V3 插件架构之上的动态能力，零业务行为变化
+  - 🛣️ **3 种加载路径**：BUILTIN_PLUGINS 静态注册 / 显式 API（`hot_register` / `hot_unregister`）/ drop-in 目录扫描（`plugins_extra/*.py`）
+  - 🔄 **运行时轮询**：周期检查 drop-in 目录文件 mtime，变更时自动 reload
+  - 🛡️ **生产安全**：reload 失败回滚到旧实例、路径穿越三层防护、`--no-hot-reload` 完全关闭动态能力
+  - 🔌 **V3 插件实现**：Phase 16 重构 V3 插件架构（1464→42 行），Phase 17 叠加热加载
+  - 📄 详细方案：[docs/dev/PHASE17_PLAN.md](docs/dev/PHASE17_PLAN.md)
 
 ## 🎉 2026 年 5 月最新更新 (v2.5)
 
@@ -12,11 +52,17 @@
   - 💫 **反馈控制环**：感知-决策-执行-反馈完整闭环，基于案例的策略选择（非PID，适配认知任务）
   - 📊 **性能画像**：执行案例记录、失败/成功模式提取、相似案例检索（非预测）、冷启动优雅降级
   - 🛡️ **守护协调器**：执行前预验证、实时异常检测、执行后审查、AI增强风险评估
+  - 🏗️ **6 个核心组件**：`feedback_control_loop.py`（反馈控制环）、`performance_fingerprint.py`（性能画像）、`guard_coordinator.py`（守护协调器）、`hierarchical_control.py`（层次化控制器）、`cybernetics_integration.py`（统一集成接口）、`context_fingerprint_integration.py`（上下文集成）
   - 🎯 **预期收益**：执行成功率 +8%，方差 -67%，人工介入 -70%
-  - 核心组件：`scripts/feedback_control_loop.py`、`scripts/performance_fingerprint.py`、`scripts/guard_coordinator.py`、`scripts/hierarchical_control.py`
+  - 📄 详细分析：[docs/dev/CYBERNETICS_ANALYSIS.md](docs/dev/CYBERNETICS_ANALYSIS.md)
 
 ## 🎉 2026 年 4 月最新更新 (v2.4)
 
+- ✅ **Ponytail 决策梯 (v2.6)** - 6 步决策梯（YAGNI→标准库→平台原生→复用现有→一行优先→最小可行）+ 16 条不可简化红线 + 三种强度模式（lite/full/ultra）+ 债务台账 + 需求追踪
+- ✅ **Autonomous 自主迭代模式 (v2.6)** - 4 阶段循环（plan→dev→verify→fix）+ 9 个核心组件 + 17 个 CLI flag + 智能确认三态决策 + 断点续跑 + 跨平台防休眠
+- ✅ **Dynamic Workflows 6 大模式 (v2.6)** - 分类并行动 / 扇出与聚合 / 对抗性验证 / 生成与筛选 / 锦标赛 / 循环直到完成 + 12 个实现模块 + 模型路由 + worktree 隔离
+- ✅ **插件热加载 (v2.6)** - 3 种加载路径（静态注册 / 显式 API / drop-in 目录扫描）+ V3 插件实现 + 运行时轮询 + 生产安全（回滚 / 路径穿越防护）
+- ✅ **Cybernetics 工程控制论增强 (v2.5)** - 三环控制模型 + 反馈控制环 + 性能画像 + 守护协调器 + 6 个核心组件
 - ✅ **Karpathy 四大核心原则** - 融入 Andrej Karpathy 的编程智慧：Think Before Coding、Simplicity First、Surgical Changes、Goal-Driven Execution
 - ✅ **行为准则体系** - 所有角色统一的 LLM 编程行为准则，减少错误、过度复杂、无关修改
 - ✅ **验证检查点机制** - 目标驱动的验证流程，确保每个阶段都有明确的成功标准
@@ -65,6 +111,11 @@
 ## 📖 目录 / Table of Contents
 
 - [功能特性](#-功能特性)
+  - [Ponytail 决策梯 (v2.6)](#ponytail-决策梯-v26-新增)
+  - [Autonomous 自主迭代模式 (v2.6)](#autonomous-自主迭代模式-v26-新增)
+  - [Dynamic Workflows 6 大模式 (v2.6)](#dynamic-workflows-6-大模式-v26-新增)
+  - [插件热加载 (v2.6)](#插件热加载-v26-新增)
+  - [Karpathy 四大核心原则 (v2.4)](#karpathy-四大核心原则-v24-新增)
 - [快速开始](#-快速开始)
 - [角色介绍](#-角色介绍)
 - [使用方法](#-使用方法)
@@ -178,6 +229,174 @@ python3 scripts/tests/run_tests.py
 - 自动平台检测：`claude_code` / `trae` / `unknown`
 - 统一 `invoke_agent()` 接口
 - 环境变量检测：`CLAUDE_CODE_ENV` / `TRAE_ENV`
+
+### Ponytail 决策梯 (v2.6 新增)
+
+在 Karpathy Simplicity First 原则之上，提供可执行的"写代码前先停一停"决策梯，强制开发者每写一行代码前先问 6 个问题：
+
+1. **6 步决策梯** 🪜
+   - 台阶 1 - YAGNI：这东西真的需要存在吗？推测性需求直接跳过
+   - 台阶 2 - 标准库优先：语言标准库能搞定？直接用标准库
+   - 台阶 3 - 平台原生：运行时平台自带功能能覆盖？用平台原生特性
+   - 台阶 4 - 复用现有：已安装的依赖能解决？复用现有依赖，不新增
+   - 台阶 5 - 一行优先：能写成一行？写成一行，不牺牲可读性
+   - 台阶 6 - 最小可行：以上都不行，写最少能做工作的代码
+   - 核心文件：`scripts/ponytail/ruleset.py`
+
+2. **16 条不可简化红线** 🚫
+   - 原始 Ponytail 红线（6 条）：信任边界输入校验、防数据丢失错误处理、安全措施、无障碍基础、用户明确要求保留功能、真实硬件校准旋钮
+   - 项目规则红线（10 条）：真实业务逻辑禁 mock、需求文档功能禁跳过、非平凡逻辑留可运行检查、并发安全不可简化、真实错误处理禁吞异常、关键路径日志禁删除、密钥配置校验禁简化、数据库事务边界禁简化、API 契约禁单方面简化、隐私数据处理禁简化
+   - 核心文件：`scripts/ponytail/ruleset.py`
+
+3. **三种强度模式** 🎚️
+   - `lite`：精简版，注入 6 步决策梯（无红线详情），适用 test_expert / ui_designer
+   - `full`（默认）：完整版，注入 6 步 + 16 条红线 + 输出规范，适用 solo_coder / architect
+   - `ultra`：YAGNI 极端主义，full + 额外约束，autonomous 模式自动降级为 full
+   - 核心文件：`scripts/ponytail/mode_tracker.py`
+
+4. **债务台账 + 需求追踪** 📒
+   - `DebtCollector`：verify 阶段自动扫描 `# ponytail:` 注释，区分"有升级路径"与"腐烂风险"债务，超过 3 条 no_trigger 债务则告警
+   - `RequirementTracer`：解析需求文档 `[REQ-XXX]` 标记，中文关键词提取 + 代码实现检测（≥50% 关键词匹配视为已实现）
+   - 核心文件：`scripts/ponytail/debt_collector.py`、`scripts/ponytail/requirement_tracer.py`
+
+**使用方式**:
+```bash
+# 在对话中切换模式
+/ponytail ultra    # 切换到 ULTRA 模式（YAGNI 极端主义）
+/ponytail full     # 切换到 FULL 模式（默认）
+/ponytail lite     # 切换到 LITE 模式（精简）
+/ponytail off      # 关闭决策梯注入
+/ponytail          # 查看当前模式
+
+# 环境变量（优先级最高）
+export PONYTAIL_MODE=ultra
+
+# 配置文件
+echo "full" > .ponytail_mode
+```
+
+**测试**: 10 个测试文件，98 个测试用例全部通过 ✅
+```bash
+bash scripts/tests/scripts/run_ponytail_tests.sh
+```
+
+📄 详细指南：[docs/guides/PONYTAIL_GUIDE.md](docs/guides/PONYTAIL_GUIDE.md)
+
+### Autonomous 自主迭代模式 (v2.6 新增)
+
+借鉴 gnhf Ralph 风格的"无人值守迭代"工作流，给定目标后多角色团队按 4 阶段循环执行，直到满足停止条件或触发硬上限：
+
+1. **4 阶段循环** 🔄
+   - `plan`：规划阶段，分解任务、制定方案
+   - `dev`：开发阶段，编写代码、实现功能
+   - `verify`：验证阶段，运行测试、检查质量
+   - `fix`：修复阶段，处理失败、迭代改进
+   - 核心文件：`scripts/autonomous/loop_controller.py`
+
+2. **9 个核心组件** 🧩
+   - `RalphAutonomousPlugin`：插件入口（priority=5，CLI flag `--autonomous`）
+   - `RalphLoopController`：主循环控制（Plan / Dev / Verify / Fix）
+   - `RunState`：状态持久化（SHA256 校验、备份恢复）
+   - `NotesMemory`：跨轮 `notes.md` 累积记忆
+   - `GitDriver`：原子 commit / 滚动回滚
+   - `SleepGuard`：跨平台防休眠（caffeinate / systemd-inhibit）
+   - `SmartConfirmation`：三态确认（白名单 + 风险评分 + 黑名单）
+   - `AutoSkillLoader`：自动按任务特征加载相关 skill
+   - `DispatcherAdapter`：与 V3 dispatcher 解耦适配
+
+3. **17 个 CLI flag** 🚩
+   - 主开关：`--autonomous`
+   - 运行时上限：`--auto-max-iterations`、`--auto-max-tokens`、`--auto-stop-when`、`--auto-failure-abort`
+   - 阶段节奏：`--auto-stage-order`、`--auto-test-command`、`--auto-backoff-base`、`--auto-backoff-max`
+   - 续跑状态：`--auto-resume`、`--auto-resume-latest`、`--auto-run-dir`
+   - 安全防休眠：`--auto-no-caffeinate`、`--auto-no-commit`、`--auto-confirm-mode`、`--auto-security-analyzer`
+   - Git 作者：`--auto-git-author-name`、`--auto-git-author-email`
+   - Notes 记忆：`--auto-notes-path`、`--auto-max-size-kb`、`--auto-trim-keep-last-n`
+
+4. **智能确认三态决策** 🤖
+   - `smart`（默认）：白名单自动通过 + 风险评分 + 黑名单自动拒绝
+   - `whitelist-only`：仅白名单操作自动通过，其余询问
+   - `blacklist-only`：仅黑名单操作拒绝，其余自动通过
+   - 核心文件：`scripts/autonomous/smart_confirmation.py`
+
+**使用示例**:
+```bash
+# 最小化启动
+python -m cli.main \
+    --autonomous \
+    --task "实现一个线程安全的 LRU 缓存" \
+    --project-root .
+
+# 完整推荐启动命令
+python -m cli.main \
+    --autonomous \
+    --task "为 parser 模块补齐边界测试" \
+    --project-root . \
+    --auto-max-iterations 30 \
+    --auto-stop-when "all tests pass" \
+    --auto-test-command "python3 -m unittest discover -s tests -p 'test_*.py'" \
+    --auto-confirm-mode smart \
+    --auto-git-author-name "Ralph Bot" \
+    --auto-git-author-email "ralph@example.com"
+```
+
+📄 详细指南：[docs/guides/AUTONOMOUS_MODE_GUIDE.md](docs/guides/AUTONOMOUS_MODE_GUIDE.md)
+
+### Dynamic Workflows 6 大模式 (v2.6 新增)
+
+融合 Anthropic Dynamic Workflows（Claude Opus 4.8）思想，将 6 大经典模式沉淀为可复用的声明式能力单元，解决长程/并行/对抗任务的三大痛点：
+
+1. **6 大模式** 🎯
+   - **分类并行动（classifier-dispatch）**：分类器路由任务到不同子流程
+   - **扇出与聚合（fan-out-aggregate）**：任务拆 N 份并行处理 → 屏障等待 → 合并
+   - **对抗性验证（adversarial-verify）**：生成 + 验证两两配对，验证者独立 context
+   - **生成与筛选（generate-filter）**：大规模生成 → 标准筛选 → 重复去除
+   - **锦标赛（tournament）**：N 个 Agent 竞争 → 两两 PK → 决出冠军
+   - **循环直到完成（loop-until-done）**：动态生成 Agent 直至停止条件
+
+2. **12 个实现模块** 📦
+   - `guard.py`：模式库 schema 校验 + 提示词注入防护
+   - `interruption_recovery.py`：中断恢复管理（pause/resume/cancel）
+   - `model_router.py`：模型路由层（Sonnet/Opus 动态权衡）
+   - `pattern_composer.py`：模式组合器（多模式串联/并联）
+   - `pattern_executor.py`：模式执行器（调度 subagent）
+   - `pattern_tier_resolver.py`：模式层级解析（tier-aware dispatch）
+   - `semantic_embedder.py`：语义嵌入层（多语言去重）
+   - `skill_injector.py`：Skill 注入器（6 个核心组件）
+   - `subagent_sandbox.py`：子智能体沙箱（worktree 隔离）
+   - `token_budget_guard.py`：Token 预算守卫
+   - `workflow_step_adapter.py`：工作流步骤适配器
+   - `worktree_manager.py`：worktree 管理器
+
+3. **三大痛点应对** 🧠
+   - **Agentic Laziness（智能体懒惰）**：对抗性验证 + 锦标赛模式强制全面执行
+   - **Self-preferential Bias（自我偏好偏差）**：独立 context 验证者 + 评估准则
+   - **Goal Drift（目标漂移）**：循环停止条件 + Token 预算 + 中断恢复
+
+📄 详细文档：[docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md](docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md)
+
+### 插件热加载 (v2.6 新增)
+
+V3 插件架构之上的动态能力，保留 Phase 16 静态注册路径基础上叠加动态加载，零业务行为变化：
+
+1. **3 种加载路径** 🛣️
+   - **BUILTIN_PLUGINS 静态注册**：`scripts/plugins/__init__.py` 中静态构造 5 个内置插件
+   - **显式 API**：`dispatcher.hot_register(plugin)` / `dispatcher.hot_unregister(name)`
+   - **drop-in 目录扫描**：扫描 `plugins_extra/*.py`，自动 import + 注册 + 运行时轮询 reload
+
+2. **V3 插件实现** 🔌
+   - Phase 16 重构 V3 插件架构（1464→42 行），统一插件契约
+   - Phase 17 叠加热加载，181 个测试覆盖
+   - 5 个内置插件：`GoalCancelPlugin`、`GoalGraphPlugin`、`GoalResumePlugin`、`MultiGoalPlugin`、`LoopGoalPlugin`
+
+3. **生产安全** 🛡️
+   - reload 失败回滚到旧实例（不破坏现有调度）
+   - 路径穿越三层防护（parser + watcher + facade 串联校验）
+   - `--no-hot-reload` 完全关闭动态能力（生产模式）
+   - reload 期间持锁的 plugin 等锁释放再 unregister
+   - 核心文件：`scripts/dispatcher/hot_reload_watcher.py`、`scripts/dispatcher/drop_in_loader.py`、`scripts/dispatcher/reload_guard.py`
+
+📄 详细方案：[docs/dev/PHASE17_PLAN.md](docs/dev/PHASE17_PLAN.md)
 
 ### 核心能力
 
@@ -693,7 +912,7 @@ python3 scripts/trae_agent_dispatch.py [参数]
 | 参数 | 类型 | 必需 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | `--task` | string | ✅ | - | 任务描述 |
-| `--agent` | string | ❌ | auto | 指定角色：architect, product-manager, tester, solo-coder, ui-designer, devops, auto |
+| `--agent` | string | ❌ | auto | 指定角色：architect, product-manager, tester, solo-coder, ui-designer, auto |
 | `--project-root` | string | ❌ | . | 项目根目录路径 |
 | `--task-file` | string | ❌ | - | 任务文件路径（从文件读取任务） |
 | `--output` | string | ❌ | - | 输出文件路径 |
@@ -711,7 +930,6 @@ python3 scripts/trae_agent_dispatch.py [参数]
 - `tester`: 测试专家 - 负责测试策略、质量保障
 - `solo-coder`: 独立开发者 - 负责功能开发、代码实现
 - `ui-designer`: UI 设计师 - 负责界面设计、用户体验
-- `devops`: DevOps 工程师 - 负责部署、运维
 - `auto`: 自动匹配 - 根据任务内容自动识别最适合的角色（默认）
 
 ### 使用示例
@@ -1283,6 +1501,25 @@ SOFTWARE.
 ## 🙏 致谢
 
 感谢所有贡献者和用户的支持！
+
+### 📚 版本历程
+
+| 版本 | 日期 | 核心特性 |
+|------|------|---------|
+| v2.6 | 2026 年 6 月 | Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载 |
+| v2.5 | 2026 年 5 月 | Cybernetics 工程控制论增强（三环控制模型、反馈控制环、性能画像、守护协调器） |
+| v2.4 | 2026 年 4 月 | Karpathy 四大核心原则、行为准则体系、验证检查点机制、Claude Code SubAgent 适配器 |
+| v2.3 | 2026 年 3 月 | 多角色代码走读、Workspace 支持、3D 代码地图可视化、任务可视化页面 |
+| v2.2 | 2026 年 2 月 | 长程 Agent 支持（Checkpoint、Handoff、TaskList、WorkflowEngineV2） |
+| v2.1 | 2026 年 1 月 | AI 语义理解驱动角色匹配、AI 助手深度集成、智能缓存和降级策略 |
+
+### 🔗 v2.6 详细文档索引
+
+- [Ponytail 决策梯指南](docs/guides/PONYTAIL_GUIDE.md) - 6 步决策梯、16 条红线、三种模式、债务台账
+- [Autonomous 模式指南](docs/guides/AUTONOMOUS_MODE_GUIDE.md) - 4 阶段循环、9 个核心组件、17 个 CLI flag
+- [Dynamic Workflows 融合方案](docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md) - 6 大模式、12 个实现模块
+- [Cybernetics 增强分析](docs/dev/CYBERNETICS_ANALYSIS.md) - 6 个核心组件、三环控制模型
+- [Phase 17 插件热加载方案](docs/dev/PHASE17_PLAN.md) - 3 种加载路径、V3 插件实现
 
 ---
 

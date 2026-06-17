@@ -5,6 +5,114 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.6.0] - 2026-06-15
+
+### Added
+
+#### v2.6 — Ponytail 决策梯 + Autonomous Mode + 插件热加载
+
+本版本围绕「让 Agent 自主编排更可控、更可观测」演进，落地三大能力：
+Ponytail 决策梯（少写多余代码）、Autonomous Mode（Ralph 风格自主编排）、
+插件热加载（V3 插件架构）。共新增 30+ 模块文件、400+ 测试用例，
+配套完整文档与单元/集成测试。
+
+##### Phase 19: Ponytail 决策梯完整实现
+
+- ✅ 新增 `scripts/ponytail/` 模块（4 个文件）
+  - `ruleset.py` — 6 步决策梯 + 16 条不可简化红线 + 三种模式（lite/full/ultra）
+  - `mode_tracker.py` — 线程安全模式追踪（Lock + 原子文件操作）
+  - `debt_collector.py` — 债务台账扫描（自动扫描 `# ponytail:` 标记 + 上限关键词识别）
+  - `requirement_tracer.py` — 需求追踪（[REQ-XXX] 标记 + 覆盖率检查）
+- ✅ 修改 4 个 handler（dev/fix/plan/verify）
+  - 修复 DevHandler/FixHandler 无限递归（直接调用 `_dispatch_via_claude_code`）
+  - 参数化决策梯注入（线程安全，100 并发测试通过）
+  - ULTRA 模式在 autonomous 场景自动降级为 FULL
+  - VerifyHandler 新增债务检测 + 空 diff 检测
+- ✅ 修改 `claude_code_subagent_adapter.py`
+  - 参数化决策梯注入（`context['ponytail_decision_ladder']` 优先，兜底 `context['_ponytail_engine']`）
+  - 修复 `json.dumps` 非 serializable 对象崩溃（添加 `default=str`）
+- ✅ 修改 `karpathy_principle_enforcer.py`
+  - 扩展红线检测模式（YAGNI 违规 + 新依赖 + standalone pass + `unittest.mock`）
+  - 新增 `file_whitelist` 和 `context_whitelist` 避免误报
+- ✅ 新增 10 个测试文件，98 个测试用例
+- ✅ 新增/更新文档：`PONYTAIL_GUIDE.md` / `CONSTITUTION.md` 更新 / `coder-code-analysis.md` 更新
+
+##### Phase 18: Autonomous Mode（Ralph 风格自主编排）
+
+- ✅ 新增 `scripts/autonomous/` 模块（10 个文件）
+  - `loop_controller.py` — Ralph 循环控制器（4 阶段 plan→dev→verify→fix）
+  - `run_state.py` — 运行状态持久化（SHA256 校验 + `ResumeContext`）
+  - `notes_memory.py` — Notes 跨轮记忆
+  - `git_driver.py` — Git 驱动（自动 commit + 分支管理）
+  - `sleep_guard.py` — 防休眠守护
+  - `smart_confirmation.py` — 智能确认（三态：auto-approve / ask-user / fail-closed）
+  - `auto_skill_loader.py` — Auto-skill 加载器
+  - `dispatcher_adapter.py` — Dispatcher 适配器
+  - `config_loader.py` — 配置加载器
+  - `handlers/` — 4 个阶段处理器（plan/dev/verify/fix）
+- ✅ 新增 `scripts/plugins/autonomous.py` — Ralph Autonomous 插件
+- ✅ 新增 17 个 CLI flag（`--auto-mode` / `--auto-goal` / `--auto-max-iterations` 等）
+- ✅ 新增 259 个测试用例
+- ✅ 新增文档：`AUTONOMOUS_MODE_GUIDE.md` / `PHASE18_PLAN.md`
+
+##### Phase 17: 插件热加载（V3 插件架构）
+
+- ✅ 新增 `scripts/dispatcher/` 模块（7 个文件）
+  - `goal_dispatcher.py` — Goal 调度器（DAG 依赖图）
+  - `plugin_context.py` — 插件上下文
+  - `drop_in_loader.py` — Drop-in 目录加载器
+  - `hot_reload_watcher.py` — 热加载监视器
+  - `reload_guard.py` — 重载守护（Condition 替代 Event）
+  - `middleware.py` — 中间件
+  - `dispatch_result.py` / `errors.py` — 结果和错误定义
+- ✅ 新增 V3 插件实现（`scripts/plugins/`）
+  - `multi_goal.py` — 多 Goal 编排插件
+  - `graph.py` — 图编排插件
+  - `loop.py` — 循环编排插件
+  - `resume.py` — 断点续跑插件
+  - `cancel.py` — 取消插件
+- ✅ 3 种加载路径（Drop-in 目录 / Hot Register API / `HotReloadWatcher`）
+- ✅ 新增 102+ 个测试用例
+- ✅ 新增文档：`PHASE17_PLAN.md`
+
+### Fixed
+
+#### Phase 19 关键缺陷修复
+
+- ✅ 修复 DevHandler / FixHandler 在自主编排场景下的无限递归
+- ✅ 修复 `claude_code_subagent_adapter.py` 中 `json.dumps` 对非 serializable 对象崩溃
+- ✅ 修复 Karpathy 原则执行器在测试场景下的误报（白名单机制）
+
+## [2.5.0] - 2026-05-20
+
+### Added
+
+#### v2.5 — Cybernetics 工程控制论增强
+
+本版本引入工程控制论（Cybernetics）思想，构建「感知-决策-执行-反馈」闭环，
+并落地 Dynamic Workflows v1.7 动态工作流编排能力，使多 Agent 协作具备
+自适应、自优化、自纠偏能力。
+
+##### Cybernetics 核心组件
+
+- ✅ 新增 6 个核心组件（`scripts/` 根目录）
+  - `feedback_control_loop.py` — 反馈控制环（感知-决策-执行-反馈）
+  - `performance_fingerprint.py` — 性能画像（执行案例记录 + 相似案例检索）
+  - `guard_coordinator.py` — 守护协调器（执行前验证 + 异常检测）
+  - `hierarchical_control.py` — 分层控制（战略层 / 战术层 / 执行层）
+  - `cybernetics_integration.py` — Cybernetics 集成入口
+  - `context_fingerprint_integration.py` — 上下文画像集成
+- ✅ 三环控制模型：战略层（长期目标）+ 战术层（中期策略）+ 执行层（短期动作）
+- ✅ 新增 70+ 个测试用例
+- ✅ 新增文档：`CYBERNETICS_ANALYSIS.md`
+
+##### Dynamic Workflows v1.7
+
+- ✅ 新增 `scripts/dynamic_workflow/` 模块（12 个文件）
+  - 6 大模式：classifier-dispatch / fan-out-aggregate / adversarial-verify / generate-filter / tournament / loop-until-done
+  - 12 个实现模块：`pattern_composer` / `pattern_executor` / `pattern_tier_resolver` / `subagent_sandbox` / `model_router` / `token_budget_guard` / `semantic_embedder` / `skill_injector` / `interruption_recovery` / `workflow_step_adapter` / `worktree_manager` / `guard`
+- ✅ 新增文档：`DYNAMIC_WORKFLOWS_INTEGRATION.md`
+
 ## [2.4.1] - 2026-05-03
 
 ### Changed

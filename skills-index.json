@@ -1,7 +1,7 @@
 {
   "version": "2.6.0",
   "name": "trae-multi-agent",
-  "description": "多角色智能体调度器 - 基于任务类型自动调度到架构师、产品经理、测试专家、Solo Coder 或 UI 设计师。支持 Karpathy 四大核心原则强制执行、Ponytail 决策梯（少写多余代码）、跨平台 Agent 适配、多角色代码走读、3D 代码地图可视化、长程 Agent 支持。",
+  "description": "多角色智能体调度器 - 基于任务类型自动调度到架构师、产品经理、测试专家、Solo Coder 或 UI 设计师。支持 Karpathy 四大核心原则、Ponytail 决策梯（少写多余代码）、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、跨平台 Agent 适配、多角色代码走读、3D 代码地图可视化。",
   "author": "Claw Team",
   "license": "MIT",
   "enabled": true,
@@ -20,6 +20,13 @@
     "Ponytail",
     "决策梯",
     "YAGNI",
+    "Cybernetics",
+    "工程控制论",
+    "Autonomous",
+    "自主编排",
+    "Dynamic Workflows",
+    "动态工作流",
+    "插件热加载",
     "代码走读",
     "Code Review",
     "UI 设计",
@@ -151,6 +158,46 @@
     "ponytailRequirementTracer": {
       "enabled": true,
       "description": "需求追踪：解析 [REQ-XXX] 标记，追踪需求文档到代码实现的覆盖情况"
+    },
+    "cyberneticsEngineering": {
+      "enabled": true,
+      "description": "Cybernetics 工程控制论（v2.5）：三环控制模型（战略/战术/执行）+ 反馈控制环 + 性能画像 + 守护协调器"
+    },
+    "autonomousMode": {
+      "enabled": true,
+      "description": "Autonomous Mode 自主编排（Phase 18）：4 阶段循环（plan→dev→verify→fix）+ 9 核心组件 + 17 CLI flag + 智能确认 + 状态持久化"
+    },
+    "dynamicWorkflows": {
+      "enabled": true,
+      "description": "Dynamic Workflows 6 大动态工作流模式（v1.7）：classifier-dispatch / fan-out-aggregate / adversarial-verify / generate-filter / tournament / loop-until-done"
+    },
+    "pluginHotReload": {
+      "enabled": true,
+      "description": "插件热加载 V3 架构（Phase 17）：3 种加载路径（Drop-in 目录 / Hot Register API / HotReloadWatcher）+ ReloadGuard 安全守护"
+    },
+    "multiGoalOrchestration": {
+      "enabled": true,
+      "description": "多 Goal 编排：DAG 依赖图 + Resume 断点续跑 + Reuse 复用 + Schedule 调度 + Report 报告"
+    },
+    "subagentSandbox": {
+      "enabled": true,
+      "description": "Subagent 沙箱：隔离子代理执行环境，防止副作用传播"
+    },
+    "modelRouter": {
+      "enabled": true,
+      "description": "模型路由器：根据任务特征自动选择最优 LLM 模型"
+    },
+    "tokenBudgetGuard": {
+      "enabled": true,
+      "description": "Token 预算守护：监控和限制 Token 消耗，防止超支"
+    },
+    "interruptionRecovery": {
+      "enabled": true,
+      "description": "中断恢复：任务中断后自动恢复执行，支持检查点续跑"
+    },
+    "semanticEmbedder": {
+      "enabled": true,
+      "description": "语义嵌入器：TFIDF / Hashing / SentenceTransformer 三种实现，支持语义相似度计算"
     }
   },
   "dependencies": {

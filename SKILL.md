@@ -403,18 +403,140 @@ bash scripts/tests/scripts/run_ponytail_tests.sh
 
 详细指南见 `docs/guides/PONYTAIL_GUIDE.md`。
 
+### Autonomous Mode（v2.6 / Phase 18 — Ralph 风格自主编排）
+
+> **来源**: Ralph 自主编排框架 + gnhf 库启发
+> **目的**: 让多角色团队在用户睡觉时自主完成完整项目生命周期
+
+**4 阶段循环**（plan → dev → verify → fix）:
+```
+┌─────────────────────────────────────────────────┐
+│  Plan（规划）→ Dev（开发）→ Verify（验证）→ Fix（修复）│
+│       ↑                                          │
+│       └──────────── 循环直到完成 ────────────────┘
+└─────────────────────────────────────────────────┘
+```
+
+**9 个核心组件**:
+| 组件 | 功能 |
+|------|------|
+| LoopController | Ralph 循环控制器（4 阶段调度） |
+| RunState | 运行状态持久化（SHA256 校验 + Resume） |
+| NotesMemory | Notes 跨轮记忆（notes.md 读写） |
+| GitDriver | Git 驱动（自动 commit + 分支管理） |
+| SleepGuard | 防休眠守护（阻止系统休眠） |
+| SmartConfirmation | 智能确认（三态：auto-approve/ask-user/fail-closed） |
+| AutoSkillLoader | Auto-skill 加载器（自动加载所需 skill） |
+| DispatcherAdapter | Dispatcher 适配器（Claude Code / Trae） |
+| ConfigLoader | 配置加载器（autonomous.yml） |
+
+**17 个 CLI flag**:
+```bash
+python3 scripts/trae_agent_dispatch.py \
+    --auto-mode \
+    --auto-goal "实现用户登录功能" \
+    --auto-max-iterations 10 \
+    --auto-confirmation smart \
+    --auto-git-enabled \
+    --auto-skill-injection \
+    --auto-notes-memory \
+    --auto-sleep-guard \
+    --auto-resume \
+    --auto-ponytail-mode full \
+    # ... 更多 flag 见 AUTONOMOUS_MODE_GUIDE.md
+```
+
+详细指南见 `docs/guides/AUTONOMOUS_MODE_GUIDE.md`。
+
+### Dynamic Workflows（v1.7 — 6 大动态工作流模式）
+
+> **来源**: Anthropic Multi-Agent Research + 项目实践
+> **目的**: 根据任务特征自动选择最优工作流模式
+
+**6 大模式**:
+| 模式 | 适用场景 | 执行方式 |
+|------|---------|---------|
+| classifier-dispatch | 任务分类后分发 | 分类器 → 角色分发 |
+| fan-out-aggregate | 并行处理 + 汇总 | 扇出 N 个子任务 → 聚合结果 |
+| adversarial-verify | 对抗式验证 | 生成 → 审查 → 修复循环 |
+| generate-filter | 生成 + 过滤 | 批量生成 → 质量过滤 |
+| tournament | 锦标赛选择 | 多方案竞争 → 最优胜出 |
+| loop-until-done | 循环直到完成 | 迭代直到成功标准满足 |
+
+**12 个实现模块**（`scripts/dynamic_workflow/`）:
+- `pattern_composer.py` — 模式组合器
+- `pattern_executor.py` — 模式执行器
+- `pattern_tier_resolver.py` — 模式层级解析器
+- `subagent_sandbox.py` — Subagent 沙箱
+- `model_router.py` — 模型路由器
+- `token_budget_guard.py` — Token 预算守护
+- `semantic_embedder.py` — 语义嵌入器（TFIDF/Hashing/SentenceTransformer）
+- `skill_injector.py` — Skill 注入器
+- `interruption_recovery.py` — 中断恢复
+- `workflow_step_adapter.py` — 工作流步骤适配器
+- `worktree_manager.py` — Worktree 管理器
+- `guard.py` — 守护组件
+
+详细方案见 `docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md`。
+
+### Cybernetics 工程控制论（v2.5 — 三环控制模型）
+
+> **来源**: 钱学森工程控制论 + ICLR 2026 Profile-Aware Maneuvering
+> **目的**: 通过反馈控制环实现自适应执行
+
+**6 个核心组件**（`scripts/` 根目录）:
+| 组件 | 功能 |
+|------|------|
+| `feedback_control_loop.py` | 反馈控制环（感知-决策-执行-反馈） |
+| `performance_fingerprint.py` | 性能画像（执行案例记录 + 相似案例检索） |
+| `guard_coordinator.py` | 守护协调器（执行前验证 + 异常检测） |
+| `hierarchical_control.py` | 分层控制（战略层/战术层/执行层） |
+| `cybernetics_integration.py` | Cybernetics 集成入口 |
+| `context_fingerprint_integration.py` | 上下文画像集成 |
+
+**三环控制模型**:
+- **战略层**: 长期目标 + 资源规划
+- **战术层**: 中期策略 + 任务分解
+- **执行层**: 短期动作 + 实时反馈
+
+详细分析见 `docs/dev/CYBERNETICS_ANALYSIS.md`。
+
+### 插件热加载（v2.6 / Phase 17 — V3 插件架构）
+
+> **目的**: 支持运行时动态加载/卸载插件，无需重启
+
+**3 种加载路径**:
+1. **Drop-in 目录加载**: 自动扫描 `drop-in/` 目录下的插件
+2. **Hot Register API**: 通过 `hot_register()` API 动态注册
+3. **HotReloadWatcher**: 文件监视器自动检测变更并重载
+
+**核心模块**（`scripts/dispatcher/`）:
+- `goal_dispatcher.py` — Goal 调度器（DAG 依赖图）
+- `plugin_context.py` — 插件上下文
+- `drop_in_loader.py` — Drop-in 目录加载器
+- `hot_reload_watcher.py` — 热加载监视器
+- `reload_guard.py` — 重载守护（Condition 替代 Event）
+
+**V3 插件实现**（`scripts/plugins/`）:
+- `autonomous.py` — Ralph Autonomous 插件
+- `multi_goal.py` — 多 Goal 编排插件（DAG + Resume + Reuse + Schedule + Report）
+- `graph.py` — 图编排插件
+- `loop.py` — 循环编排插件
+- `resume.py` — 断点续跑插件
+- `cancel.py` — 取消插件
+
+详细设计见 `docs/dev/PHASE17_PLAN.md`。
+
 ## 文档结构
 
 ```
 docs/
-├── project-understanding/  # 项目理解文档
-├── spec/                   # 规范驱动开发文档
-├── architect/              # 架构师文档
-├── product-manager/        # 产品经理文档
-├── tester/                 # 测试专家文档
-├── solo-coder/              # 独立开发者文档
-├── ui-designer/            # UI 设计师文档
-└── devops/                 # DevOps 工程师文档
+├── guides/                 # 用户指南（Ponytail/Autonomous/Karpathy/可视化）
+├── spec/                   # 规范文档（CONSTITUTION/SPEC/role-prompts）
+│   └── role-prompts/       # 5 个核心角色 + 逻辑漏洞审查专家的代码分析模板
+├── dev/                    # 开发文档（各 Phase 设计方案 + 最终报告）
+├── roles/                  # 角色执行记录（architect/product-manager/solo-coder/test-expert/ui-designer）
+└── project-understanding/  # 项目理解文档
 ```
 
 ## 故障排查
@@ -448,11 +570,16 @@ python3 scripts/trae_agent_dispatch.py \
 ## 总结
 
 Trae Multi-Agent Dispatcher 提供了：
-- ✅ 智能角色识别
-- ✅ 多角色协同
-- ✅ 上下文感知
-- ✅ 完整项目流程
-- ✅ 紧急任务处理
+- ✅ 智能角色识别（5 个核心角色 + AI 语义匹配）
+- ✅ 多角色协同 + 共识机制
+- ✅ 七阶段标准工作流程
+- ✅ Karpathy 四大核心原则强制执行（v2.4）
+- ✅ Cybernetics 工程控制论三环控制（v2.5）
+- ✅ Ponytail 决策梯 + 16 条不可简化红线（v2.6）
+- ✅ Autonomous Mode 自主编排（Phase 18，4 阶段循环 + 9 核心组件）
+- ✅ Dynamic Workflows 6 大动态工作流模式（v1.7）
+- ✅ 插件热加载 V3 架构（Phase 17）
+- ✅ 代码走读与审查 + 3D 代码地图可视化
 - ✅ UI 设计（避免 AI slop）
 
-通过智能调度，减少用户干预，提升协作效率！
+通过智能调度 + 自主编排 + 决策梯约束，减少用户干预，提升协作效率！
