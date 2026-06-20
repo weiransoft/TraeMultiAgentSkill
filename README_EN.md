@@ -1,6 +1,85 @@
 # Trae Multi-Agent Skill
 
-🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual.
+🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts.
+
+## 🎉 June 2026 Latest Updates (v2.7)
+
+> Design Principles: Standard library first (Playwright + PIL), YAGNI, Failure-safe
+> Applicable Roles: UI Designer (pre-delivery self-check) / Test Expert (E2E pixel-level assertions) / Solo Coder (PR gate)
+
+- ✅ **UI/UX Audit Analysis (v2.7)** - 4 detection dimensions covering frontend quality gates
+  - ♿ **Accessibility (A11y)**: WCAG AA contrast (normal text 4.5:1 / large text 3:1), img alt, form label, semantic tags, keyboard accessibility
+  - 👆 **Interaction Quality**: Minimum button size (Apple HIG ≥44px), focus visibility, loading feedback
+  - 📐 **Layout & Responsive**: Element overlap, text truncation (text-overflow), viewport overflow
+  - ⚠️ **UX Anti-patterns**: Forced registration, destructive actions without confirmation, forms without validation
+  - 🎯 **Key Classes**: `UIUXIssue` (dataclass: severity/category/rule/element/message/fix/metric) + `UIUXAnalyzer` (core: audit/dump)
+  - 🚀 **Playwright Single Comprehensive Probe**: One evaluate call fetches all probe data, avoiding multiple round-trips
+  - 🛡️ **Failure-Safe**: Any check item exception is isolated by try/except, not affecting other checks
+  - 📄 Detailed section: [SKILL.md](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具)
+
+- ✅ **Visual Regression & Display Integrity (v2.7)** - Pixel-level Diff + Display error detection
+  - 🖼️ **Visual Regression**: PIL `ImageChops` pixel-level Diff + simplified SSIM region-level Diff
+  - 📊 **Data Incompleteness Detection**: Text truncation, element overflow, image not loaded, skeleton screen >10s, long table horizontal scroll
+  - 🚨 **Display Error Detection**: Red text/background (HSV detection), error keywords, Ant Design / Arco / Element UI error Toasts, browser native dialogs
+  - 🎯 **Key Classes**: `ChangedRegion` / `DiffResult` / `VisualRegressionChecker`
+  - 📦 **Soft Dependencies**: Pillow (required), numpy (optional, better SSIM), playwright (DOM check)
+  - ⚙️ **Configurable Threshold**: Default `pixel_diff_ratio < 1%`
+  - 🧘 **YAGNI**: Only implements the 3 most common detection types, no big-everything framework
+  - 📄 Detailed section: [SKILL.md](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具)
+
+## 🎉 June 2026 Latest Updates (v2.6)
+
+> Source: Ponytail project decision ladder, gnhf Ralph autonomous iteration philosophy, Anthropic Dynamic Workflows (Claude Opus 4.8), Phase 17 plugin hot-reload solution
+> Theory: YAGNI principle, Karpathy Simplicity First, Ashby's Law of Requisite Variety, cybernetics feedback loop
+
+- ✅ **Ponytail Decision Ladder (v2.6)** - Executable "pause before coding" decision ladder built on Karpathy's Simplicity First principle
+  - 🪜 **6-Step Decision Ladder**: YAGNI → Standard library first → Platform native → Reuse existing → One-liner preferred → Minimum viable, stop at the first step that solves the problem
+  - 🚫 **16 Non-Simplifiable Red Lines**: 6 original Ponytail red lines (input validation, error handling, security, accessibility, etc.) + 10 project-specific red lines (real business logic, concurrency safety, API contracts, etc.)
+  - 🎚️ **Three Intensity Modes**: `lite` (simplified, for Test/UI roles) / `full` (default, for developer/architect) / `ultra` (YAGNI extremism, auto-degraded to full in autonomous)
+  - 📒 **Debt Ledger**: `# ponytail:` comment marks intentional simplification, `DebtCollector` auto-scans to distinguish "with upgrade path" vs "rotting risk" debt
+  - 🔍 **Requirement Tracing**: `RequirementTracer` parses `[REQ-XXX]` markers, Chinese keyword extraction + implementation detection
+  - 💬 **Usage**: `/ponytail ultra|full|lite|off` command to switch, env var / config file override
+  - 🧪 **Tests**: 10 test files, 98 test cases all passed
+  - Core components: `scripts/ponytail/ruleset.py`, `scripts/ponytail/mode_tracker.py`, `scripts/ponytail/debt_collector.py`, `scripts/ponytail/requirement_tracer.py`
+  - 📄 Detailed guide: [docs/guides/PONYTAIL_GUIDE.md](docs/guides/PONYTAIL_GUIDE.md)
+
+- ✅ **Autonomous Iteration Mode (v2.6)** - Borrowed from gnhf Ralph style, let the multi-role team complete all tasks automatically while you sleep
+  - 🔄 **4-Stage Loop**: `plan → dev → verify → fix`, until stop conditions are met or hard limits are triggered
+  - 🧩 **9 Core Components**: `RalphAutonomousPlugin`, `RalphLoopController`, `RunState`, `NotesMemory`, `GitDriver`, `SleepGuard`, `SmartConfirmation`, `AutoSkillLoader`, `DispatcherAdapter`
+  - 🚩 **17 CLI Flags**: Prefixed with `--auto-`, covering runtime limits, stage pacing, resume state, safe sleep prevention, Git author, Notes memory
+  - 🤖 **Smart Confirmation Tri-State Decision**: `smart` (whitelist + risk scoring + blacklist) / `whitelist-only` / `blacklist-only`
+  - 💾 **Resume from Breakpoint**: `--auto-resume` / `--auto-resume-latest`, SHA256 verification + backup recovery
+  - ☕ **Cross-Platform Sleep Prevention**: `caffeinate` (macOS) / `systemd-inhibit` (Linux), can be disabled in CI environments
+  - 📄 Detailed guide: [docs/guides/AUTONOMOUS_MODE_GUIDE.md](docs/guides/AUTONOMOUS_MODE_GUIDE.md)
+
+- ✅ **Dynamic Workflows 6 Modes (v2.6)** - Combines Anthropic Dynamic Workflows philosophy, distills into reusable declarative pattern library
+  - 🎯 **6 Modes**: classifier-dispatch / fan-out-aggregate / adversarial-verify / generate-filter / tournament / loop-until-done
+  - 📦 **12 Implementation Modules**: `guard`, `interruption_recovery`, `model_router`, `pattern_composer`, `pattern_executor`, `pattern_tier_resolver`, `semantic_embedder`, `skill_injector`, `subagent_sandbox`, `token_budget_guard`, `workflow_step_adapter`, `worktree_manager`
+  - 🧠 **Three Pain Points Addressed**: Agentic Laziness / Self-preferential Bias / Goal Drift
+  - 🔀 **Model Router**: Classifier decides Sonnet/Opus routing, cost vs quality dynamic trade-off
+  - 🌲 **Worktree Isolation**: Subagents execute in independent worktrees, avoiding mutual interference, parallel-safe
+  - 📄 Detailed docs: [docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md](docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md)
+
+- ✅ **Plugin Hot-Reload (v2.6)** - Dynamic capabilities on top of V3 plugin architecture, zero business behavior change
+  - 🛣️ **3 Loading Paths**: BUILTIN_PLUGINS static registration / explicit API (`hot_register` / `hot_unregister`) / drop-in directory scan (`plugins_extra/*.py`)
+  - 🔄 **Runtime Polling**: Periodically checks drop-in directory file mtime, auto-reloads on change
+  - 🛡️ **Production Safety**: Reload failure rolls back to old instance, 3-layer path traversal protection, `--no-hot-reload` completely disables dynamic capabilities
+  - 🔌 **V3 Plugin Implementation**: Phase 16 refactored V3 plugin architecture (1464→42 lines), Phase 17 added hot-reload
+  - 📄 Detailed plan: [docs/dev/PHASE17_PLAN.md](docs/dev/PHASE17_PLAN.md)
+
+## 🎉 May 2026 Latest Updates (v2.5)
+
+> Source: https://github.com/Jiaqi-Guo-0114/cybernetics-agent
+> Theory: ICLR 2026 Profile-Aware Maneuvering architecture, Qian Xuesen's Engineering Cybernetics (systems engineering, systematology), Norbert Wiener cybernetics, Ashby's Law of Requisite Variety
+
+- ✅ **Engineering Cybernetics Enhancement (v2.5)** - Based on the cybernetics-agent project, introduces feedback loops, adaptivity, and observability enhancements
+  - 🔄 **Three-Ring Control Model**: Strategic layer (task planning, AI dynamic planning), Tactical layer (Guard validation, anomaly detection), Execution layer (task execution, feedback collection)
+  - 💫 **Feedback Control Loop**: Perception-decision-execution-feedback complete closed loop, case-based policy selection (non-PID, adapted for cognitive tasks)
+  - 📊 **Performance Fingerprint**: Execution case recording, failure/success pattern extraction, similar case retrieval (non-predictive), graceful cold-start degradation
+  - 🛡️ **Guard Coordinator**: Pre-execution validation, real-time anomaly detection, post-execution review, AI-enhanced risk assessment
+  - 🏗️ **6 Core Components**: `feedback_control_loop.py` (feedback control loop), `performance_fingerprint.py` (performance fingerprint), `guard_coordinator.py` (guard coordinator), `hierarchical_control.py` (hierarchical controller), `cybernetics_integration.py` (unified integration interface), `context_fingerprint_integration.py` (context integration)
+  - 🎯 **Expected Benefits**: Execution success rate +8%, variance -67%, manual intervention -70%
+  - 📄 Detailed analysis: [docs/dev/CYBERNETICS_ANALYSIS.md](docs/dev/CYBERNETICS_ANALYSIS.md)
 
 ## 🎉 April 2026 Latest Updates (v2.4)
 
@@ -940,7 +1019,32 @@ SOFTWARE.
 
 ## 🙏 Acknowledgments / 致谢
 
-感谢所有贡献者和用户的支持！
+Thanks to all contributors and users for their support!
+
+### 📚 Version History / 版本历程
+
+| Version | Date | Core Features |
+|---------|------|---------------|
+| v2.7 | June 2026 | UI/UX Audit Analysis (`uiux_analyzer.py`, 4 detection dimensions), Visual Regression & Display Integrity (`visual_regression.py`, 3 detection dimensions) |
+| v2.6 | June 2026 | Ponytail Decision Ladder (less redundant code), Autonomous Iteration Mode, Dynamic Workflows 6 Modes, Plugin Hot-Reload |
+| v2.5 | May 2026 | Engineering Cybernetics Enhancement (three-ring control model, feedback control loop, performance fingerprint, guard coordinator) |
+| v2.4 | April 2026 | Karpathy Four Core Principles, Behavior Standard System, Verification Checkpoint Mechanism, Claude Code SubAgent Adapter |
+| v2.3 | March 2026 | Multi-Role Code Walkthrough, Workspace Support, 3D Code Map Visualization, Task Visualization Page |
+| v2.2 | February 2026 | Long-Running Agent Support (Checkpoint, Handoff, TaskList, WorkflowEngineV2) |
+| v2.1 | January 2026 | AI Semantic Role Matching, AI Assistant Deep Integration, Smart Cache and Fallback Strategy |
+
+### 🔗 v2.7 Detailed Documentation Index / v2.7 详细文档索引
+
+- [SKILL.md - UI/UX Audit & Visual Regression](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具) - 4+3 detection dimensions, key classes, usage examples, CLI integration
+- [CHANGELOG.md - v2.7.0](CHANGELOG.md) - Complete changelog (Chinese)
+
+### 🔗 v2.6 Detailed Documentation Index / v2.6 详细文档索引
+
+- [Ponytail Decision Ladder Guide](docs/guides/PONYTAIL_GUIDE.md) - 6-step ladder, 16 red lines, 3 modes, debt ledger
+- [Autonomous Mode Guide](docs/guides/AUTONOMOUS_MODE_GUIDE.md) - 4-stage loop, 9 core components, 17 CLI flags
+- [Dynamic Workflows Integration Plan](docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md) - 6 modes, 12 implementation modules
+- [Cybernetics Enhancement Analysis](docs/dev/CYBERNETICS_ANALYSIS.md) - 6 core components, three-ring control model
+- [Phase 17 Plugin Hot-Reload Plan](docs/dev/PHASE17_PLAN.md) - 3 loading paths, V3 plugin implementation
 
 ---
 
