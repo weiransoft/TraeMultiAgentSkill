@@ -1,6 +1,31 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本。
+
+## 🎉 2026 年 6 月最新更新 (v2.7)
+
+> 设计原则：标准库优先（Playwright + PIL）、YAGNI、失败安全
+> 适用角色：UI 设计师（交付前自检）/ 测试专家（E2E 像素级断言）/ Solo Coder（PR 门禁）
+
+- ✅ **UI/UX 巡检分析 (v2.7)** - 4 大检测维度覆盖前端质量门禁
+  - ♿ **可访问性 (A11y)**: WCAG AA 对比度（正常文本 4.5:1 / 大文本 3:1）、img alt、form label、语义化标签、键盘可达
+  - 👆 **交互质量**: 按钮最小尺寸（Apple HIG ≥44px）、焦点可见性、加载反馈
+  - 📐 **布局与响应式**: 元素重叠、文字截断（text-overflow）、视口溢出
+  - ⚠️ **UX 反模式**: 强制注册、破坏性操作无确认、表单无校验
+  - 🎯 **关键类**: `UIUXIssue`（dataclass，severity/category/rule/element/message/fix/metric）+ `UIUXAnalyzer`（核心，audit/dump）
+  - 🚀 **Playwright 单次综合探针**: 一次 evaluate 取齐所有探针数据，避免多次往返
+  - 🛡️ **失败安全**: 任一检查项异常被 try/except 隔离，不影响其他检查
+  - 📄 详细章节：[SKILL.md](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具)
+
+- ✅ **视觉回归与显示完整性 (v2.7)** - 像素级 Diff + 显示错误检测
+  - 🖼️ **视觉回归**: PIL `ImageChops` 像素级 Diff + 简化 SSIM 区域级 Diff
+  - 📊 **数据显示不全检测**: 文本截断、元素溢出视口、图片未加载、骨架屏 >10s、长表格横向滚动
+  - 🚨 **显示错误检测**: 红色文字/背景（HSV 检测）、错误关键词、Ant Design / Arco / Element UI 错误 Toast、浏览器原生 dialog
+  - 🎯 **关键类**: `ChangedRegion` / `DiffResult` / `VisualRegressionChecker`
+  - 📦 **软依赖**: Pillow（必需）、numpy（可选，更好的 SSIM）、playwright（DOM 检查）
+  - ⚙️ **阈值可配**: 默认 `pixel_diff_ratio < 1%`
+  - 🧘 **YAGNI**: 只实现最常用的 3 类检测，不造大而全框架
+  - 📄 详细章节：[SKILL.md](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具)
 
 ## 🎉 2026 年 6 月最新更新 (v2.6)
 
@@ -1506,12 +1531,18 @@ SOFTWARE.
 
 | 版本 | 日期 | 核心特性 |
 |------|------|---------|
+| v2.7 | 2026 年 6 月 | UI/UX 巡检分析（`uiux_analyzer.py`，4 大检测维度）、视觉回归与显示完整性（`visual_regression.py`，3 大检测维度） |
 | v2.6 | 2026 年 6 月 | Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载 |
 | v2.5 | 2026 年 5 月 | Cybernetics 工程控制论增强（三环控制模型、反馈控制环、性能画像、守护协调器） |
 | v2.4 | 2026 年 4 月 | Karpathy 四大核心原则、行为准则体系、验证检查点机制、Claude Code SubAgent 适配器 |
 | v2.3 | 2026 年 3 月 | 多角色代码走读、Workspace 支持、3D 代码地图可视化、任务可视化页面 |
 | v2.2 | 2026 年 2 月 | 长程 Agent 支持（Checkpoint、Handoff、TaskList、WorkflowEngineV2） |
 | v2.1 | 2026 年 1 月 | AI 语义理解驱动角色匹配、AI 助手深度集成、智能缓存和降级策略 |
+
+### 🔗 v2.7 详细文档索引
+
+- [SKILL.md - UI/UX 巡检与视觉回归](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具) - 4+3 检测维度、关键类、用法示例、CLI 集成
+- [CHANGELOG.md - v2.7.0](CHANGELOG.md) - 完整变更日志
 
 ### 🔗 v2.6 详细文档索引
 

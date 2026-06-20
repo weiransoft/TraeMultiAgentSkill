@@ -5,6 +5,53 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.7.0] - 2026-06-20
+
+### Added
+
+#### v2.7 — UI/UX 巡检分析 + 视觉回归测试
+
+本版本新增 2 个独立的 E2E 视觉质量保障脚本，作为多智能体团队在「UI 设计师」与
+「测试专家」角色下执行前端质量门禁的标准工具。脚本以可独立 import / CLI 调用的
+形式提供，可与现有 Autonomous 模式、E2E 测试套件无缝集成。
+
+##### 新增 `scripts/uiux_analyzer.py`（UI/UX 巡检分析器）
+
+- ✅ 4 大检测维度
+  - **可访问性 (A11y)**: WCAG AA 对比度、img alt、form label、语义化标签、键盘可达
+  - **交互质量**: 按钮最小尺寸（Apple HIG ≥44px）、焦点可见性、加载反馈
+  - **布局与响应式**: 元素重叠、文字截断（text-overflow）、视口溢出
+  - **UX 反模式**: 强制注册、破坏性操作无确认、表单无校验
+- ✅ 关键类：`UIUXIssue`（dataclass）/ `UIUXAnalyzer`（核心）
+- ✅ Playwright 单次综合探针 JS（一次 evaluate 取齐所有数据，避免多次往返）
+- ✅ WCAG AA 阈值常量（`CONTRAST_AA_NORMAL=4.5` / `CONTRAST_AA_LARGE=3.0`）
+- ✅ 失败安全：任一检查项异常不影响其他检查（try/except 隔离）
+- ✅ 设计原则：标准库优先（纯 Playwright JS 注入 + 规则引擎，零三方依赖）
+
+##### 新增 `scripts/visual_regression.py`（视觉回归 + 显示完整性）
+
+- ✅ 3 大检测维度
+  - **视觉回归**: 像素级 Diff（PIL `ImageChops`）+ 简化 SSIM 区域级 Diff
+  - **数据显示不全检测**: 文本截断、元素溢出视口、图片未加载、骨架屏 >10s、长表格横向滚动
+  - **显示错误检测**: 红色文字/背景（HSV 检测）、错误关键词、Ant Design / Arco Design / Element UI 错误 Toast、浏览器原生 dialog
+- ✅ 关键类：`ChangedRegion` / `DiffResult` / `VisualRegressionChecker`
+- ✅ 软依赖：Pillow（必需），numpy（可选，更好的 SSIM）
+- ✅ 阈值可配：默认 `pixel_diff_ratio < 1%`
+- ✅ YAGNI：只实现最常用的 3 类检测，不造大而全框架
+
+##### 角色集成
+
+- **UI 设计师**: 在交付前端稿前使用 `uiux_analyzer.audit(page)` 验证设计质量
+- **测试专家**: 在 E2E 套件中调用 `VisualRegressionChecker` 进行像素级断言
+- **Solo Coder**: 作为 PR 门禁脚本集成到 CI（pyppeteer/playwright + 本脚本）
+
+##### 文档更新
+
+- ✅ `SKILL.md` 新增「UI/UX 巡检与视觉回归」章节
+- ✅ `README.md` 顶部公告升级至 v2.7
+- ✅ `skills-index.json` 版本号 2.6.0 → 2.7.0，新增 2 个 feature 描述
+- ✅ `IMPLEMENTATION_STATUS.md` 新增 v2.7 实现状态章节
+
 ## [2.6.0] - 2026-06-15
 
 ### Added

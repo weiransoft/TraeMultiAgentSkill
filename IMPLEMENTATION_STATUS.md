@@ -2,11 +2,54 @@
 
 ## 版本信息
 
-- **当前版本**: 2.6
-- **发布日期**: 2026-06-17
+- **当前版本**: 2.7
+- **发布日期**: 2026-06-20
 - **状态**: ✅ 已完成（所有计划功能 100% 实现）
 
 ## 核心实现
+
+### v2.7 新增功能（UI/UX 巡检 + 视觉回归）
+
+#### UI/UX 巡检分析（`scripts/uiux_analyzer.py`）
+
+- **状态**: ✅ 完整实现
+- **关键类**:
+  - `UIUXIssue`（dataclass）— `severity` (HIGH/MEDIUM/LOW) / `category` (a11y/interaction/layout/ux) / `rule` / `element` / `message` / `fix` / `metric`
+  - `UIUXAnalyzer`（核心）— `audit(page)` → `list[UIUXIssue]` + `dump(path)` 输出 JSON
+- **4 大检测维度**:
+  - **可访问性 (A11y)**: WCAG AA 对比度（正常文本 4.5:1 / 大文本 3:1）、img alt、form label、语义化标签、键盘可达
+  - **交互质量**: 按钮最小尺寸（Apple HIG ≥44px）、焦点可见性、加载反馈
+  - **布局与响应式**: 元素重叠、文字截断（text-overflow）、视口溢出
+  - **UX 反模式**: 强制注册、破坏性操作无确认、表单无校验
+- **设计原则**: 标准库优先（纯 Playwright JS 注入 + 规则引擎，零三方依赖）
+- **失败安全**: 任一检查项异常被 try/except 隔离，不影响其他检查
+- **角色集成**: UI 设计师交付前自检、Solo Coder PR 门禁
+
+#### 视觉回归测试（`scripts/visual_regression.py`）
+
+- **状态**: ✅ 完整实现
+- **关键类**:
+  - `ChangedRegion`（dataclass）— `x/y/width/height/pixel_count/severity`
+  - `DiffResult`（dataclass）— 完整 diff 结果（`pixel_diff_ratio` / `ssim_score` / `changed_regions` / `data_incomplete` / `display_errors`）
+  - `VisualRegressionChecker`（核心）— `compare(baseline, current, step, page)` → `DiffResult`
+- **3 大检测维度**:
+  - **视觉回归**: 像素级 Diff（PIL `ImageChops`）+ 简化 SSIM 区域级 Diff
+  - **数据显示不全检测**: 文本截断、元素溢出视口、图片未加载、骨架屏 >10s、长表格横向滚动
+  - **显示错误检测**: 红色文字/背景（HSV 检测）、错误关键词、Ant Design / Arco / Element UI 错误 Toast、浏览器原生 dialog
+- **软依赖**:
+  - Pillow（必需）
+  - numpy（可选，更好的 SSIM）
+  - playwright（必需，DOM 检查）
+- **阈值可配**: 默认 `pixel_diff_ratio < 1%`
+- **YAGNI**: 只实现最常用的 3 类检测，不造大而全框架
+- **角色集成**: 测试专家 E2E 像素级断言、UI 设计师稿评审、Solo Coder CI 门禁
+
+#### 文档同步更新
+
+- ✅ `CHANGELOG.md` — 新增 v2.7.0 章节（2026-06-20）
+- ✅ `SKILL.md` — frontmatter 升级至 v2.7 + 新增「UI/UX 巡检与视觉回归」章节
+- ✅ `skills-index.json` — version 2.6.0 → 2.7.0 + 新增 2 个 feature 描述 + 6 个新关键词
+- ✅ `README.md` — 顶部公告升级至 v2.7
 
 ### v2.6 新增功能（Phase 17-19）
 

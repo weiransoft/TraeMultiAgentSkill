@@ -1,7 +1,7 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本。
 ---
 
 # Multi-Agent Team Dispatcher (AI-Enhanced)
@@ -526,6 +526,98 @@ python3 scripts/trae_agent_dispatch.py \
 - `cancel.py` — 取消插件
 
 详细设计见 `docs/dev/PHASE17_PLAN.md`。
+
+### UI/UX 巡检与视觉回归（v2.7 新增 — 前端质量门禁工具）
+
+> **目的**: 在 E2E 测试阶段提供可复用的 UI/UX 质量与视觉回归检测脚本，
+> 作为「UI 设计师」与「测试专家」角色的标准前端质量门禁。
+> **设计原则**: 标准库优先（Playwright + PIL）、YAGNI、失败安全。
+
+#### `scripts/uiux_analyzer.py`（UI/UX 巡检分析器）
+
+4 大检测维度：
+| 维度 | 检测项 | 关键阈值 |
+|------|--------|---------|
+| 可访问性 (A11y) | WCAG AA 对比度、img alt、form label、语义化标签、键盘可达 | 正常文本 4.5:1 / 大文本 3:1 |
+| 交互质量 | 按钮最小尺寸、焦点可见性、加载反馈 | 最小可点击 ≥44px（Apple HIG） |
+| 布局与响应式 | 元素重叠、文字截断、视口溢出 | — |
+| UX 反模式 | 强制注册、破坏性操作无确认、表单无校验 | — |
+
+**关键类**:
+- `UIUXIssue`（dataclass）— 包含 `severity` (HIGH/MEDIUM/LOW) / `category` (a11y/interaction/layout/ux) / `rule` / `element` / `message` / `fix` / `metric`
+- `UIUXAnalyzer`（核心）— `audit(page)` → `list[UIUXIssue]`，`dump(path)` 输出 JSON
+
+**用法示例**:
+```python
+from uiux_analyzer import UIUXAnalyzer
+
+analyzer = UIUXAnalyzer()
+page.goto("https://example.com/login")
+issues = analyzer.audit(page)
+analyzer.dump(Path("reports/uiux.json"))
+for issue in issues:
+    if issue.severity == "HIGH":
+        print(f"[{issue.category}] {issue.message} → {issue.fix}")
+```
+
+**Playwright 综合探针**: 一次 `page.evaluate` 取齐所有探针数据（图片/表单/按钮/链接/标题/错误），避免多次往返。
+
+#### `scripts/visual_regression.py`（视觉回归 + 显示完整性）
+
+3 大检测维度：
+| 维度 | 检测项 | 实现 |
+|------|--------|------|
+| 视觉回归 | 像素级 Diff、SSIM 区域级 Diff | PIL `ImageChops` + 简化 SSIM |
+| 数据显示不全 | 文本截断、元素溢出视口、图片未加载、骨架屏 >10s、长表格横向滚动 | Playwright DOM 检查 |
+| 显示错误 | 红色文字/背景、错误关键词、Ant Design / Arco / Element UI error Toast、浏览器原生 dialog | HSV 检测 + 关键词 + 类名匹配 |
+
+**关键类**:
+- `ChangedRegion`（dataclass）— `x/y/width/height/pixel_count/severity`
+- `DiffResult`（dataclass）— 完整 diff 结果（含 `pixel_diff_ratio` / `ssim_score` / `changed_regions` / `data_incomplete` / `display_errors`）
+- `VisualRegressionChecker`（核心）— `compare(baseline, current, step) → DiffResult`
+
+**软依赖**:
+- Pillow（必需）
+- numpy（可选，启用更好的 SSIM）
+- playwright（必需，DOM 检查）
+
+**用法示例**:
+```python
+from visual_regression import VisualRegressionChecker
+
+checker = VisualRegressionChecker(pixel_diff_threshold=0.01)
+result = checker.compare(
+    baseline_path="baseline/login.png",
+    current_path="current/login.png",
+    test_id="TC-001",
+    step="submit_form",
+    page=page,  # 用于 DOM 检查
+)
+if result.pixel_diff_ratio > 0.01:
+    print(f"⚠️ 像素差异 {result.pixel_diff_ratio:.2%}")
+    for region in result.changed_regions:
+        print(f"  变化区域: {region.severity} ({region.width}x{region.height})")
+```
+
+**CLI 用法**:
+```bash
+# UI/UX 巡检（需要先启动浏览器/Playwright session）
+python3 scripts/uiux_analyzer.py --url https://example.com --out report.json
+
+# 视觉回归
+python3 scripts/visual_regression.py \
+    --baseline baseline/login.png \
+    --current current/login.png \
+    --threshold 0.01 \
+    --out diff_report.json
+```
+
+**角色集成**:
+- **UI 设计师** — 交付稿前自检：`uiux_analyzer.audit(page)` 输出 `reports/uiux.json` 供评审
+- **测试专家** — E2E 套件像素级断言：替代人工对比基线截图
+- **Solo Coder** — PR 门禁：CI 中调用 CLI，输出 JUnit XML 报告
+
+**失败安全设计**: 任一检查器异常被 try/except 隔离，不影响主流程与其他检查；返回的 `error` 字段记录异常原因供排查。
 
 ## 文档结构
 
