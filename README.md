@@ -83,32 +83,12 @@
 
 ## 🎉 2026 年 4 月最新更新 (v2.4)
 
-- ✅ **Ponytail 决策梯 (v2.6)** - 6 步决策梯（YAGNI→标准库→平台原生→复用现有→一行优先→最小可行）+ 16 条不可简化红线 + 三种强度模式（lite/full/ultra）+ 债务台账 + 需求追踪
-- ✅ **Autonomous 自主迭代模式 (v2.6)** - 4 阶段循环（plan→dev→verify→fix）+ 9 个核心组件 + 17 个 CLI flag + 智能确认三态决策 + 断点续跑 + 跨平台防休眠
-- ✅ **Dynamic Workflows 6 大模式 (v2.6)** - 分类并行动 / 扇出与聚合 / 对抗性验证 / 生成与筛选 / 锦标赛 / 循环直到完成 + 12 个实现模块 + 模型路由 + worktree 隔离
-- ✅ **插件热加载 (v2.6)** - 3 种加载路径（静态注册 / 显式 API / drop-in 目录扫描）+ V3 插件实现 + 运行时轮询 + 生产安全（回滚 / 路径穿越防护）
-- ✅ **Cybernetics 工程控制论增强 (v2.5)** - 三环控制模型 + 反馈控制环 + 性能画像 + 守护协调器 + 6 个核心组件
 - ✅ **Karpathy 四大核心原则** - 融入 Andrej Karpathy 的编程智慧：Think Before Coding、Simplicity First、Surgical Changes、Goal-Driven Execution
+- ✅ **Karpathy 原则执行检查器** - 原则合规性检查、5 级严重度违规检测、验证检查点管理、执行报告生成
+- ✅ **Claude Code SubAgent 适配器** - 跨平台 Agent 适配，统一 Claude Code / Trae IDE 的 subagent 调用接口
 - ✅ **行为准则体系** - 所有角色统一的 LLM 编程行为准则，减少错误、过度复杂、无关修改
 - ✅ **验证检查点机制** - 目标驱动的验证流程，确保每个阶段都有明确的成功标准
 - ✅ **角色专属应用指南** - 每个角色都有 Karpathy 原则的具体应用场景和行为准则
-- ✅ **多角色代码走读 (v2.3)** - 架构师、产品经理、独立开发者、UI 设计师、测试专家多视角分析代码，生成对齐后的统一代码地图
-- ✅ **代码地图 Workspace 支持 (v2.3)** - 支持一个 workspace 包含多个项目的场景，明确项目标识
-- ✅ **3D 代码地图可视化 (v2.3)** - 基于 Three.js 的交互式代码结构可视化，动态流动效果，深色/浅色主题切换
-- ✅ **任务可视化页面 (v2.3)** - 实时展现各角色任务状态、进度、依赖关系、交接过程、协同关系图
-- ✅ **文档与代码一致性检查 (v2.3)** - 代码走读审查报告中新增文档与代码差异检查清单
-- ✅ **长程 Agent 支持 (v2.2)** - 基于 Anthropic《Effective Harnesses for Long-Running Agents》核心思想，支持 Checkpoint 检查点、Handoff 交接班、TaskList 任务清单
-- ✅ **AI 语义理解驱动的角色匹配 (v2.1)** - 使用大模型理解任务深层语义，提供可解释的匹配结果和置信度评分
-- ✅ **AI 助手深度集成 (v2.1)** - 集成大模型 AI 助手能力，支持代码审查，知识问答、文本分析等功能
-- ✅ **智能缓存和降级策略 (v2.1)** - 性能优化，AI 不可用时自动降级到关键词匹配
-- ✅ **UI 设计师角色** - 添加 UI 设计师角色，创建独特、生产级的 UI 界面，避免通用的 AI "slop" 美学
-- ✅ **Agent Loop 思考循环修复** - 修复 is_all_tasks_completed 方法，增加连续无进展检测保护机制
-- ✅ **规范驱动开发** - 完整的规范工具链，统一的文档管理体系，多角色共识制定规范
-- ✅ **代码地图生成** - 自动生成项目代码结构映射，支持 JSON 和 Markdown 格式，识别核心组件和模块依赖
-- ✅ **项目理解** - 快速读取项目文档和代码，为各角色生成定制化理解文档，提供项目概览和技术栈分析
-- ✅ **八阶段标准工作流程** - 需求分析→架构设计→UI 设计→测试设计→任务分解→开发实现→测试验证→发布评审
-- ✅ **跨角色设计评审机制** - PRD 评审、架构评审、UI 设计评审、测试计划评审，开发计划评审
-- ✅ **基于文档的任务分解** - 所有角色基于文档进行任务分解，确保文档驱动开发
 
 ## 🌍 多语言支持 / Multi-Language Support
 
@@ -141,6 +121,7 @@
   - [Dynamic Workflows 6 大模式 (v2.6)](#dynamic-workflows-6-大模式-v26-新增)
   - [插件热加载 (v2.6)](#插件热加载-v26-新增)
   - [Karpathy 四大核心原则 (v2.4)](#karpathy-四大核心原则-v24-新增)
+  - [UI/UX 巡检与视觉回归 (v2.7)](#uiux-巡检与视觉回归-v27-新增)
 - [快速开始](#-快速开始)
 - [角色介绍](#-角色介绍)
 - [使用方法](#-使用方法)
@@ -422,6 +403,31 @@ V3 插件架构之上的动态能力，保留 Phase 16 静态注册路径基础�
    - 核心文件：`scripts/dispatcher/hot_reload_watcher.py`、`scripts/dispatcher/drop_in_loader.py`、`scripts/dispatcher/reload_guard.py`
 
 📄 详细方案：[docs/dev/PHASE17_PLAN.md](docs/dev/PHASE17_PLAN.md)
+
+### UI/UX 巡检与视觉回归 (v2.7 新增)
+
+作为「UI 设计师」与「测试专家」角色的标准前端质量门禁，提供可独立 import / CLI 调用的 E2E 视觉质量保障脚本。
+
+1. **UI/UX 巡检分析** ♿
+   - 4 大检测维度：可访问性（WCAG AA 对比度 / img alt / form label / 语义化标签 / 键盘可达）、交互质量（按钮最小尺寸 ≥44px / 焦点可见性 / 加载反馈）、布局与响应式（元素重叠 / 文字截断 / 视口溢出）、UX 反模式（强制注册 / 破坏性操作无确认 / 表单无校验）
+   - 关键类：`UIUXIssue`（dataclass）/ `UIUXAnalyzer`（核心，提供 `audit(page)` / `dump(path)`）
+   - Playwright 单次综合探针：一次 `page.evaluate` 取齐所有探针数据，避免多次往返
+   - 失败安全：任一检查项异常被 try/except 隔离，不影响其他检查
+   - 核心文件：`scripts/uiux_analyzer.py`
+
+2. **视觉回归与显示完整性** 🖼️
+   - 3 大检测维度：像素级 Diff（PIL `ImageChops`）+ 简化 SSIM 区域级 Diff、数据显示不全（文本截断 / 元素溢出 / 图片未加载 / 骨架屏 >10s / 长表格横向滚动）、显示错误（红色文字/背景 / 错误关键词 / 组件库错误 Toast / 浏览器原生 dialog）
+   - 关键类：`ChangedRegion` / `DiffResult` / `VisualRegressionChecker`
+   - 软依赖：Pillow（必需）、numpy（可选，更好的 SSIM）、playwright（DOM 检查）
+   - 阈值可配：默认 `pixel_diff_ratio < 1%`
+   - 核心文件：`scripts/visual_regression.py`
+
+3. **角色集成** 🎭
+   - **UI 设计师**：交付稿前自检 `uiux_analyzer.audit(page)`，输出 `reports/uiux.json`
+   - **测试专家**：E2E 套件中调用 `VisualRegressionChecker.compare(...)` 替代人工截图对比
+   - **Solo Coder**：PR 门禁中调用 CLI，输出 JUnit XML 报告
+
+📄 详细章节：[SKILL.md](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具)
 
 ### 核心能力
 

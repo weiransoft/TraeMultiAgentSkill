@@ -1,13 +1,20 @@
 name: trae-multi-agent
-version: 2.4.1
+version: 2.7.0
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
   
   核心特性：
   - Karpathy 四大核心原则强制执行（Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven）
+  - Ponytail 决策梯：6 步决策梯 + 16 条不可简化红线，少写多余代码
+  - Cybernetics 工程控制论增强：三环控制模型 + 反馈控制环 + 性能画像 + 守护协调器
+  - Autonomous Mode 自主编排：plan→dev→verify→fix 4 阶段循环
+  - Dynamic Workflows 6 大动态工作流模式
+  - 插件热加载 V3 架构
+  - UI/UX 巡检分析与视觉回归测试脚本（v2.7）
+  - 多角色代码走读与 3D 代码地图可视化
   - 双层动态上下文管理（长期记忆 + 工作记忆）
   - AI 语义理解驱动的智能角色匹配
   - 灵活的工作流编排引擎
@@ -28,6 +35,12 @@ ai_capabilities:
   long_running_agent: true
   karpathy_principle_enforcement: true
   cross_platform_adaptation: true
+  cybernetics_feedback_control: true
+  autonomous_orchestration: true
+  dynamic_workflow_patterns: true
+  plugin_hot_reload: true
+  uiux_audit: true
+  visual_regression: true
 
 capabilities:
   - name: product-manager

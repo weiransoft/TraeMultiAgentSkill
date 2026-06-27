@@ -214,6 +214,31 @@ Each role is equipped with complete work rules and quality standards:
 - Auto platform detection via environment variables
 - Generic fallback for unknown platforms
 
+### UI/UX Audit and Visual Regression (v2.7)
+
+Standard frontend quality gates for the **UI Designer** and **Test Expert** roles, provided as independently importable / CLI-callable E2E visual quality assurance scripts.
+
+1. **UI/UX Audit Analysis** ♿
+   - 4 detection dimensions: Accessibility (WCAG AA contrast / img alt / form label / semantic tags / keyboard accessibility), Interaction Quality (minimum button size ≥44px / focus visibility / loading feedback), Layout & Responsive (element overlap / text truncation / viewport overflow), UX Anti-patterns (forced registration / destructive actions without confirmation / forms without validation)
+   - Key classes: `UIUXIssue` (dataclass) / `UIUXAnalyzer` (core, provides `audit(page)` / `dump(path)`)
+   - Playwright single comprehensive probe: one `page.evaluate` fetches all probe data, avoiding multiple round-trips
+   - Failure-safe: any check item exception is isolated by try/except, not affecting other checks
+   - Core file: `scripts/uiux_analyzer.py`
+
+2. **Visual Regression & Display Integrity** 🖼️
+   - 3 detection dimensions: pixel-level Diff (PIL `ImageChops`) + simplified SSIM region-level Diff, data incompleteness (text truncation / element overflow / image not loaded / skeleton screen >10s / long table horizontal scroll), display errors (red text/background / error keywords / component library error Toasts / browser native dialogs)
+   - Key classes: `ChangedRegion` / `DiffResult` / `VisualRegressionChecker`
+   - Soft dependencies: Pillow (required), numpy (optional, better SSIM), playwright (DOM check)
+   - Configurable threshold: default `pixel_diff_ratio < 1%`
+   - Core file: `scripts/visual_regression.py`
+
+3. **Role Integration** 🎭
+   - **UI Designer**: self-check before delivery with `uiux_analyzer.audit(page)`, output `reports/uiux.json`
+   - **Test Expert**: call `VisualRegressionChecker.compare(...)` in E2E suites to replace manual screenshot comparison
+   - **Solo Coder**: call CLI in PR gates and output JUnit XML reports
+
+📄 Detailed section: [SKILL.md](SKILL.md#uiux-巡检与视觉回归v27-新增--前端质量门禁工具)
+
 ## 🚀 Quick Start / 快速开始
 
 ### Prerequisites / 前置要求

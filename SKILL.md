@@ -22,7 +22,18 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 - 🔬 **Surgical Changes（精准修改）**: 只改需要的、不改无关的、保持风格一致
 - ✅ **Goal-Driven Execution（目标驱动）**: 定义成功标准、验证检查点、迭代直到完成
 
-**v2.4 新增（Karpathy 四大核心原则）**:
+**v2.6 新增（Ponytail 决策梯 + 自主编排 + 插件热加载）**:
+- 🪜 Ponytail 决策梯：6 步决策梯 + 16 条不可简化红线，少写多余代码
+- 🤖 Autonomous 自主迭代模式：plan→dev→verify→fix 4 阶段循环，Ralph 风格自主编排
+- 🔄 Dynamic Workflows 6 大模式：分类并行、扇出聚合、对抗验证、生成筛选、锦标赛、循环直到完成
+- 🔌 插件热加载 V3 架构：Drop-in 目录 / Hot Register API / HotReloadWatcher 3 种加载路径
+
+**v2.7 新增（UI/UX 巡检 + 视觉回归测试）**:
+- ♿ UI/UX 巡检分析：`scripts/uiux_analyzer.py`，4 大检测维度（可访问性 / 交互质量 / 布局响应式 / UX 反模式）
+- 🖼️ 视觉回归测试：`scripts/visual_regression.py`，像素级 Diff + 数据显示不全 + 显示错误检测
+- 🛡️ 前端质量门禁：UI 设计师交付前自检、测试专家 E2E 断言、Solo Coder CI 门禁
+
+**v2.3 新增（代码走读与可视化）**:
 - 🚀 代码走读与审查：多角色协作分析，生成统一代码地图和审查报告
 - 🗺️ 代码地图 Workspace 支持：支持一个 workspace 包含多个项目
 - 📊 文档对齐引擎：多角色分析结果对齐，生成共识代码地图
@@ -673,5 +684,6 @@ Trae Multi-Agent Dispatcher 提供了：
 - ✅ 插件热加载 V3 架构（Phase 17）
 - ✅ 代码走读与审查 + 3D 代码地图可视化
 - ✅ UI 设计（避免 AI slop）
+- ✅ UI/UX 巡检分析与视觉回归测试（v2.7，前端质量门禁）
 
 通过智能调度 + 自主编排 + 决策梯约束，减少用户干预，提升协作效率！
