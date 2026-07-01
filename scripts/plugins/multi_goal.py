@@ -1,4 +1,5 @@
 """MultiGoalPlugin — Phase 13 引入的多 Goal 编排功能插件化（priority=30，状态变更）。"""
+
 import argparse
 from typing import Set
 from plugins.base import GoalCommandPlugin
@@ -19,7 +20,15 @@ class MultiGoalPlugin(GoalCommandPlugin):
     @property
     def mutex_with(self) -> Set[str]:
         # Phase 18：与 autonomous 互斥
-        return {"goal-cancel", "goal-graph", "goal-resume", "loop", "autonomous"}
+        # Loop Engineering：与 loop-engineering 互斥
+        return {
+            "goal-cancel",
+            "goal-graph",
+            "goal-resume",
+            "loop",
+            "autonomous",
+            "loop-engineering",
+        }
 
     @property
     def requires_task(self) -> bool:
@@ -30,6 +39,7 @@ class MultiGoalPlugin(GoalCommandPlugin):
 
     def execute(self, args: argparse.Namespace, ctx: PluginContext) -> bool:
         from dispatch.legacy import dispatch_agent_v2_with_multi_goal
+
         ctx.log(
             f"🎯 Phase 16 检测到多 Goal 编排模式：goals={args.multi_goal}",
             "INFO",

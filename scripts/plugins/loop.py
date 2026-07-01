@@ -1,4 +1,5 @@
 """LoopGoalPlugin — Phase 11 引入的 /loop 功能插件化（priority=40，循环/长期运行）。"""
+
 import argparse
 from typing import Set
 from plugins.base import GoalCommandPlugin
@@ -19,7 +20,14 @@ class LoopGoalPlugin(GoalCommandPlugin):
     @property
     def mutex_with(self) -> Set[str]:
         # Phase 18：与 autonomous 互斥
-        return {"goal-cancel", "goal-graph", "goal-resume", "multi-goal", "autonomous"}
+        return {
+            "goal-cancel",
+            "goal-graph",
+            "goal-resume",
+            "multi-goal",
+            "autonomous",
+            "loop-engineering",
+        }
 
     @property
     def requires_task(self) -> bool:
@@ -30,6 +38,7 @@ class LoopGoalPlugin(GoalCommandPlugin):
 
     def execute(self, args: argparse.Namespace, ctx: PluginContext) -> bool:
         from dispatch.legacy import dispatch_agent_v2_with_loop_goal
+
         ctx.log(
             f"🔁 Phase 16 检测到 /loop 模式：loop_count={getattr(args, 'loop', 1)}",
             "INFO",

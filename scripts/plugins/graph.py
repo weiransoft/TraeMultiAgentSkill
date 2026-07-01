@@ -1,4 +1,5 @@
 """GoalGraphPlugin — Phase 15 引入的 DAG 可视化插件化（priority=10，只读）。"""
+
 import argparse
 from typing import Set
 from plugins.base import GoalCommandPlugin
@@ -19,7 +20,15 @@ class GoalGraphPlugin(GoalCommandPlugin):
     @property
     def mutex_with(self) -> Set[str]:
         # Phase 18：与 autonomous 互斥
-        return {"goal-cancel", "goal-resume", "multi-goal", "loop", "autonomous"}
+        # Loop Engineering：与 loop-engineering 互斥
+        return {
+            "goal-cancel",
+            "goal-resume",
+            "multi-goal",
+            "loop",
+            "autonomous",
+            "loop-engineering",
+        }
 
     @property
     def requires_task(self) -> bool:
@@ -30,6 +39,7 @@ class GoalGraphPlugin(GoalCommandPlugin):
 
     def execute(self, args: argparse.Namespace, ctx: PluginContext) -> bool:
         from dispatch.legacy import dispatch_agent_v2_with_goal_graph
+
         ctx.log(
             f"📊 Phase 16 检测到 DAG 可视化模式：root={args.goal_graph}",
             "INFO",

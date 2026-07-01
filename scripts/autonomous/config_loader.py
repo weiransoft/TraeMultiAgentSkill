@@ -63,6 +63,15 @@ class AutonomousConfig:
     notes_path: str = "notes.md"
     confirm_mode: str = "smart"
     risk_threshold: int = 5
+    # Phase 19: Loop Engineering 全局默认配置（可选，向后兼容）
+    loop_engineering_enabled: bool = False
+    loop_type: str = "coding"
+    loop_discovery_mode: str = "auto"
+    loop_evaluator_mode: str = "strict"
+    loop_human_checkpoint_every: int = 5
+    loop_max_iterations: int = 50
+    loop_max_tokens: int = 500_000
+    loop_sampling_read_ratio: float = 0.1
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -437,6 +446,15 @@ def _apply_config(merged: Dict[str, Any]) -> AutonomousConfig:
         "notes_path": str,
         "confirm_mode": str,
         "risk_threshold": int,
+        # Phase 19: Loop Engineering 全局默认配置
+        "loop_engineering_enabled": bool,
+        "loop_type": str,
+        "loop_discovery_mode": str,
+        "loop_evaluator_mode": str,
+        "loop_human_checkpoint_every": int,
+        "loop_max_iterations": int,
+        "loop_max_tokens": int,
+        "loop_sampling_read_ratio": float,
     }
     kwargs: Dict[str, Any] = {}
     extra: Dict[str, Any] = {}

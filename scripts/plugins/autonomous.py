@@ -11,13 +11,12 @@
 - 仅调用 dispatcher.dispatch() 间接走 V3 流程
 - 真实实现所有逻辑（无 mock/简化）
 """
+
 from __future__ import annotations
 
 import argparse
 import json
-import time
 import uuid
-from dataclasses import asdict
 from pathlib import Path
 from typing import Optional, Set
 
@@ -58,7 +57,14 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         - multi-goal: 多 Goal 编排
         - loop: /loop 循环（autonomous 自带循环）
         """
-        return {"goal-cancel", "goal-graph", "goal-resume", "multi-goal", "loop"}
+        return {
+            "goal-cancel",
+            "goal-graph",
+            "goal-resume",
+            "multi-goal",
+            "loop",
+            "loop-engineering",
+        }
 
     @property
     def requires_task(self) -> bool:
@@ -118,6 +124,7 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         stage_handlers = self._build_stage_handlers(components, config=config)
         # 6. 构造 RalphLoopController
         from autonomous.loop_controller import RalphLoopController
+
         loop = RalphLoopController(
             config=config,
             project_root=ctx.project_root,
@@ -166,11 +173,10 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
     def _build_loop_config(self, args: argparse.Namespace):
         """从 CLI args 构造 LoopConfig。"""
         from autonomous.loop_controller import LoopConfig, StageKind
+
         # 解析 stage_order
         stage_order_str = getattr(args, "auto_stage_order", "plan,dev,verify,fix")
-        stage_order_list = [
-            s.strip() for s in stage_order_str.split(",") if s.strip()
-        ]
+        stage_order_list = [s.strip() for s in stage_order_str.split(",") if s.strip()]
         valid_stages = {StageKind.PLAN, StageKind.DEV, StageKind.VERIFY, StageKind.FIX}
         stage_order = []
         for s in stage_order_list:
@@ -190,7 +196,9 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
             backoff_base_sec=float(getattr(args, "auto_backoff_base", 1.0)),
             backoff_max_sec=float(getattr(args, "auto_backoff_max", 60.0)),
             consecutive_failure_abort=int(getattr(args, "auto_failure_abort", 3)),
-            git_author_name=str(getattr(args, "auto_git_author_name", "Ralph Autonomous Agent")),
+            git_author_name=str(
+                getattr(args, "auto_git_author_name", "Ralph Autonomous Agent")
+            ),
             git_author_email=str(
                 getattr(args, "auto_git_author_email", "ralph@trae-multi-agent.local")
             ),
@@ -216,6 +224,7 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
             (RunState, run_dir) 或 (None, None)（失败时）
         """
         from autonomous.run_state import RunState
+
         run_dir_rel = str(getattr(args, "auto_run_dir", ".gnhf/runs"))
         run_root = ctx.project_root / run_dir_rel
         try:
@@ -266,9 +275,7 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
             task_file = ctx.project_root / args.task_file
             if task_file.exists():
                 objective = task_file.read_text(encoding="utf-8").strip()
-        run_state = RunState(
-            run_dir=run_dir, run_id=run_id, objective=objective
-        )
+        run_state = RunState(run_dir=run_dir, run_id=run_id, objective=objective)
         run_state.state.objective = objective
         run_state.persist()
         ctx.log(f"🆕 新建 run_id={run_id}", "INFO")
@@ -316,9 +323,8 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         """
         # 1. NotesMemory
         from autonomous.notes_memory import NotesMemory
-        notes_path = run_dir / str(
-            getattr(args, "auto_notes_path", "notes.md")
-        )
+
+        notes_path = run_dir / str(getattr(args, "auto_notes_path", "notes.md"))
         notes_memory = NotesMemory(
             notes_path=notes_path,
             max_size_kb=int(getattr(args, "auto_max_size_kb", 1024)),
@@ -326,6 +332,7 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         )
         # 2. GitDriver
         from autonomous.git_driver import GitDriver
+
         git_driver = GitDriver(
             repo_root=ctx.project_root,
             run_id=run_state.state.run_id,
@@ -335,15 +342,19 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         )
         # 3. AutoSkillLoader
         from autonomous.auto_skill_loader import AutoSkillLoader
+
         auto_skill_loader = AutoSkillLoader(project_root=ctx.project_root)
         # 4. SmartConfirmation
         from autonomous.smart_confirmation import SmartConfirmation
+
         smart_confirmation = SmartConfirmation()
         # 5. DispatcherAdapter
         from autonomous.dispatcher_adapter import DispatcherAdapter
+
         dispatcher_adapter = DispatcherAdapter(log=ctx.log)
         # 6. SleepGuard
         from autonomous.sleep_guard import SleepGuard, SleepGuardMode
+
         sleep_guard_enabled = not bool(getattr(args, "auto_no_caffeinate", False))
         sleep_guard_mode = (
             SleepGuardMode.ON if sleep_guard_enabled else SleepGuardMode.OFF
@@ -374,7 +385,9 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
 
             # 构造决策梯引擎（始终构造，由 handler 按角色选择是否注入）
             ponytail_engine = PonytailRulesetEngine(
-                skill_root=str(ctx.project_root / ".trae" / "skills" / "trae-multi-agent")
+                skill_root=str(
+                    ctx.project_root / ".trae" / "skills" / "trae-multi-agent"
+                )
             )
         except ImportError as e:
             # ponytail 模块不可用时，不注入决策梯（向后兼容）
@@ -386,6 +399,7 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         debt_collector = None
         try:
             from ponytail.debt_collector import DebtCollector
+
             debt_collector = DebtCollector()
         except ImportError:
             # debt_collector 模块不可用时，不检测债务（向后兼容）
@@ -422,9 +436,16 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
         from autonomous.handlers.dev_handler import DevHandler
         from autonomous.handlers.verify_handler import VerifyHandler
         from autonomous.handlers.fix_handler import FixHandler
+
         # 从 config 读取 test_command 和 security_analyzer（stateless 契约）
-        test_command = config.test_command if config is not None else "python3 -m unittest discover -s tests -p 'test_*.py'"
-        security_analyzer = config.security_analyzer if config is not None else "builtin"
+        test_command = (
+            config.test_command
+            if config is not None
+            else "python3 -m unittest discover -s tests -p 'test_*.py'"
+        )
+        security_analyzer = (
+            config.security_analyzer if config is not None else "builtin"
+        )
 
         # 【新增】Ponytail 组件（从 components 读取，可能为 None）
         ponytail_engine = components.get("ponytail_engine")

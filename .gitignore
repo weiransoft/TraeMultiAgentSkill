@@ -26,6 +26,10 @@ logs/
 scripts/.trae/
 scripts/logs/
 
+# Loop Engineering / Autonomous 运行时 run 状态
+.gnhf/
+scripts/.gnhf/
+
 # 覆盖度报告
 scripts/tests/coverage.json
 .coveragerc

@@ -9,24 +9,25 @@
 - Phase 17：_start_hot_reload_if_enabled（v3 §2.9）— 启动 HotReloadWatcher
   + atexit 清理 + weakref 防重复（v3 P1-8）
 """
+
 import atexit
 import logging
-import sys
 import weakref
 from pathlib import Path
 from threading import RLock
+from typing import Optional
 
 # 1. re-export 11 个符号（B-2 完整列表）
 from dispatch.legacy import (  # noqa: F401
-    log,                            # 多处 test 引用
-    dispatch_agent_v2,              # 2 处 test
-    dispatch_agent,                 # plan 列入
-    dispatch_agent_v2_with_loop_goal,         # 4 处 test
-    dispatch_agent_v2_with_goal_resume,       # 1 处 test
-    dispatch_agent_v2_with_multi_goal,        # 1 处 test
-    dispatch_agent_v2_with_goal_cancel,       # 1 处 test
-    dispatch_agent_v2_with_goal_graph,        # 4 处 dag_visualizer_integration test
-    _is_overall_success,            # 3 处 test_loop_goal
+    log,  # 多处 test 引用
+    dispatch_agent_v2,  # 2 处 test
+    dispatch_agent,  # plan 列入
+    dispatch_agent_v2_with_loop_goal,  # 4 处 test
+    dispatch_agent_v2_with_goal_resume,  # 1 处 test
+    dispatch_agent_v2_with_multi_goal,  # 1 处 test
+    dispatch_agent_v2_with_goal_cancel,  # 1 处 test
+    dispatch_agent_v2_with_goal_graph,  # 4 处 dag_visualizer_integration test
+    _is_overall_success,  # 3 处 test_loop_goal
     _module_level_single_dispatch,  # 2 处 test_goal_orchestrator
 )
 from cli.parser import parse_arguments  # 4 处 test 引用  # noqa: F401
@@ -76,9 +77,9 @@ def _dispatch_through_v3(args) -> int:
     ctx = PluginContext(
         project_root=project_root,
         log=log,
-        dry_run=getattr(args, 'dry_run', False),
-        verbose=getattr(args, 'verbose', False),
-        agent_type=getattr(args, 'agent', 'auto'),
+        dry_run=getattr(args, "dry_run", False),
+        verbose=getattr(args, "verbose", False),
+        agent_type=getattr(args, "agent", "auto"),
     )
 
     # 互斥预校验（替代 god module line 1326-1334 的硬编码 if-elif 链）
@@ -97,12 +98,18 @@ def _dispatch_through_v3(args) -> int:
     # 排除模式：goal_graph / goal_cancel / goal_resume / multi_goal /
     #          loop > 1 / goal 不为 None
     if not args.task and not (
-        args.goal_graph or args.goal_cancel or args.goal_resume
-        or args.multi_goal or args.loop > 1 or args.goal is not None
+        args.goal_graph
+        or args.goal_cancel
+        or args.goal_resume
+        or args.multi_goal
+        or args.loop > 1
+        or args.goal is not None
+        or getattr(args, "loop_engineering", False)
     ):
         log(
             "❌ --task 必填（除非使用 --goal-graph / --goal-cancel / "
-            "--goal-resume / --multi-goal / --loop / --goal 模式）",
+            "--goal-resume / --multi-goal / --loop / --goal / "
+            "--loop-engineering 模式）",
             "ERROR",
         )
         return 1
@@ -119,10 +126,10 @@ def _dispatch_through_v3(args) -> int:
 
     if result.skipped_reason == "dry_run":
         # 风险-5 修正：dispatcher 内部 dry_run 短路
-        log('🔄 模拟模式：不实际调用智能体', 'WARNING')
-        log(f'   将调度智能体：{args.agent}', 'WARNING')
-        log(f'   任务：{args.task}', 'WARNING')
-        log('✅ 模拟完成', 'SUCCESS')
+        log("🔄 模拟模式：不实际调用智能体", "WARNING")
+        log(f"   将调度智能体：{args.agent}", "WARNING")
+        log(f"   任务：{args.task}", "WARNING")
+        log("✅ 模拟完成", "SUCCESS")
         return 0
 
     if result.skipped_reason == "no_match":
@@ -139,6 +146,7 @@ def _dispatch_through_v3(args) -> int:
 
 
 # === Phase 17 v3 §2.9：hot reload watcher 启动 + 清理 ===
+
 
 def _start_hot_reload_if_enabled(
     dispatcher: "object",  # GoalDispatcher
@@ -161,25 +169,24 @@ def _start_hot_reload_if_enabled(
         HotReloadWatcher 实例 or None
     """
     # v3 P1-5 兜底
-    enabled = getattr(args, 'hot_reload', None)
+    enabled = getattr(args, "hot_reload", None)
     assert enabled is not None, (
         "args.hot_reload is None — parser 解析异常，"
         "请检查 --hot-reload/--no-hot-reload 配置"
     )
     if not enabled:
-        _facade_logger.info(
-            "[facade] hot reload 显式禁用（--no-hot-reload）"
-        )
+        _facade_logger.info("[facade] hot reload 显式禁用（--no-hot-reload）")
         return None
 
     # v3 P0-7 第三层：facade 串联（即使 parser 漏过 + watcher 兜底）
     # 注解：args.hot_reload_dir 已被 parser type 校验（CLI 第一层）
-    drop_in_dir = Path(getattr(args, 'hot_reload_dir', 'plugins_extra'))
-    poll_interval = float(getattr(args, 'hot_reload_interval', 5.0))
+    drop_in_dir = Path(getattr(args, "hot_reload_dir", "plugins_extra"))
+    poll_interval = float(getattr(args, "hot_reload_interval", 5.0))
 
     try:
         # 延迟 import：避免 HotReloadWatcher 自身 import 异常阻断 facade 加载
         from dispatcher.hot_reload_watcher import HotReloadWatcher
+
         watcher = HotReloadWatcher(
             dispatcher=dispatcher,
             drop_in_dir=drop_in_dir,
@@ -188,9 +195,7 @@ def _start_hot_reload_if_enabled(
         )
     except Exception as e:
         # watcher 构造失败不阻断 main 流程（生产友好）
-        _facade_logger.error(
-            f"[facade] watcher 启动失败：{e}"
-        )
+        _facade_logger.error(f"[facade] watcher 启动失败：{e}")
         return None
 
     # 启动 + 等待首次扫描完成（v3 P0-4：避免 dispatch 早于首次扫描）
@@ -224,9 +229,7 @@ def _safe_watcher_stop(watcher) -> None:
     try:
         watcher.stop(timeout=5.0)
     except Exception as e:
-        _facade_logger.warning(
-            f"[facade] watcher.stop 异常：{e}"
-        )
+        _facade_logger.warning(f"[facade] watcher.stop 异常：{e}")
 
 
 __all__ = [

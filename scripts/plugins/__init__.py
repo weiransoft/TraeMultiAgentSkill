@@ -21,6 +21,7 @@ from plugins.graph import GoalGraphPlugin
 from plugins.resume import GoalResumePlugin
 from plugins.multi_goal import MultiGoalPlugin
 from plugins.loop import LoopGoalPlugin
+from plugins.loop_engineering import LoopEngineeringPlugin
 from plugins.autonomous import RalphAutonomousPlugin
 
 
@@ -29,6 +30,7 @@ from plugins.autonomous import RalphAutonomousPlugin
 # Phase 18 新增：RalphAutonomousPlugin（priority=5）
 #   - 与 goal-cancel(0) 不冲突（priority 不同）
 #   - 与 loop/multi-goal 等通过 mutex_with 互斥
+# Loop Engineering 新增：LoopEngineeringPlugin（priority=42）
 BUILTIN_PLUGINS: list = [
     GoalCancelPlugin(),
     RalphAutonomousPlugin(),  # Phase 18 新增（priority=5）
@@ -36,6 +38,7 @@ BUILTIN_PLUGINS: list = [
     GoalResumePlugin(),
     MultiGoalPlugin(),
     LoopGoalPlugin(),
+    LoopEngineeringPlugin(),  # Loop Engineering 入口
 ]
 
 
@@ -46,6 +49,7 @@ __all__ = [
     "GoalResumePlugin",
     "MultiGoalPlugin",
     "LoopGoalPlugin",
+    "LoopEngineeringPlugin",
     "RalphAutonomousPlugin",
     "BUILTIN_PLUGINS",
 ]

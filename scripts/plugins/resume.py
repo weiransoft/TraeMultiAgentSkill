@@ -1,4 +1,5 @@
 """GoalResumePlugin — Phase 13/14 引入的 Goal 续跑功能插件化（priority=20，状态变更）。"""
+
 import argparse
 from typing import Set
 from plugins.base import GoalCommandPlugin
@@ -19,7 +20,15 @@ class GoalResumePlugin(GoalCommandPlugin):
     @property
     def mutex_with(self) -> Set[str]:
         # Phase 18：与 autonomous 互斥
-        return {"goal-cancel", "goal-graph", "multi-goal", "loop", "autonomous"}
+        # Loop Engineering：与 loop-engineering 互斥
+        return {
+            "goal-cancel",
+            "goal-graph",
+            "multi-goal",
+            "loop",
+            "autonomous",
+            "loop-engineering",
+        }
 
     @property
     def requires_task(self) -> bool:
@@ -30,6 +39,7 @@ class GoalResumePlugin(GoalCommandPlugin):
 
     def execute(self, args: argparse.Namespace, ctx: PluginContext) -> bool:
         from dispatch.legacy import dispatch_agent_v2_with_goal_resume
+
         ctx.log(
             f"🔄 Phase 16 检测到续跑模式：goal={args.goal_resume}",
             "INFO",

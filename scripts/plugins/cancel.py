@@ -1,4 +1,5 @@
 """GoalCancelPlugin — Phase 14 引入的 Goal 取消功能插件化（priority=0，破坏性最高）。"""
+
 import argparse
 from typing import Set
 from plugins.base import GoalCommandPlugin
@@ -20,7 +21,15 @@ class GoalCancelPlugin(GoalCommandPlugin):
     def mutex_with(self) -> Set[str]:
         # cancel 与所有其他 plugin 互斥
         # Phase 18：与 autonomous 互斥
-        return {"goal-graph", "goal-resume", "multi-goal", "loop", "autonomous"}
+        # Loop Engineering：与 loop-engineering 互斥
+        return {
+            "goal-graph",
+            "goal-resume",
+            "multi-goal",
+            "loop",
+            "autonomous",
+            "loop-engineering",
+        }
 
     @property
     def requires_task(self) -> bool:
@@ -32,6 +41,7 @@ class GoalCancelPlugin(GoalCommandPlugin):
     def execute(self, args: argparse.Namespace, ctx: PluginContext) -> bool:
         # B-3 修复：从 dispatch.legacy 导入（不再 from goal_orchestrator）
         from dispatch.legacy import dispatch_agent_v2_with_goal_cancel
+
         ctx.log(
             f"🛑 Phase 16 检测到取消模式：goal={args.goal_cancel}",
             "INFO",

@@ -8,6 +8,7 @@ from plugins.graph import GoalGraphPlugin
 from plugins.resume import GoalResumePlugin
 from plugins.multi_goal import MultiGoalPlugin
 from plugins.loop import LoopGoalPlugin
+from plugins.loop_engineering import LoopEngineeringPlugin
 from plugins.autonomous import RalphAutonomousPlugin
 
 
@@ -61,12 +62,13 @@ class TestBuiltinPluginsContract(unittest.TestCase):
                 self.assertIn(mutex_name, names, f"Plugin {p.name!r} mutex_with 引用不存在 {mutex_name!r}")
 
     def test_builtin_plugin_classes_importable(self):
-        # 6 个 plugin class 全部可 import
+        # 7 个 plugin class 全部可 import
         self.assertIsNotNone(GoalCancelPlugin)
         self.assertIsNotNone(GoalGraphPlugin)
         self.assertIsNotNone(GoalResumePlugin)
         self.assertIsNotNone(MultiGoalPlugin)
         self.assertIsNotNone(LoopGoalPlugin)
+        self.assertIsNotNone(LoopEngineeringPlugin)
         self.assertIsNotNone(RalphAutonomousPlugin)
 
 
@@ -79,8 +81,8 @@ class TestBuiltinPluginsStateless(unittest.TestCase):
         plugin_classes = set()
         for p in builtin1:
             plugin_classes.add(type(p))
-        self.assertEqual(len(plugin_classes), 6, "内置 plugin 应该是 6 个不同 class")
+        self.assertEqual(len(plugin_classes), 7, "内置 plugin 应该是 7 个不同 class")
 
-    def test_builtins_count_is_6(self):
-        # Phase 18：autonomous 加入后共 6 个内置 plugin
-        self.assertEqual(len(BUILTIN_PLUGINS), 6)
+    def test_builtins_count_is_7(self):
+        # Phase 18 + Loop Engineering：共 7 个内置 plugin
+        self.assertEqual(len(BUILTIN_PLUGINS), 7)
