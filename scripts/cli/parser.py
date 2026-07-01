@@ -14,6 +14,29 @@ import argparse
 from pathlib import Path
 
 
+def _str_to_bool(value: str) -> bool:
+    """将字符串形式的布尔值转换为 bool。
+
+    支持：true / false / 1 / 0 / yes / no（大小写不敏感）。
+    用于兼容旧版 CLI 中 `--flag true` 的传参风格。
+
+    Args:
+        value: 待转换的字符串。
+
+    Returns:
+        bool: 转换后的布尔值。
+
+    Raises:
+        argparse.ArgumentTypeError: 无法识别为布尔值时抛出。
+    """
+    lower = value.strip().lower()
+    if lower in ("true", "1", "yes"):
+        return True
+    if lower in ("false", "0", "no"):
+        return False
+    raise argparse.ArgumentTypeError(f"无效布尔值：{value}（期望 true/false）")
+
+
 def _validate_drop_in_dir(value: str) -> str:
     """Phase 17 v3 P0-7 第一层：CLI 层早期校验 drop-in 目录路径。
 
@@ -75,6 +98,29 @@ def parse_arguments():
         ],
         default="auto",
         help="指定要调度的智能体角色（默认：auto - 自动匹配）",
+    )
+
+    # 旧版 / Claude Code 触发器兼容性 flag：
+    # --consensus / --explain / --match-strategy 在 autonomous dispatcher_adapter
+    # 构造 Namespace 时使用；直接调用 trae_agent_dispatch.py 时需解析通过。
+    parser.add_argument(
+        "--consensus",
+        type=_str_to_bool,
+        default=False,
+        help="多角色代码审查是否启用共识汇总（true/false；默认 false）",
+    )
+    parser.add_argument(
+        "--explain",
+        type=_str_to_bool,
+        default=False,
+        help="是否输出解释性分析（true/false；默认 false）",
+    )
+    parser.add_argument(
+        "--match-strategy",
+        type=str,
+        default="auto",
+        choices=["auto", "exact", "fuzzy", "semantic"],
+        help="角色匹配策略（auto/exact/fuzzy/semantic；默认 auto）",
     )
 
     parser.add_argument(
