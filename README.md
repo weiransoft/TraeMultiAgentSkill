@@ -1,6 +1,35 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算。
+
+## 🎉 2026 年 7 月最新修订 (v2.7.1)
+
+> 背景：多角色团队全量代码 review 发现的模拟实现与双宿主漂移问题集中修复
+> 原则：禁止模拟/占位/mock，诚实降级；双宿主（Trae / Claude Code）能力对齐
+
+- ✅ **AI 诚实降级** - 消除脚本层全部模拟 AI 响应
+  - 🤥→✅ `ai_assistant.py`：Trae AI 返回明确"不可用"标注，custom 实现真实 HTTP 调用，local 实现真实模型加载
+  - 🤥→✅ `ai_semantic_matcher.py`：删除 `_simulate_ai_response`，无客户端时抛错并降级到确定性关键词匹配
+  - 📄 能力分层说明：[SKILL.md](SKILL.md) 顶部「能力实现方式说明」
+
+- ✅ **真实语义匹配** - 向量相似度替代关键词重叠
+  - 🔢 `role_matcher.py`：本地 embedder（TFIDF/Hashing）余弦相似度，确定性可复现
+  - 🛡️ `goal_orchestrator.py`：embedder 三级降级链 SentenceTransformer → TFIDF → Hashing，无网络自动降级
+
+- ✅ **Claude Code 真实 SubAgent** - `.claude/agents/` 5 角色定义
+  - 🎭 architect / product-manager / test-expert / solo-coder / ui-designer
+  - 📥 `install-claude-code.sh` 自动安装到 `~/.claude/agents/`，宿主 Task 机制真实并行调度
+
+- ✅ **双宿主清单同步** - 防能力漂移 CI 门禁
+  - 🔄 新增 `scripts/sync_manifests.py`：校验三份 manifest 的 name / version 一致
+  - 📋 统一 `name=multi-agent-team`、`version=2.7.1`
+
+- ✅ **v1 死代码清算** - 删除 3 个遗留文件（1195 行）
+  - 🧹 `workflow_engine.py` / `code_map_generator.py` / `test_v2_components.py`
+  - 🔀 `dispatch/legacy.py` 切换到 `WorkflowEngineV2`，业务代码零改动
+  - 📦 `requirements.txt` 显式标注软依赖（playwright / Pillow / sentence-transformers 可选）
+
+- 🧪 **测试**：193 通过 / 22 跳过 / 0 失败；`sync_manifests.py` 三清单一致
 
 ## 🎉 2026 年 6 月最新更新 (v2.7)
 

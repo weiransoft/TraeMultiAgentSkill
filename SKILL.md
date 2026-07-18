@@ -1,17 +1,26 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算。
 ---
 
 # Multi-Agent Team Dispatcher (AI-Enhanced)
 
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
 
-> **能力实现方式说明（v2.7.0 诚实标注）**：
+> **能力实现方式说明（v2.7.1 诚实标注）**：
 > - **提示词层 AI（宿主 LLM 完成）**：任务语义理解、角色智能匹配、多角色共识决策、架构设计审查——由 Trae/Claude 宿主大模型直接执行，脚本仅提供候选清单与规则约束。
 > - **脚本层确定性工具（Python 实现）**：代码地图扫描、UI/UX 巡检、视觉回归对比、决策梯合规检查、TFIDF/Hashing 文本相似度——为无 LLM 的独立进程，提供可复现的确定性结果。
 > - **降级模式说明**：当脚本层需要语义相似度但无网络/模型时，自动降级到 TFIDF/Hashing 本地算法；SubAgent 调用在 Claude Code 侧为模拟适配（`fallback_mode: simulation`），真实并行子代理由宿主 Task 机制实现。
+
+**v2.7.1 修订（AI 诚实化 + 代码清算 + 双宿主同步）**:
+- 🤥→✅ AI 诚实降级：`ai_assistant.py` / `ai_semantic_matcher.py` 移除全部模拟响应，无 AI 客户端时明确抛错并降级到确定性匹配，不再伪装 AI 输出
+- 🔢 真实语义匹配：`role_matcher.py` 从关键词重叠升级为本地 embedder（TFIDF/Hashing）向量余弦相似度
+- 🛡️ embedder 三级降级链：`goal_orchestrator.py` SentenceTransformer → TFIDF → Hashing，无网络/无模型时自动降级
+- 🎭 Claude Code 真实 SubAgent：`.claude/agents/` 新增 5 角色定义文件，替代脚本模拟
+- 🔄 双宿主清单同步：`sync_manifests.py` CI 校验三份 manifest（skill-manifest.yaml / skills-index.json / claude-code-skill.json）版本与命名一致
+- 🧹 v1 死代码清算：删除 `workflow_engine.py` / `code_map_generator.py` / `test_v2_components.py`，`dispatch/legacy.py` 切换到 `WorkflowEngineV2`
+- 📦 依赖显式化：`requirements.txt` 标注软依赖（playwright / Pillow / sentence-transformers 均为可选）
 
 **v2.5 新增（Cybernetics 工程控制论增强）**:
 > 参考来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  

@@ -2,9 +2,55 @@
 
 ## 版本信息
 
-- **当前版本**: 2.7
-- **发布日期**: 2026-06-20
+- **当前版本**: 2.7.1
+- **发布日期**: 2026-07-18
 - **状态**: ✅ 已完成（所有计划功能 100% 实现）
+
+## v2.7.1 修订（AI 诚实化 + 真实语义匹配 + 双宿主同步 + v1 死代码清算）
+
+### AI 诚实降级
+
+- **`scripts/ai_assistant.py`**: ✅ 移除全部模拟响应
+  - `_call_trae_ai` 返回明确"不可用"标注（`unavailable: true`，宿主 IDE API 脚本不可达）
+  - `_call_custom_ai` 实现真实 HTTP 调用（urllib 标准库，OpenAI 兼容端点）
+  - `_call_local_ai` 实现真实本地模型加载（transformers 软依赖）
+- **`scripts/ai_semantic_matcher.py`**: ✅ 删除 `_simulate_ai_response`，无客户端抛 `RuntimeError` 触发上层降级到 `_fallback_match()` 关键词匹配
+
+### 真实语义匹配
+
+- **`scripts/role_matcher.py`**: ✅ `_semantic_match` 从 Jaccard 关键词重叠升级为本地 embedder（TFIDF/Hashing）向量余弦相似度，失败降级关键词重叠
+- **`scripts/goal_orchestrator.py`**: ✅ embedder 三级降级链 SentenceTransformer → TFIDF → HashingEmbedder，扩展异常捕获（网络异常非 ImportError）
+
+### 双宿主清单同步
+
+- **`scripts/sync_manifests.py`**: ✅ 新增 CI 校验（name / version 一致性，退出码 0/1）
+- **三份清单**: ✅ 统一 `name=multi-agent-team`、`version=2.7.1`
+
+### Claude Code SubAgent
+
+- **`.claude/agents/`**: ✅ 新增 5 角色定义（architect / product-manager / test-expert / solo-coder / ui-designer）
+- **`install-claude-code.sh`**: ✅ 新增 SubAgent 安装逻辑（复制到 `~/.claude/agents/`）
+
+### v1 死代码清算
+
+- **已删除**: `scripts/workflow_engine.py`（588 行）/ `scripts/code_map_generator.py`（297 行）/ `scripts/test_v2_components.py`（310 行）
+- **`scripts/dispatch/legacy.py`**: ✅ 切换到 `WorkflowEngineV2`（别名 `WorkflowEngine`，业务零改动）
+- **引用同步**: `quick-install.sh` / `claude-code-skill.json` / `skills-index.json` / `trae-agent` / `INSTALLATION_COMPLETE.md` / `CONFIGURATION.md`
+- **保留**: `trae_agent_dispatch.py` 作为向后兼容命令行薄壳入口
+
+### 依赖显式化
+
+- **`requirements.txt`**: ✅ 重写——核心零第三方硬依赖；软依赖（playwright / Pillow / sentence-transformers）标注可选并说明降级行为
+
+### 测试修复
+
+- **`scripts/tests/test_v3_integration.py`**: ✅ 插件数量断言 6 → 7（LoopEngineeringPlugin）
+- **`claude-code-skill.json`**: ✅ 修复 JSON 语法错误（缺闭合 `}`、`]` 重复）
+
+### 验证结果
+
+- 单元测试：193 通过 / 22 跳过 / 0 失败
+- `sync_manifests.py --report`：三清单一致
 
 ## 核心实现
 

@@ -1,6 +1,35 @@
 # Trae Multi-Agent Skill
 
-🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts.
+🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup.
+
+## 🎉 July 2026 Latest Revision (v2.7.1)
+
+> Background: Centralized fixes for simulation implementations and dual-host drift found in full code review
+> Principle: No simulation/placeholder/mock — honest degradation; dual-host (Trae / Claude Code) capability alignment
+
+- ✅ **AI Honest Degradation** - Eliminated all simulated AI responses at script layer
+  - 🤥→✅ `ai_assistant.py`: Trae AI returns explicit "unavailable" annotation; custom implements real HTTP calls; local implements real model loading
+  - 🤥→✅ `ai_semantic_matcher.py`: Removed `_simulate_ai_response`; raises error without client and degrades to deterministic keyword matching
+  - 📄 Capability layering: see "Capability Implementation Notes" at top of [SKILL.md](SKILL.md)
+
+- ✅ **Real Semantic Matching** - Vector similarity replaces keyword overlap
+  - 🔢 `role_matcher.py`: Local embedder (TFIDF/Hashing) cosine similarity, deterministic and reproducible
+  - 🛡️ `goal_orchestrator.py`: 3-level embedder fallback chain SentenceTransformer → TFIDF → Hashing, auto-degrades offline
+
+- ✅ **Claude Code Real SubAgents** - 5 role definitions in `.claude/agents/`
+  - 🎭 architect / product-manager / test-expert / solo-coder / ui-designer
+  - 📥 `install-claude-code.sh` auto-installs to `~/.claude/agents/` for real parallel dispatch via host Task mechanism
+
+- ✅ **Dual-Host Manifest Sync** - CI gate against capability drift
+  - 🔄 New `scripts/sync_manifests.py`: validates name / version consistency across three manifests
+  - 📋 Unified `name=multi-agent-team`, `version=2.7.1`
+
+- ✅ **v1 Dead Code Cleanup** - Removed 3 legacy files (1,195 lines)
+  - 🧹 `workflow_engine.py` / `code_map_generator.py` / `test_v2_components.py`
+  - 🔀 `dispatch/legacy.py` switched to `WorkflowEngineV2`, zero business code changes
+  - 📦 `requirements.txt` explicitly marks soft dependencies (playwright / Pillow / sentence-transformers optional)
+
+- 🧪 **Tests**: 193 passed / 22 skipped / 0 failed; `sync_manifests.py` three-manifest consistency verified
 
 ## 🎉 June 2026 Latest Updates (v2.7)
 

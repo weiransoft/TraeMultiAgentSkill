@@ -5,6 +5,68 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.7.1] - 2026-07-18
+
+### Changed
+
+#### v2.7.1 — AI 诚实化 + 真实语义匹配 + 双宿主同步 + v1 死代码清算
+
+本修订版本针对多角色团队 review 发现的问题进行集中修复：消除脚本层模拟 AI 响应、
+升级语义匹配为真实向量实现、统一双宿主（Trae / Claude Code）清单、清算 v1 遗留死代码。
+
+##### AI 诚实降级（消除模拟响应）
+
+- ✅ `scripts/ai_assistant.py` 改造为诚实降级
+  - `_call_trae_ai`：脚本进程无法访问宿主 IDE AI API，返回明确"不可用"标注（`unavailable: true`），不再伪装 AI 输出
+  - `_call_custom_ai`：实现真实 HTTP 调用（urllib 标准库，OpenAI 兼容端点）
+  - `_call_local_ai`：实现真实本地模型加载（transformers 软依赖），未安装时明确报错
+- ✅ `scripts/ai_semantic_matcher.py` 移除模拟路径
+  - 删除 `_simulate_ai_response` 方法（此前生成伪装成 AI 响应的模拟 JSON）
+  - 无 AI 客户端时抛出 `RuntimeError`，由上层 `match()` 捕获后降级到 `_fallback_match()` 确定性关键词匹配
+
+##### 真实语义匹配升级
+
+- ✅ `scripts/role_matcher.py` `_semantic_match` 从 Jaccard 关键词重叠升级为本地 embedder 向量余弦相似度（TFIDF/Hashing，确定性可复现），embedder 计算失败时降级到关键词重叠
+- ✅ `scripts/goal_orchestrator.py` embedder 三级降级链
+  - 第一层 SentenceTransformer（高精度语义，需网络/本地缓存）
+  - 第二层 TFIDF（纯本地，不联网）
+  - 第三层 HashingEmbedder（纯本地，零外部依赖）
+  - 扩展异常捕获范围（SentenceTransformer 构造器在无网络时抛网络异常而非 ImportError）
+
+##### 双宿主清单同步
+
+- ✅ 新增 `scripts/sync_manifests.py` CI 校验脚本
+  - 校验三份清单（`skill-manifest.yaml` / `skills-index.json` / `claude-code-skill.json`）的 name / version 一致性
+  - 防止双宿主能力漂移（此前 claude-code-skill.json 停留在 2.4.1）
+- ✅ 三份清单统一 `name=multi-agent-team`、`version=2.7.1`
+
+##### Claude Code 真实 SubAgent 定义
+
+- ✅ 新增 `.claude/agents/` 5 个角色定义文件（architect / product-manager / test-expert / solo-coder / ui-designer）
+  - Claude Code 侧可通过宿主 Task 机制调用真实并行子代理，替代脚本模拟
+- ✅ `install-claude-code.sh` 新增 SubAgent 定义安装逻辑（复制到 `~/.claude/agents/`）
+
+##### v1 死代码清算
+
+- ✅ 删除 `scripts/workflow_engine.py`（v1，588 行）、`scripts/code_map_generator.py`（v1，297 行）、`scripts/test_v2_components.py`（310 行）
+- ✅ `scripts/dispatch/legacy.py` 切换到 `WorkflowEngineV2`（别名保持 `WorkflowEngine`，业务代码零改动）
+- ✅ 同步更新 `quick-install.sh` / `claude-code-skill.json` / `skills-index.json` / `trae-agent` / `INSTALLATION_COMPLETE.md` / `CONFIGURATION.md` 中的 v1 文件引用
+- ✅ `trae_agent_dispatch.py` 作为向后兼容命令行入口（薄壳包装器）保留
+
+##### 依赖显式化
+
+- ✅ `requirements.txt` 重写：核心运行时零第三方硬依赖（纯标准库），软依赖（playwright / Pillow / sentence-transformers）显式标注为可选并说明降级行为
+
+### Fixed
+
+- ✅ `scripts/tests/test_v3_integration.py` 插件数量断言 6 → 7（LoopEngineeringPlugin 新增后未同步）
+- ✅ `claude-code-skill.json` JSON 语法错误（对象缺闭合 `}`、`]` 重复）
+
+### 测试
+
+- 单元测试：193 通过 / 22 跳过 / 0 失败（run_tests.py 24/24、workflow_engine_v2 等核心 60/60、v3_integration 23/23、semantic_embedder+ponytail+phase18 86 通过 22 跳过）
+- `sync_manifests.py --report` 三清单一致校验通过
+
 ## [2.7.0] - 2026-06-20
 
 ### Added
