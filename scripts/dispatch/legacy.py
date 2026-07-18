@@ -74,7 +74,7 @@ try:
     )
     from skill_registry import SkillRegistry, SkillManifest
     from role_matcher import RoleMatcher, TaskRequirement, MatchResult, create_default_roles
-    from workflow_engine import WorkflowEngine
+    from workflow_engine_v2 import WorkflowEngineV2 as WorkflowEngine
     NEW_COMPONENTS_AVAILABLE = True
 except ImportError as e:
     NEW_COMPONENTS_AVAILABLE = False

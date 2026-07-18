@@ -1,4 +1,4 @@
-name: trae-multi-agent
+name: multi-agent-team
 version: 2.7.0
 description: |
   Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归）
@@ -27,20 +27,31 @@ description: |
 author: Trae Team
 status: active
 ai_enhanced: true
+# v2.7.0 诚实标注：AI 能力分层说明
+# - 提示词层 AI：由宿主 LLM（Trae/Claude）直接执行语义理解、角色匹配、共识决策
+# - 脚本层确定性：Python 工具提供代码扫描、UI 检测、视觉回归、TFIDF/Hashing 相似度
+# - 降级模式：无网络/模型时脚本自动降级到本地算法；Claude Code SubAgent 为模拟适配
+ai_capability_note: |
+  本技能的"AI 智能"由宿主大模型在提示词层完成，脚本层仅提供确定性工具。
+  角色匹配的语义理解依赖宿主 LLM；脚本中的 TFIDF/Hashing 为本地降级实现。
+  Claude Code 侧 SubAgent 调用为模拟模式（fallback_mode: simulation），
+  真实并行子代理由宿主 Task 机制实现。
 ai_capabilities:
-  semantic_matching: true
-  intelligent_reasoning: true
-  context_understanding: true
-  natural_language_interface: true
-  long_running_agent: true
-  karpathy_principle_enforcement: true
-  cross_platform_adaptation: true
-  cybernetics_feedback_control: true
-  autonomous_orchestration: true
-  dynamic_workflow_patterns: true
-  plugin_hot_reload: true
-  uiux_audit: true
-  visual_regression: true
+  semantic_matching: true        # 宿主 LLM 提示词层
+  intelligent_reasoning: true    # 宿主 LLM 提示词层
+  context_understanding: true    # 宿主 LLM 提示词层
+  natural_language_interface: true # 宿主 LLM 提示词层
+  long_running_agent: true       # 脚本层（Checkpoint + Handoff）
+  karpathy_principle_enforcement: true # 脚本层（规则检查）
+  cross_platform_adaptation: true # 脚本层（平台检测 + 适配器）
+  cybernetics_feedback_control: true # 脚本层（控制环逻辑）
+  autonomous_orchestration: true # 脚本层（4 阶段循环）
+  dynamic_workflow_patterns: true # 脚本层（6 大模式执行器）
+  plugin_hot_reload: true        # 脚本层（V3 架构）
+  uiux_audit: true               # 脚本层（确定性检测）
+  visual_regression: true        # 脚本层（像素级对比）
+  tfidf_similarity: true         # 脚本层（本地降级算法）
+  hashing_similarity: true       # 脚本层（本地降级算法）
 
 capabilities:
   - name: product-manager

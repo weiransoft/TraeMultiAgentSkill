@@ -4,10 +4,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_NAME="trae-multi-agent"
+SKILL_NAME="multi-agent-team"
 TARGET_DIR="$HOME/.claude/skills/$SKILL_NAME"
 
-echo "🚀 安装 Claude Code Multi-Agent Skill v2.4.1..."
+echo "🚀 安装 Claude Code Multi-Agent Skill v2.7.0..."
 echo ""
 
 # 1. 创建目标目录
@@ -30,7 +30,6 @@ ESSENTIAL_SCRIPTS=(
     "claude_code_subagent_adapter.py"
     "dual_layer_context_manager.py"
     "role_matcher.py"
-    "workflow_engine.py"
     "workflow_engine_v2.py"
     "skill_registry.py"
     "task_completion_checker.py"
@@ -52,7 +51,6 @@ ESSENTIAL_SCRIPTS=(
     "multi_role_code_walkthrough.py"
     "multi_role_collaborative_analyzer.py"
     "spec_tools.py"
-    "code_map_generator.py"
     "code_map_generator_v2.py"
     "ai_initializer.py"
     "update_docs.py"

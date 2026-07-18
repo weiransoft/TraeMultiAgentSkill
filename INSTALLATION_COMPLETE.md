@@ -23,7 +23,7 @@
 - ✅ `claude_code_subagent_adapter.py` - Claude Code SubAgent 适配器
 - ✅ `dual_layer_context_manager.py` - 双层上下文管理器
 - ✅ `role_matcher.py` - 角色匹配器
-- ✅ `workflow_engine.py` - 工作流引擎
+- ✅ `workflow_engine_v2.py` - 增强版工作流引擎
 - ✅ `skill_registry.py` - Skill 注册表
 - ✅ `task_completion_checker.py` - 任务完成检查器
 - ✅ `task_list_manager.py` - 任务列表管理器

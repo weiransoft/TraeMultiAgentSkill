@@ -170,7 +170,7 @@ chmod +x trae_agent_dispatch_wrapper.sh
 - `dual_layer_context_manager.py`: 双层上下文管理器
 - `skill_registry.py`: 技能注册和发现
 - `role_matcher.py`: AI 增强的角色匹配器
-- `workflow_engine.py`: 工作流编排引擎
+- `workflow_engine_v2.py`: 工作流编排引擎（v2 增强版）
 
 ## 更新日志
 

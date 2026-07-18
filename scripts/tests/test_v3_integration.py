@@ -65,8 +65,8 @@ class TestBackwardCompat(unittest.TestCase):
         import facade
         import dispatch.legacy
         from plugins import BUILTIN_PLUGINS
-        # Phase 18 新增 autonomous plugin，共 6 个
-        self.assertEqual(len(BUILTIN_PLUGINS), 6)
+        # Phase 18 新增 autonomous plugin + Loop Engineering 新增 loop-engineering，共 7 个
+        self.assertEqual(len(BUILTIN_PLUGINS), 7)
 
     def test_07_dispatch_legacy_no_reverse_import(self):
         # 风险-6 验证：dispatch.legacy 不反向 import facade / 薄壳
@@ -102,8 +102,8 @@ class TestBackwardCompat(unittest.TestCase):
         from plugins import BUILTIN_PLUGINS
         d = GoalDispatcher(plugins=list(BUILTIN_PLUGINS))
         names = [p.name for p in d.list_plugins()]
-        # Phase 18 新增 autonomous plugin，共 6 个
-        self.assertEqual(len(names), 6)
+        # Phase 18 新增 autonomous + Loop Engineering 新增 loop-engineering，共 7 个
+        self.assertEqual(len(names), 7)
         self.assertIn("goal-cancel", names)
         self.assertIn("goal-graph", names)
         self.assertIn("goal-resume", names)
@@ -118,8 +118,8 @@ class TestBackwardCompat(unittest.TestCase):
         from plugins import BUILTIN_PLUGINS
         d = GoalDispatcher(plugins=list(BUILTIN_PLUGINS))
         names = [p.name for p in d.list_plugins()]
-        # 验证 6 个 plugin 全部存在
-        self.assertEqual(len(names), 6)
+        # 验证 7 个 plugin 全部存在
+        self.assertEqual(len(names), 7)
         # 验证 autonomous 在列表中
         self.assertIn("autonomous", names)
 

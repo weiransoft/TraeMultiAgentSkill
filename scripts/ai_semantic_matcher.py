@@ -183,86 +183,33 @@ class AISemanticMatcher:
         """
         调用 AI 助手
         
+        诚实降级策略：
+        - 有 ai_client → 调用真实 AI
+        - 无 ai_client → 抛出异常，由上层 match() 捕获后降级到 _fallback_match()
+          （确定性关键词匹配），不再返回伪装成 AI 响应的模拟数据
+        
         Args:
             prompt: 提示词
             
         Returns:
             str: AI 响应
+            
+        Raises:
+            RuntimeError: 无 AI 客户端时抛出，触发上层降级
         """
-        # 如果提供了 AI 客户端，使用真实 AI 调用
         if self.ai_client:
             try:
                 response = self.ai_client.complete(prompt)
                 return response
             except Exception as e:
-                print(f"⚠️  AI 调用失败，使用模拟响应：{e}")
+                # AI 调用失败同样触发降级
+                raise RuntimeError(f"AI 客户端调用失败：{e}") from e
         
-        # 模拟 AI 响应（用于测试和降级）
-        return self._simulate_ai_response(prompt)
-    
-    def _simulate_ai_response(self, prompt: str) -> str:
-        """
-        模拟 AI 响应
-        
-        在实际 AI 客户端不可用时使用
-        
-        Args:
-            prompt: 提示词
-            
-        Returns:
-            str: 模拟的 AI 响应
-        """
-        # 基于关键词的简单规则匹配
-        prompt_lower = prompt.lower()
-        
-        # 检测角色相关关键词
-        role_keywords = {
-            'architect': ['架构', '设计', '系统', '技术选型', '模块', '接口'],
-            'product-manager': ['需求', '产品', '用户', '功能', 'prd'],
-            'developer': ['开发', '实现', '代码', '功能', '编程'],
-            'tester': ['测试', '质量', 'bug', '用例', '验证'],
-            'ui-designer': ['ui', '设计', '界面', '交互', '视觉', '原型'],
-            'devops': ['部署', '运维', 'ci/cd', '监控', '容器']
-        }
-        
-        matches = []
-        for role_id, keywords in role_keywords.items():
-            score = sum(1 for kw in keywords if kw in prompt_lower)
-            if score > 0:
-                matches.append({
-                    'role_id': role_id,
-                    'score': score
-                })
-        
-        # 排序
-        matches.sort(key=lambda x: x['score'], reverse=True)
-        
-        # 构建响应
-        if matches:
-            best_match = matches[0]
-            response = {
-                "matches": [
-                    {
-                        "role_id": best_match['role_id'],
-                        "role_name": best_match['role_id'].replace('-', ' ').title(),
-                        "confidence": min(0.5 + best_match['score'] * 0.1, 0.95),
-                        "reasoning": f"基于关键词匹配，任务描述中包含 {best_match['score']} 个相关关键词",
-                        "matched_capabilities": ["相关能力"],
-                        "relevance_score": best_match['score'] / 10.0,
-                        "explanation": "任务需求与该角色职责高度相关"
-                    }
-                ],
-                "best_match": best_match['role_id'],
-                "analysis": f"通过分析任务描述，推荐 {best_match['role_id']} 角色"
-            }
-        else:
-            response = {
-                "matches": [],
-                "best_match": None,
-                "analysis": "未找到明确匹配的角色"
-            }
-        
-        return json.dumps(response, ensure_ascii=False)
+        # 无 AI 客户端：诚实告知不可用，由上层降级到确定性匹配
+        raise RuntimeError(
+            "AI 客户端未配置（脚本层无 LLM 能力）。"
+            "请注入 ai_client 或使用降级匹配 _fallback_match()"
+        )
     
     def _parse_ai_response(self, response: str, 
                           roles: List[Dict[str, Any]]) -> List[SemanticMatchResult]:

@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_NAME="trae-multi-agent"
+SKILL_NAME="multi-agent-team"
 
 # 默认安装路径
 DEFAULT_CLAUDE_SKILL_DIR="$HOME/.claude/skills"
@@ -21,7 +21,7 @@ TARGET_SKILL_DIR="$DEFAULT_CLAUDE_SKILL_DIR/$SKILL_NAME"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║   Claude Code Multi-Agent Skill 安装脚本              ║${NC}"
-echo -e "${BLUE}║   版本：v2.4.1 (支持 SubAgent 调用)                    ║${NC}"
+echo -e "${BLUE}║   版本：v2.7.0 (支持 SubAgent 调用)                    ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -122,6 +122,23 @@ copy_files() {
     if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
         cp "$SCRIPT_DIR/requirements.txt" "$TARGET_SKILL_DIR/"
         echo -e "${GREEN}  ✓ requirements.txt${NC}"
+    fi
+    
+    # 安装 Claude Code SubAgent 定义文件到全局 agents 目录（v2.7.0 新增）
+    # 让 Claude Code 宿主可用真实 Task 子代理执行 5 个角色，替代脚本模拟
+    if [ -d "$SCRIPT_DIR/.claude/agents" ]; then
+        echo -e "\n${BLUE}🎭 安装 SubAgent 定义（5 角色）...${NC}"
+        GLOBAL_AGENTS_DIR="$HOME/.claude/agents"
+        mkdir -p "$GLOBAL_AGENTS_DIR"
+        AGENT_COUNT=0
+        for agent_file in "$SCRIPT_DIR/.claude/agents"/*.md; do
+            if [ -f "$agent_file" ]; then
+                cp "$agent_file" "$GLOBAL_AGENTS_DIR/"
+                echo -e "${GREEN}  ✓${NC} $(basename "$agent_file")"
+                AGENT_COUNT=$((AGENT_COUNT + 1))
+            fi
+        done
+        echo -e "${GREEN}✅ 已安装 $AGENT_COUNT 个 SubAgent 定义到 $GLOBAL_AGENTS_DIR${NC}"
     fi
 }
 

@@ -1,6 +1,6 @@
 {
   "version": "2.7.0",
-  "name": "trae-multi-agent",
+  "name": "multi-agent-team",
   "description": "多角色智能体调度器 - 基于任务类型自动调度到架构师、产品经理、测试专家、Solo Coder 或 UI 设计师。支持 Karpathy 四大核心原则、Ponytail 决策梯（少写多余代码）、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、跨平台 Agent 适配、多角色代码走读、3D 代码地图可视化。v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本。",
   "author": "Claw Team",
   "license": "MIT",
@@ -77,31 +77,94 @@
     "architect": {
       "name": "架构师",
       "description": "设计系统性、前瞻性、可落地、可验证的架构。专注于 Spring Boot 3/Java 21 最佳实践、云原生架构及安全合规。负责生成和维护项目代码map，确保架构一致性。",
-      "keywords": ["架构", "设计", "选型", "审查", "性能", "瓶颈", "模块", "接口", "部署", "Spring Boot", "微服务", "code map", "代码map", "项目结构"],
+      "keywords": [
+        "架构",
+        "设计",
+        "选型",
+        "审查",
+        "性能",
+        "瓶颈",
+        "模块",
+        "接口",
+        "部署",
+        "Spring Boot",
+        "微服务",
+        "code map",
+        "代码map",
+        "项目结构"
+      ],
       "priority": 1
     },
     "product_manager": {
       "name": "产品经理",
       "description": "定义用户价值清晰、需求明确、可落地、可验收的产品。采用数据驱动决策及 AI 辅助设计。",
-      "keywords": ["需求", "PRD", "用户故事", "竞品", "市场", "调研", "验收", "UAT", "体验", "数据驱动", "AI"],
+      "keywords": [
+        "需求",
+        "PRD",
+        "用户故事",
+        "竞品",
+        "市场",
+        "调研",
+        "验收",
+        "UAT",
+        "体验",
+        "数据驱动",
+        "AI"
+      ],
       "priority": 2
     },
     "test_expert": {
       "name": "测试专家",
       "description": "确保全面、深入、自动化、可量化的质量保障。推广测试金字塔、契约测试及混沌工程。",
-      "keywords": ["测试", "质量", "验收", "自动化", "性能测试", "缺陷", "评审", "门禁", "Testcontainers", "混沌工程"],
+      "keywords": [
+        "测试",
+        "质量",
+        "验收",
+        "自动化",
+        "性能测试",
+        "缺陷",
+        "评审",
+        "门禁",
+        "Testcontainers",
+        "混沌工程"
+      ],
       "priority": 3
     },
     "solo_coder": {
       "name": "Solo Coder",
       "description": "编写完整、高质量、可维护、可测试的代码。严格遵循 Java 21/Spring Boot 3 现代编码规范。",
-      "keywords": ["实现", "开发", "代码", "修复", "优化", "重构", "单元测试", "文档", "Java 21", "Clean Code"],
+      "keywords": [
+        "实现",
+        "开发",
+        "代码",
+        "修复",
+        "优化",
+        "重构",
+        "单元测试",
+        "文档",
+        "Java 21",
+        "Clean Code"
+      ],
       "priority": 4
     },
     "ui_designer": {
       "name": "UI 设计师",
       "description": "创建独特、生产级的 UI 界面，具有高设计质量，避免通用的 AI \"slop\" 美学。专注于 Web UI 设计，包括组件、页面、应用、海报、应用程序等。",
-      "keywords": ["UI设计", "界面设计", "前端设计", "视觉设计", "UI/UX", "UI原型", "界面美化", "UI优化", "UI重构", "设计系统", "风格指南", "高保真原型", "避免 AI slop"],
+      "keywords": [
+        "UI设计",
+        "界面设计",
+        "前端设计",
+        "视觉设计",
+        "UI/UX",
+        "UI原型",
+        "界面美化",
+        "UI优化",
+        "UI重构",
+        "设计系统",
+        "风格指南",
+        "高保真原型",
+        "避免 AI slop"
+      ],
       "priority": 5
     }
   },
@@ -218,13 +281,13 @@
   "dependencies": {
     "python3": ">=3.8",
     "scripts": [
-      "clawskills/trae/scripts/trae_agent_dispatch.py",
-      "clawskills/trae/scripts/code_map_generator.py",
+      "clawskills/trae/scripts/trae_agent_dispatch_v2.py",
+      "clawskills/trae/scripts/code_map_generator_v2.py",
       "clawskills/trae/scripts/project_understanding.py"
     ]
   },
   "installation": {
-    "path": "~/.trae/skills/trae-multi-agent",
+    "path": "~/.trae-cn/skills/multi-agent-team",
     "files": [
       "SKILL.md",
       "skills-index.json"

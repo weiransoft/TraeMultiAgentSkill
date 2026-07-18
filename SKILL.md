@@ -8,6 +8,11 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
 
+> **能力实现方式说明（v2.7.0 诚实标注）**：
+> - **提示词层 AI（宿主 LLM 完成）**：任务语义理解、角色智能匹配、多角色共识决策、架构设计审查——由 Trae/Claude 宿主大模型直接执行，脚本仅提供候选清单与规则约束。
+> - **脚本层确定性工具（Python 实现）**：代码地图扫描、UI/UX 巡检、视觉回归对比、决策梯合规检查、TFIDF/Hashing 文本相似度——为无 LLM 的独立进程，提供可复现的确定性结果。
+> - **降级模式说明**：当脚本层需要语义相似度但无网络/模型时，自动降级到 TFIDF/Hashing 本地算法；SubAgent 调用在 Claude Code 侧为模拟适配（`fallback_mode: simulation`），真实并行子代理由宿主 Task 机制实现。
+
 **v2.5 新增（Cybernetics 工程控制论增强）**:
 > 参考来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  
 > 理论依据：钱学森工程控制论（系统工程、系统学）、ICLR 2026 Profile-Aware Maneuvering 架构、Norbert Wiener 控制论、Ashby 必要多样性定律  
@@ -169,36 +174,79 @@ python3 scripts/trae_agent_dispatch.py \
 
 ## AI 集成说明 (v2.1)
 
-### AI 能力
+> **宿主 LLM 调度指令（提示词层，Trae/Claude 主 Agent 必读）**：
+> 以下匹配决策与拓扑路由由你（宿主大模型）直接执行，脚本层仅提供确定性工具。
+> 不要调用 `ai_semantic_matcher.py` 的模拟路径——它已在 v2.7.0 改造为诚实降级。
 
-- **语义理解**: 深层语义分析、上下文感知、多义词消歧
-- **智能匹配**: 多维度评分（能力 50% + 技能 30% + 语义 20%），可解释结果
-- **匹配策略**: `ai_enhanced`（默认）、`semantic`、`keyword`、`hybrid`
-- **代码审查**: 质量评估、性能分析、安全检查、最佳实践建议
-- **知识问答**: 技术咨询、架构建议、工具推荐
+### 角色智能匹配规则（宿主 LLM 执行）
+
+接到任务后，按以下多维度评分选择角色（无需调用脚本）：
+
+| 维度 | 权重 | 评估要点 |
+|------|------|---------|
+| 能力匹配 | 50% | 任务核心需求与角色职责的重合度（见下方角色触发关键词） |
+| 技能匹配 | 30% | 任务所需技术栈与角色技能列表的重合度 |
+| 语义相关 | 20% | 任务描述与角色描述的深层语义关联（同义、上下位、因果） |
+
+**决策规则**：
+1. 单角色置信度 ≥ 0.7 → 直接调度该角色
+2. 多角色均 ≥ 0.6 且任务可分解 → 多角色协作（见拓扑路由）
+3. 所有角色 < 0.5 → 向用户澄清需求，不要强行匹配
+4. 任务跨多个领域（如"设计+实现+测试"）→ 按七阶段流程依次调度
+
+### 动态工作流拓扑路由决策表（宿主 LLM 执行）
+
+根据任务 DAG 特征选择执行模式（对齐 2026 拓扑自适应编排结论）：
+
+| 任务特征 | 路由模式 | 执行方式 |
+|---------|---------|---------|
+| 可分解为独立子任务（并行宽 ≥ 2，无相互依赖） | fan-out-aggregate | 并行派发 → 聚合结果 |
+| 需要质量验证/对抗审查（如代码审查、安全审计） | adversarial-verify | 生成 → 审查 → 修复循环 |
+| 需要多方案竞争（如架构选型、文案创作） | tournament | 多方案并行 → 最优胜出 |
+| 需批量生成后筛选（如测试用例、候选实现） | generate-filter | 批量生成 → 质量过滤 |
+| 任务类型明确且单一（如纯测试、纯文档） | classifier-dispatch | 分类 → 单角色执行 |
+| 成功标准可量化但未达成（如性能优化、缺陷修复） | loop-until-done | 迭代直到满足标准 |
+| **强顺序依赖、链式推理**（如调试根因分析、数学推导、分步重构） | **单角色链** | ⚠️ **禁用多 Agent 并行**——实证显示此类任务多 Agent 反降 39–70% 性能，由单一角色顺序完成 |
+
+**降级红线**：当任务本质是顺序推理（步骤 N 依赖步骤 N-1 的结果）时，禁止为了"多角色"而强行并行，应退化为单角色链式执行。
+
+### AI 能力（脚本层工具）
+
+- **语义理解**: 宿主 LLM 提示词层完成；脚本层提供 TFIDF/Hashing 本地相似度（降级用）
+- **智能匹配**: 宿主 LLM 按上表执行；脚本 `role_matcher.py` 提供关键词+embedder 降级
+- **匹配策略**: `ai_enhanced`（宿主提示词层）、`semantic`（脚本 embedder）、`keyword`（脚本关键词）
+- **代码审查**: 宿主 LLM 执行；脚本层提供代码地图、guard 校验等确定性输入
+- **知识问答**: 宿主 LLM 直接回答
 
 ### AI 配置
 
 ```yaml
 ai_integration:
   enabled: true
-  provider: trae_ai_assistant
+  provider: host_llm_prompt_layer   # v2.7.0 修正：AI 在宿主提示词层
   features:
-    - semantic_matching
-    - intelligent_reasoning
-    - context_understanding
+    - semantic_matching      # 宿主 LLM
+    - intelligent_reasoning  # 宿主 LLM
+    - context_understanding  # 宿主 LLM
+  script_layer_tools:        # 脚本层确定性工具（非 AI）
+    - tfidf_similarity
+    - hashing_similarity
+    - keyword_matching
+    - code_map_scan
+    - uiux_audit
+    - visual_regression
   config:
     max_tokens: 4096
     temperature: 0.7
     top_p: 0.9
     use_cache: true
-    fallback_to_keyword: true
+    fallback_to_keyword: true  # 脚本层降级链：embedder → 关键词
 ```
 
 ### 性能优化
 
 - **缓存机制**: 相同请求直接返回缓存结果
-- **降级策略**: AI 不可用时自动降级到关键词匹配
+- **降级策略**: 脚本层 embedder 不可用时自动降级到关键词匹配；AI 语义理解始终由宿主 LLM 提供，无降级
 - **批量处理**: 支持批量请求，减少 API 调用次数
 
 ## 角色介绍

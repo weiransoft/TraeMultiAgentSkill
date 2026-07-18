@@ -1,25 +1,42 @@
-# Trae Multi-Agent Skill 依赖
+# Trae Multi-Agent Skill 依赖声明
+#
+# ============================================================
+# 核心运行时依赖（必选）
+# ============================================================
+# 本技能核心调度逻辑仅依赖 Python 标准库，无第三方硬依赖。
+# 要求 Python >= 3.8（已在 skill-manifest.yaml / skills-index.json 中声明）。
+#
+# 标准库（无需 pip 安装）：
+#   - sqlite3 / json / pathlib / typing / logging / argparse
+#   - re / datetime / dataclasses / enum / concurrent.futures
+#   - xml.etree.ElementTree / html.parser / urllib.request
 
-# 核心依赖
-python>=3.8
+# ============================================================
+# 软依赖（可选，按需安装）
+# 未安装时对应功能自动降级或跳过，不影响核心调度。
+# ============================================================
 
-# 标准库（无需额外安装）
-# - sqlite3 (数据库操作)
-# - json (数据处理)
-# - pathlib (路径处理)
-# - typing (类型注解)
-# - logging (日志记录)
-# - argparse (命令行参数)
-# - re (正则表达式)
-# - datetime (日期时间)
+# --- 视觉回归测试（scripts/visual_regression.py） ---
+# 浏览器截图 + DOM 检查需要 playwright；像素级 Diff 需要 Pillow。
+# 安装：pip install playwright Pillow && playwright install chromium
+# playwright>=1.40.0
+# Pillow>=9.0.0
 
-# 开发依赖（可选）
+# --- UI/UX 巡检（scripts/uiux_analyzer.py） ---
+# 仅浏览器端检测需要 playwright；无浏览器时退化为静态 HTML 解析（标准库）。
+# playwright>=1.40.0
+
+# --- 高精度语义匹配（scripts/dynamic_workflow/semantic_embedder.py） ---
+# SentenceTransformerEmbedder 提供高精度语义向量，需联网下载模型。
+# 未安装时自动降级到 TFIDFEmbedder / HashingEmbedder（纯标准库实现）。
+# 安装：pip install sentence-transformers
+# sentence-transformers>=2.2.0
+
+# ============================================================
+# 开发 / 测试依赖（可选）
+# ============================================================
 # pytest>=7.0.0          # 测试框架
 # pytest-cov>=3.0.0      # 测试覆盖率
 # black>=22.0.0          # 代码格式化
 # flake8>=4.0.0          # 代码检查
 # mypy>=0.950            # 类型检查
-
-# 注意：
-# 本技能主要使用 Python 标准库，无需安装额外的第三方包
-# 只需确保 Python 版本 >= 3.8 即可

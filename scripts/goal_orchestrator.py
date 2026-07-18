@@ -1050,29 +1050,44 @@ class GoalIterationReuser:
         self.audit_log: List[CrossGoalReuseEntry] = []
 
         # B2 修复：默认 embedder 跨语言
+        # N25 修复：扩展异常捕获范围，SentenceTransformer 构造器会触发网络下载
+        # 在无网络或 huggingface 不可达时抛出网络异常（非 ImportError），需降级到本地 embedder
         if embedder is None:
+            embedder_instance: Any = None
+            # 第一层：尝试 SentenceTransformer（高精度语义，需网络/本地缓存）
             try:
-                # 延迟 import：避免循环依赖
                 from dynamic_workflow.semantic_embedder import (
                     SentenceTransformerEmbedder,
                 )
-                self.embedder: Any = SentenceTransformerEmbedder(
+                embedder_instance = SentenceTransformerEmbedder(
                     model_name=DEFAULT_EMBEDDER_NAME,
                 )
-            except ImportError:
-                # 降级：TFIDF embedder
+            except Exception as e_st:
+                logger.info(
+                    f"[GoalIterationReuser] SentenceTransformerEmbedder 加载失败"
+                    f"（{type(e_st).__name__}: {e_st}），将降级到本地 embedder"
+                )
+                # 第二层：降级到 TFIDF embedder（纯本地，不联网）
                 try:
                     from dynamic_workflow.semantic_embedder import (
                         create_default_embedder,
                     )
-                    self.embedder = create_default_embedder()
-                except ImportError:
-                    # 极端情况：禁用 embedder（不抛错，find_similar_iterations 返回空）
-                    self.embedder = None
-                    logger.warning(
-                        "[GoalIterationReuser] 无法加载任何 embedder；"
-                        "跨 Goal 复用功能将不可用"
+                    embedder_instance = create_default_embedder()
+                except Exception as e_tf:
+                    logger.info(
+                        f"[GoalIterationReuser] TFIDF embedder 加载失败"
+                        f"（{type(e_tf).__name__}: {e_tf}），将降级到 HashingEmbedder"
                     )
+                    # 第三层：降级到 HashingEmbedder（纯本地，零外部依赖）
+                    try:
+                        from dynamic_workflow.semantic_embedder import HashingEmbedder
+                        embedder_instance = HashingEmbedder(n_features=512)
+                    except Exception as e_hash:
+                        logger.warning(
+                            f"[GoalIterationReuser] HashingEmbedder 也加载失败"
+                            f"（{type(e_hash).__name__}），跨 Goal 复用功能将不可用"
+                        )
+            self.embedder = embedder_instance
         else:
             self.embedder = embedder
 

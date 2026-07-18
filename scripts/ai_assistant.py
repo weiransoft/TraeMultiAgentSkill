@@ -265,59 +265,158 @@ class AIAssistant:
         """
         调用 Trae AI 助手
         
-        实际集成时，这里会调用 Trae IDE 的 AI 助手 API
-        目前使用模拟响应
-        """
-        # TODO: 集成真实的 Trae AI 助手 API
+        脚本层限制说明：Trae IDE 的 AI 助手 API 运行在宿主进程内，
+        独立 Python 脚本进程无法直接访问。
         
-        # 模拟响应
+        因此本方法返回诚实的"不可用"降级响应，真正的 AI 语义理解
+        应由宿主 LLM 在提示词层完成（见 SKILL.md 能力实现方式说明）。
+        """
         return AIResponse(
-            content=f"[Trae AI] 收到请求：{prompt[:50]}...",
-            confidence=0.9,
-            reasoning="基于 Trae AI 助手的语义理解",
+            content=(
+                "[脚本层不可用] Trae AI 助手 API 位于宿主 IDE 进程内，"
+                "独立脚本无法直接调用。请通过宿主 LLM 提示词层使用 AI 能力，"
+                "或配置 custom/local 提供商后重试。"
+            ),
+            confidence=0.0,
+            reasoning="脚本进程无法访问宿主 IDE AI API（架构限制，非错误）",
             metadata={
                 'provider': 'trae',
-                'model': 'trae-ai-v1'
+                'unavailable': True,
+                'unavailable_reason': 'host_process_api_not_accessible_from_script',
+                'suggestion': 'use_host_llm_prompt_layer_or_custom_provider'
             },
-            tokens_used=len(prompt) // 4
+            tokens_used=0
         )
     
     def _call_custom_ai(self, prompt: str, context: str = None) -> AIResponse:
         """
-        调用自定义 AI 服务
+        调用自定义 AI 服务（OpenAI 兼容 API 格式）
         
-        需要配置 API 端点和认证信息
+        真实 HTTP 实现：使用标准库 urllib 调用 OpenAI 兼容的
+        chat/completions 端点（vLLM、OpenAI、DeepSeek 等均兼容）。
+        
+        配置项（.env 或 config dict）：
+        - api_url: API 端点（如 http://localhost:8000/v1/chat/completions）
+        - api_key: 认证密钥（可选，本地 vLLM 通常不需要）
+        - model: 模型名称（默认 default）
         """
-        api_url = self.config.get('api_url')
-        api_key = self.config.get('api_key')
+        import urllib.request
+        import urllib.error
+        
+        api_url = self.config.get('api_url') or os.environ.get('AI_API_URL')
+        api_key = self.config.get('api_key') or os.environ.get('AI_API_KEY', '')
+        model = self.config.get('model') or os.environ.get('AI_MODEL_NAME', 'default')
+        timeout_ms = self.default_config.get('timeout', 30000)
         
         if not api_url:
-            raise ValueError("自定义 AI 服务未配置 api_url")
+            raise ValueError(
+                "自定义 AI 服务未配置 api_url。"
+                "请在 config 或环境变量 AI_API_URL 中设置 OpenAI 兼容端点"
+            )
         
-        # TODO: 实现 HTTP 调用
-        # response = requests.post(api_url, json={...})
+        # 构建 OpenAI 兼容请求体
+        messages = []
+        if context:
+            messages.append({"role": "system", "content": context})
+        messages.append({"role": "user", "content": prompt})
         
-        return AIResponse(
-            content="[Custom AI] 响应内容",
-            confidence=0.85
+        request_body = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": self.default_config.get('max_tokens', 4096),
+            "temperature": self.default_config.get('temperature', 0.7),
+            "top_p": self.default_config.get('top_p', 0.9),
+        }
+        
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        
+        req = urllib.request.Request(
+            api_url,
+            data=json.dumps(request_body).encode('utf-8'),
+            headers=headers,
+            method='POST'
         )
+        
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_ms / 1000) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+            
+            choice = result.get('choices', [{}])[0]
+            content = choice.get('message', {}).get('content', '')
+            usage = result.get('usage', {})
+            
+            return AIResponse(
+                content=content,
+                confidence=0.9,
+                reasoning=f"来自自定义 AI 服务（{model}）的真实响应",
+                metadata={
+                    'provider': 'custom',
+                    'model': model,
+                    'finish_reason': choice.get('finish_reason', '')
+                },
+                tokens_used=usage.get('total_tokens', 0)
+            )
+        except urllib.error.URLError as e:
+            raise ConnectionError(f"自定义 AI 服务连接失败（{api_url}）：{e}") from e
     
     def _call_local_ai(self, prompt: str, context: str = None) -> AIResponse:
         """
         调用本地模型
         
-        需要配置本地模型路径和参数
+        真实实现：使用 transformers 加载本地模型进行推理。
+        若 transformers 未安装或模型路径无效，诚实抛出异常（由上层降级处理）。
+        
+        配置项：
+        - model_path: 本地模型路径（HuggingFace 格式目录）
         """
-        model_path = self.config.get('model_path')
+        model_path = self.config.get('model_path') or os.environ.get('AI_LOCAL_MODEL_PATH')
         
         if not model_path:
-            raise ValueError("本地模型未配置 model_path")
+            raise ValueError(
+                "本地模型未配置 model_path。"
+                "请在 config 或环境变量 AI_LOCAL_MODEL_PATH 中设置模型目录"
+            )
         
-        # TODO: 加载和调用本地模型
+        try:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            import torch
+        except ImportError as e:
+            raise ImportError(
+                "本地模型推理需要安装 transformers 和 torch。"
+                "请运行：pip install transformers torch"
+            ) from e
+        
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        )
+        
+        full_prompt = f"{context}\n\n{prompt}" if context else prompt
+        inputs = tokenizer(full_prompt, return_tensors="pt")
+        
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=self.default_config.get('max_tokens', 4096),
+                temperature=self.default_config.get('temperature', 0.7),
+                top_p=self.default_config.get('top_p', 0.9),
+                do_sample=True,
+            )
+        
+        content = tokenizer.decode(
+            outputs[0][inputs['input_ids'].shape[1]:],
+            skip_special_tokens=True
+        )
         
         return AIResponse(
-            content="[Local AI] 响应内容",
-            confidence=0.8
+            content=content,
+            confidence=0.85,
+            reasoning=f"来自本地模型（{model_path}）的真实推理结果",
+            metadata={'provider': 'local', 'model_path': model_path},
+            tokens_used=int(outputs.shape[1])
         )
     
     def _fallback_complete(self, prompt: str, context: str = None) -> AIResponse:

@@ -1,51 +1,95 @@
 {
   "name": "multi-agent-team",
-  "version": "2.4.1",
-  "description": "Multi-Agent Team Dispatcher - 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持 Claude Code SubAgent 调用。",
+  "version": "2.7.0",
+  "description": "Multi-Agent Team Dispatcher - 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持 Claude Code SubAgent 调用、Karpathy 四大核心原则、Ponytail 决策梯、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、UI/UX 巡检与视觉回归。",
   "author": "Claw Team",
   "license": "MIT",
   "homepage": "https://github.com/weiransoft/TraeMultiAgentSkill",
-  
   "capabilities": {
     "subagent_dispatch": true,
     "multi_agent_collaboration": true,
     "code_review": true,
     "project_lifecycle": true
   },
-  
   "agents": {
     "architect": {
       "name": "架构师",
       "description": "设计系统性、前瞻性、可落地、可验证的架构",
-      "triggers": ["架构", "设计", "选型", "审查", "性能", "瓶颈", "模块", "接口", "部署", "微服务"],
+      "triggers": [
+        "架构",
+        "设计",
+        "选型",
+        "审查",
+        "性能",
+        "瓶颈",
+        "模块",
+        "接口",
+        "部署",
+        "微服务"
+      ],
       "priority": 1
     },
     "product-manager": {
       "name": "产品经理",
       "description": "定义用户价值清晰、需求明确、可落地、可验收的产品",
-      "triggers": ["需求", "PRD", "用户故事", "竞品", "市场", "调研", "验收", "UAT", "体验"],
+      "triggers": [
+        "需求",
+        "PRD",
+        "用户故事",
+        "竞品",
+        "市场",
+        "调研",
+        "验收",
+        "UAT",
+        "体验"
+      ],
       "priority": 2
     },
     "tester": {
       "name": "测试专家",
       "description": "确保全面、深入、自动化、可量化的质量保障",
-      "triggers": ["测试", "质量", "验收", "自动化", "性能测试", "缺陷", "评审", "门禁"],
+      "triggers": [
+        "测试",
+        "质量",
+        "验收",
+        "自动化",
+        "性能测试",
+        "缺陷",
+        "评审",
+        "门禁"
+      ],
       "priority": 3
     },
     "solo-coder": {
       "name": "独立开发者",
       "description": "编写完整、高质量、可维护、可测试的代码",
-      "triggers": ["实现", "开发", "代码", "修复", "优化", "重构", "单元测试", "文档"],
+      "triggers": [
+        "实现",
+        "开发",
+        "代码",
+        "修复",
+        "优化",
+        "重构",
+        "单元测试",
+        "文档"
+      ],
       "priority": 4
     },
     "ui-designer": {
       "name": "UI 设计师",
       "description": "创建独特、生产级的 UI 界面，避免通用的 AI slop 美学",
-      "triggers": ["UI设计", "界面设计", "前端设计", "视觉设计", "UI/UX", "UI原型", "界面美化"],
+      "triggers": [
+        "UI设计",
+        "界面设计",
+        "前端设计",
+        "视觉设计",
+        "UI/UX",
+        "UI原型",
+        "界面美化"
+      ],
       "priority": 5
     }
   },
-  
   "commands": {
     "dispatch": {
       "command": "python3",
@@ -61,7 +105,6 @@
       }
     }
   },
-  
   "auto_invoke": {
     "enabled": true,
     "patterns": [
@@ -84,42 +127,70 @@
       "前端设计"
     ]
   },
-  
   "core_principles": {
     "karpathy": [
       {
         "name": "Think Before Coding",
         "description": "三思而后行 - 明确假设、问清楚、不隐藏困惑",
-        "actions": ["明确陈述假设", "呈现多种解释", "提出更简单的方法", "遇到不清楚就停止"]
+        "actions": [
+          "明确陈述假设",
+          "呈现多种解释",
+          "提出更简单的方法",
+          "遇到不清楚就停止"
+        ]
       },
       {
         "name": "Simplicity First",
         "description": "简单优先 - 最小代码、无 speculative features",
-        "actions": ["无单次使用的抽象", "无灵活性或可配置性", "无未来可能用到的代码", "无不相关代码的改进"]
+        "actions": [
+          "无单次使用的抽象",
+          "无灵活性或可配置性",
+          "无未来可能用到的代码",
+          "无不相关代码的改进"
+        ]
       },
       {
         "name": "Surgical Changes",
         "description": "精准修改 - 只改必要的、不改无关的",
-        "actions": ["只改直接相关的行", "保持风格一致", "模仿现有模式", "不要溢出修改"]
+        "actions": [
+          "只改直接相关的行",
+          "保持风格一致",
+          "模仿现有模式",
+          "不要溢出修改"
+        ]
       },
       {
         "name": "Goal-Driven Execution",
         "description": "目标驱动执行 - 定义成功标准、验证检查点",
-        "actions": ["定义成功标准", "设定验证检查点", "迭代直到验证通过", "使用可验证的目标"]
-    ]
+        "actions": [
+          "定义成功标准",
+          "设定验证检查点",
+          "迭代直到验证通过",
+          "使用可验证的目标"
+        ]
+      }
     ]
   },
-  
   "claude_code_integration": {
     "enabled": true,
     "subagent_adapter": "scripts/claude_code_subagent_adapter.py",
     "environment_detection": true,
-    "fallback_mode": "simulation"
+    "fallback_mode": "simulation",
+    "note": "v2.7.0 同步：SubAgent 适配器为模拟模式，真实多智能体协作由宿主 LLM 在提示词层完成。脚本层提供确定性工具（代码地图、UI 巡检、视觉回归、决策梯检查等）。"
   },
-  
+  "features_v2_5_to_v2_7": {
+    "ponytail_decision_ladder": "6 步决策梯 + 16 条不可简化红线，少写多余代码（v2.6）",
+    "autonomous_mode": "plan→dev→verify→fix 4 阶段循环自主编排（v2.6/Phase 18）",
+    "dynamic_workflows": "6 大动态工作流模式：classifier/fan-out/adversarial/generate-filter/tournament/loop-until-done（v1.7）",
+    "cybernetics_control": "三环控制模型 + 反馈控制环 + 性能画像 + 守护协调器（v2.5）",
+    "plugin_hot_reload": "插件热加载 V3 架构：Drop-in / Hot Register / HotReloadWatcher（v2.6/Phase 17）",
+    "uiux_audit": "UI/UX 巡检分析：4 大检测维度（可访问性/交互质量/布局响应式/UX 反模式）（v2.7）",
+    "visual_regression": "视觉回归测试：像素级 Diff + 数据显示不全 + 显示错误检测（v2.7）",
+    "karpathy_principles": "Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven（v2.4）"
+  },
   "installation": {
     "claude_code": {
-      "path": "~/.claude/skills/trae-multi-agent",
+      "path": "~/.claude/skills/multi-agent-team",
       "files": [
         "SKILL.md",
         "skills-index.json",
@@ -127,7 +198,7 @@
         "scripts/claude_code_subagent_adapter.py",
         "scripts/dual_layer_context_manager.py",
         "scripts/role_matcher.py",
-        "scripts/workflow_engine.py",
+        "scripts/workflow_engine_v2.py",
         "scripts/skill_registry.py",
         "scripts/task_completion_checker.py",
         "scripts/task_list_manager.py",
@@ -142,7 +213,6 @@
       ]
     }
   },
-
   "lazy_load": {
     "enabled": true,
     "resources": {
@@ -188,7 +258,6 @@
       }
     }
   },
-  
   "usage_examples": {
     "architecture": "设计系统架构：包括模块划分、技术选型、部署方案",
     "product_requirements": "定义产品需求：广告拦截功能，需要明确的验收标准",

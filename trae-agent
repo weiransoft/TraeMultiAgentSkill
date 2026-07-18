@@ -19,7 +19,7 @@ def main():
     skill_root = wrapper_script.parent
     
     # 验证 skill 目录是否正确
-    dispatch_script = skill_root / 'scripts' / 'trae_agent_dispatch.py'
+    dispatch_script = skill_root / 'scripts' / 'trae_agent_dispatch_v2.py'
     
     if not dispatch_script.exists():
         print(f"❌ 错误：找不到调度脚本：{dispatch_script}", file=sys.stderr)

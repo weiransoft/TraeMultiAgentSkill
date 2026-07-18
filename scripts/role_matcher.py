@@ -26,6 +26,14 @@ except ImportError:
     AI_AVAILABLE = False
     print("⚠️  AI 语义匹配器不可用，将使用传统匹配方法")
 
+# 导入本地确定性 embedder（TFIDF/Hashing，无网络依赖）
+try:
+    from dynamic_workflow.semantic_embedder import TFIDFEmbedder, HashingEmbedder
+    EMBEDDER_AVAILABLE = True
+except ImportError:
+    EMBEDDER_AVAILABLE = False
+    print("⚠️  本地 embedder 不可用，语义匹配将降级到关键词重叠")
+
 
 class MatchStrategy(Enum):
     """匹配策略"""
@@ -109,6 +117,17 @@ class RoleMatcher:
         else:
             self.ai_matcher = None
             print("⚠️  AI 语义匹配器未初始化")
+        
+        # 本地确定性 embedder（用于无 LLM 时的语义相似度计算）
+        self._embedder = None
+        if EMBEDDER_AVAILABLE:
+            try:
+                self._embedder = TFIDFEmbedder()
+            except Exception:
+                try:
+                    self._embedder = HashingEmbedder(n_features=512)
+                except Exception:
+                    self._embedder = None
     
     def register_role(self, role: RoleDefinition):
         """
@@ -564,7 +583,10 @@ class RoleMatcher:
     def _semantic_match(self, requirement: TaskRequirement,
                        role: RoleDefinition) -> MatchResult:
         """
-        语义匹配（简化版，实际应该使用嵌入模型）
+        语义匹配（基于本地确定性 embedder：TFIDF/Hashing）
+        
+        无 LLM 环境下使用确定性向量相似度替代语义理解，
+        相比关键词重叠能捕捉部分词汇共现模式。
         
         Args:
             requirement: 任务需求
@@ -573,26 +595,44 @@ class RoleMatcher:
         Returns:
             MatchResult: 匹配结果
         """
-        # TODO: 实现基于嵌入模型的语义匹配
-        # 这里使用简化的文本相似度计算
+        task_text = f"{requirement.title} {requirement.description}"
+        role_text = f"{role.name} {role.description} {' '.join(role.capabilities)} {' '.join(role.skills)}"
         
-        task_text = f"{requirement.title} {requirement.description}".lower()
-        role_text = f"{role.name} {role.description}".lower()
+        if self._embedder is not None:
+            # 使用本地 embedder 计算向量相似度（确定性，可复现）
+            try:
+                task_vec = self._embedder.embed(task_text)
+                role_vec = self._embedder.embed(role_text)
+                
+                # 余弦相似度
+                dot = sum(a * b for a, b in zip(task_vec, role_vec))
+                norm_a = sum(a * a for a in task_vec) ** 0.5
+                norm_b = sum(b * b for b in role_vec) ** 0.5
+                similarity = dot / max(norm_a * norm_b, 1e-10)
+                
+                return MatchResult(
+                    role_id=role.role_id,
+                    role_name=role.name,
+                    confidence=similarity,
+                    reasons=[f"基于本地 embedder 向量相似度（{type(self._embedder).__name__}）"],
+                    score_breakdown={'semantic': similarity}
+                )
+            except Exception as e:
+                # embedder 计算失败，降级到关键词重叠
+                print(f"⚠️  embedder 计算失败，降级到关键词重叠：{e}")
         
-        # 简单的 Jaccard 相似度
-        task_words = set(task_text.split())
-        role_words = set(role_text.split())
-        
+        # 降级：关键词重叠（embedder 不可用时的保底方案）
+        task_words = set(task_text.lower().split())
+        role_words = set(role_text.lower().split())
         intersection = len(task_words & role_words)
         union = len(task_words | role_words)
-        
         similarity = intersection / max(union, 1)
         
         return MatchResult(
             role_id=role.role_id,
             role_name=role.name,
             confidence=similarity,
-            reasons=["基于文本相似度匹配"],
+            reasons=["基于关键词重叠匹配（embedder 不可用降级）"],
             score_breakdown={'semantic': similarity}
         )
     
