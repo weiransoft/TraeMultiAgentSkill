@@ -1,7 +1,7 @@
 {
   "name": "multi-agent-team",
-  "version": "2.7.1",
-  "description": "Multi-Agent Team Dispatcher - 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持 Claude Code SubAgent 调用、Karpathy 四大核心原则、Ponytail 决策梯、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、UI/UX 巡检与视觉回归。",
+  "version": "2.8.1",
+  "description": "Multi-Agent Team Dispatcher - 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持 Claude Code SubAgent 调用、Karpathy 四大核心原则、Ponytail 决策梯、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、UI/UX 巡检与视觉回归。v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略）。",
   "author": "Claw Team",
   "license": "MIT",
   "homepage": "https://github.com/weiransoft/TraeMultiAgentSkill",
@@ -9,7 +9,9 @@
     "subagent_dispatch": true,
     "multi_agent_collaboration": true,
     "code_review": true,
-    "project_lifecycle": true
+    "project_lifecycle": true,
+    "doc_code_review": true,
+    "workflow_loop": true
   },
   "agents": {
     "architect": {
@@ -178,7 +180,7 @@
     "fallback_mode": "simulation",
     "note": "v2.7.0 同步：SubAgent 适配器为模拟模式，真实多智能体协作由宿主 LLM 在提示词层完成。脚本层提供确定性工具（代码地图、UI 巡检、视觉回归、决策梯检查等）。"
   },
-  "features_v2_5_to_v2_7": {
+  "features_v2_5_to_v2_8": {
     "ponytail_decision_ladder": "6 步决策梯 + 16 条不可简化红线，少写多余代码（v2.6）",
     "autonomous_mode": "plan→dev→verify→fix 4 阶段循环自主编排（v2.6/Phase 18）",
     "dynamic_workflows": "6 大动态工作流模式：classifier/fan-out/adversarial/generate-filter/tournament/loop-until-done（v1.7）",
@@ -186,7 +188,10 @@
     "plugin_hot_reload": "插件热加载 V3 架构：Drop-in / Hot Register / HotReloadWatcher（v2.6/Phase 17）",
     "uiux_audit": "UI/UX 巡检分析：4 大检测维度（可访问性/交互质量/布局响应式/UX 反模式）（v2.7）",
     "visual_regression": "视觉回归测试：像素级 Diff + 数据显示不全 + 显示错误检测（v2.7）",
-    "karpathy_principles": "Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven（v2.4）"
+    "karpathy_principles": "Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven（v2.4）",
+    "eight_stage_workflow": "八阶段标准工作流（v2.8）：需求→架构→UI→测试设计→任务分解→开发→测试验证→文档对照审查",
+    "doc_code_review": "文档对照代码审查（v2.8）：六大维度检查（D1 功能完成度/D2 集成完整性/D3 测试正确性/D4 验收标准/D5 TODO-FIXME 清零/D6 文档意图遵从），多语言代码扫描（Python/JS/TS/Java/Go/Rust）",
+    "workflow_loop": "八阶段整体构建为一个 Loop（v2.8.1）：WorkflowLoopController + RollbackStrategy 回退策略，审查失败精准回退到对应阶段，最大迭代次数 3 次硬上限，累计上下文跨迭代传递"
   },
   "installation": {
     "claude_code": {

@@ -21,18 +21,20 @@ from typing import Callable, Dict, List, Optional
 
 
 class StageKind(str, Enum):
-    """Ralph 4 阶段。
+    """Ralph 阶段枚举（v2.8 新增 REVIEW）。
 
     PLAN: 制定计划
     DEV: 实际开发
     VERIFY: 验证
     FIX: 修复
+    REVIEW: 文档对照代码审查（v2.8 新增）
     """
 
     PLAN = "plan"
     DEV = "dev"
     VERIFY = "verify"
     FIX = "fix"
+    REVIEW = "review"
 
 
 @dataclass

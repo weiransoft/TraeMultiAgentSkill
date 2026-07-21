@@ -74,6 +74,33 @@
           "timeout": 3600,
           "retry_count": 3,
           "status": "pending"
+        },
+        {
+          "step_id": "doc-code-review",
+          "name": "文档对照代码审查",
+          "description": "对照文档逐项检查功能完成情况、集成情况、测试正确性，确保文档设计完整落地",
+          "role_id": "multi-role",
+          "action": "doc_code_review",
+          "inputs": {
+            "prd_path": "${prd}",
+            "architecture_path": "${architecture}",
+            "spec_path": "${spec}",
+            "test_plan_path": "${test_plan}",
+            "test_command": "${test_command}",
+            "code": "${code}",
+            "test_results": "${test_results}"
+          },
+          "outputs": {
+            "review_report": null,
+            "overall_passed": null,
+            "gap_list": null
+          },
+          "conditions": {
+            "requires_previous_step_pass": true
+          },
+          "timeout": 3600,
+          "retry_count": 2,
+          "status": "pending"
         }
       ],
       "variables": {},

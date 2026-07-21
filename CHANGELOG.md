@@ -5,6 +5,98 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.8.1] - 2026-07-21
+
+### Added
+
+#### v2.8.1 — 八阶段整体构建为 Loop + 回退策略
+
+在 v2.8.0 阶段 8（文档对照代码审查）基础上，将整个八阶段工作流构建为一个完整的循环（WorkflowLoopController），支持审查失败后回退到对应阶段修复，避免一次性失败导致整个流程作废。
+
+##### 新增核心组件
+
+- ✅ `scripts/workflow_loop_controller.py`（WorkflowLoopController + RollbackStrategy）
+  - 八阶段工作流整体构建为一个 loop，支持审查失败后回退修复
+  - `WorkflowStage` 枚举（8 个阶段，附带 stage_number/role_name/output_name 属性）
+  - `to_stage_kind()` 方法建立与 Ralph StageKind 的映射（详见设计文档 §10.3.2）
+  - 回退策略：D1/D2/D4/D5/D6 → DEVELOPMENT，D3 → TEST_VERIFICATION
+  - 最大迭代次数限制（默认 3 次，可配置）
+  - 累计上下文跨迭代传递（`_accumulated_artifacts`）
+  - 工作流执行结果摘要生成（`WorkflowRunResult.summary()`）
+  - run() 方法拆分为 4 个子方法（`_calculate_start_stage_idx` / `_execute_stages` / `_execute_single_stage` / `_handle_review_result` / `_build_run_result`），单一职责
+- ✅ `scripts/run_workflow_loop.py`（CLI 入口脚本）
+  - `DefaultStageExecutor` 提供真实阶段执行逻辑（禁 mock）
+  - 阶段 1-5：检查文档是否存在
+  - 阶段 6：假设代码已就绪
+  - 阶段 7：真实执行测试命令（subprocess.run + 多格式解析）
+  - 阶段 8：调用真实 ReviewHandler
+  - 支持 `--project-root` / `--max-iterations` / `--prd-path` / `--architecture-path` / `--spec-path` / `--test-plan-path` / `--test-command` / `--verbose` 参数
+  - 输出 JSON 格式结果文件（`<project>-WORKFLOW-LOOP-RESULT.json`）
+
+##### 文档更新
+
+- 设计文档 `docs/dev/DOC_CODE_REVIEW_STAGE.md` 追加 §10 八阶段循环章节
+  - §10.1 设计目标 / §10.2 WorkflowLoopController 定位 / §10.3 核心数据结构
+  - §10.4 RollbackStrategy 回退策略 / §10.5 最大迭代次数限制
+  - §10.6 累计上下文传递机制 / §10.7 工作流执行流程
+  - §10.8 与 autonomous 模块的集成路径 / §10.9 风险与缓解 / §10.10 测试策略
+- SKILL.md：新增"八阶段整体构建为一个 Loop"章节，含回退映射表、CLI 示例、与 RalphLoopController 的关系
+- workflows/definitions.json：`doc-code-review` 步骤输入字段统一为 `_path` 后缀，新增 `spec_path` 和 `test_command`
+
+##### 测试
+
+- `scripts/tests/test_workflow_loop_controller.py`：从 12 个测试扩展到 16 个
+  - 新增 W8: 累计上下文跨迭代传递测试
+  - 新增 W9: 端到端集成测试（真实 ReviewHandler + 真实项目目录）
+  - 新增 W10: D3 测试失败回退到 TEST_VERIFICATION 完整流程
+  - 新增 W11: WorkflowStage.to_stage_kind() 映射方法
+- `scripts/tests/test_review_handler.py`：移除 MagicMock，改用真实 `StageKind.REVIEW`
+- 全部 31 个测试通过（27 原有 + 4 新增）
+
+##### 架构师审查
+
+- 已通过架构师 review，识别并修复 3 个 P0 阻断问题：
+  - P0-1: 设计文档缺失 §10 八阶段循环章节 → 已补充
+  - P0-2: test_review_handler.py 使用 MagicMock → 已替换为真实枚举
+  - P0-3: WorkflowLoopController 是孤立组件 → 已提供 CLI 入口脚本
+- 修复 6 个 P1 重要问题：文档同步 / 字段统一 / 映射方法 / 子方法抽取 / 测试补充
+
+## [2.8.0] - 2026-07-21
+
+### Added
+
+#### v2.8 — 八阶段工作流新增阶段 8：文档对照代码审查
+
+在七阶段标准工作流末尾追加"文档对照代码审查"阶段，确保开发完成后逐项对照文档检查功能完成情况、集成情况、测试正确性，杜绝"文档写了但代码没实现"的遗漏。
+
+##### 新增核心组件
+
+- ✅ `scripts/doc_code_consistency_checker.py`（DocCodeConsistencyChecker）
+  - 六大维度检查：功能完成度(D1) / 集成完整性(D2) / 测试正确性(D3) / 验收标准满足(D4) / TODO-FIXME清零(D5) / 文档意图遵从(D6)
+  - 文档解析：支持 PRD / SPEC / 架构文档 / 测试计划的 Markdown 表格解析
+  - 代码扫描：Python / JavaScript / TypeScript / Java / Go / Rust 多语言函数/类/import 扫描
+  - 测试执行：真实执行测试命令，解析 passed/failed/skipped
+  - 报告生成：结构化 Markdown 审查报告
+- ✅ `scripts/autonomous/handlers/review_handler.py`（ReviewHandler）
+  - 继承 StageHandler，作为 Ralph 循环可选第 5 阶段
+  - 审查通过 → success，审查不通过 → retriable，检查器异常 → fatal
+- ✅ `scripts/autonomous/loop_controller.py` StageKind 新增 REVIEW 枚举值
+- ✅ `docs/dev/DOC_CODE_REVIEW_STAGE.md` 设计文档
+- ✅ `docs/spec/role-prompts/doc-code-review.md` Prompt 模板
+- ✅ `docs/roles/doc-code-review/DOC_CODE_REVIEW_TEMPLATE.md` 报告模板
+
+##### 文档更新
+
+- SKILL.md：七阶段 → 八阶段，新增阶段 8 详细说明
+- README.md：工作流同步更新，新增六大检查维度说明
+- workflows/definitions.json：standard-dev-workflow 新增 doc-code-review 步骤
+
+##### 测试
+
+- `scripts/tests/test_doc_code_consistency_checker.py`：12 个测试用例覆盖全部六大维度
+- `scripts/tests/test_review_handler.py`：4 个测试用例覆盖 handler 成功/失败/异常路径
+- `scripts/tests/scripts/run_doc_review_tests.sh`：测试脚本
+
 ## [2.7.1] - 2026-07-18
 
 ### Changed

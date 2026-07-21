@@ -131,7 +131,7 @@ AI (English): "📋 Task received, starting analysis..."
 7. **代码地图生成**: 自动生成项目代码结构映射
 8. **项目理解**: 快速读取项目文档和代码，生成项目理解文档
 9. **规范驱动开发**: 基于项目规范和文档进行开发
-10. **七阶段标准工作流程**: 需求分析→架构设计→测试设计→任务分解→开发实现→测试验证→发布评审
+10. **八阶段标准工作流程**: 需求分析→架构设计→UI设计→测试设计→任务分解→开发实现→测试验证→文档对照代码审查
 11. **UI 设计**: 创建独特、生产级的 UI 界面，避免通用的 AI "slop" 美学
 
 ## 快速开始
@@ -201,7 +201,7 @@ python3 scripts/trae_agent_dispatch.py \
 1. 单角色置信度 ≥ 0.7 → 直接调度该角色
 2. 多角色均 ≥ 0.6 且任务可分解 → 多角色协作（见拓扑路由）
 3. 所有角色 < 0.5 → 向用户澄清需求，不要强行匹配
-4. 任务跨多个领域（如"设计+实现+测试"）→ 按七阶段流程依次调度
+4. 任务跨多个领域（如"设计+实现+测试"）→ 按八阶段流程依次调度
 
 ### 动态工作流拓扑路由决策表（宿主 LLM 执行）
 
@@ -296,7 +296,7 @@ ai_integration:
 **触发关键词**: UI设计、界面设计、前端设计、视觉设计、UI/UX、UI原型、界面美化、UI优化、UI重构
 **详细 prompt**: `docs/roles/ui-designer/prompt.md`
 
-## 七阶段标准工作流程
+## 八阶段标准工作流程（v2.8 新增阶段 8：文档对照代码审查）
 
 ```
 阶段 1: 需求分析（产品经理）
@@ -313,14 +313,89 @@ ai_integration:
     ↓
 阶段 7: 测试验证（测试专家）
     ↓
-阶段 8: 发布评审（多角色）
+阶段 8: 文档对照代码审查（多角色）★ v2.8 新增
+    ↓ 审查通过
+发布
 ```
+
+### 阶段 8: 文档对照代码审查（v2.8 新增）
+
+开发完成后，对照设计文档逐项检查功能完成情况、集成情况、测试正确性，确保文档设计完整落地。
+
+**六大检查维度**：
+
+| 维度 | 检查内容 | 通过条件 |
+|------|----------|----------|
+| D1 功能完成度 | 文档中每个功能点是否有对应代码实现 | 实现率 = 100% |
+| D2 集成完整性 | 文档定义的模块间集成关系是否在代码中体现 | 集成率 = 100% |
+| D3 测试正确性 | 全部测试通过，无失败；测试覆盖文档功能 | failed = 0, passed > 0 |
+| D4 验收标准满足 | 文档中每条验收标准是否被代码满足 | 满足率 = 100% |
+| D5 TODO/FIXME 清零 | 代码中无残留的 TODO/FIXME 注释 | 未实现 = 0 |
+| D6 文档意图遵从 | 代码实现未偏离文档设计意图 | 偏离数 = 0 |
+
+**审查判定**：
+- 全部通过 → 审查通过，可发布
+- 任一不通过 → 审查不通过，列出缺口清单，回退到阶段 6 修复
+
+### 八阶段整体构建为一个 Loop（v2.8.1 新增）
+
+八阶段标准工作流整体构建为一个完整的循环（`WorkflowLoopController`），支持审查失败后回退到对应阶段修复，避免一次性失败导致整个流程作废。
+
+**核心机制**：
+- **审查驱动**：阶段 8 审查结果是循环的核心驱动：通过则结束，不通过则回退
+- **精准回退**：根据缺口维度（D1-D6）决定回退到哪个阶段
+
+| 缺口维度 | 回退到阶段 | 理由 |
+|----------|-----------|------|
+| D1 功能完成度 | 阶段 6（开发） | 功能缺失需补开发 |
+| D2 集成完整性 | 阶段 6（开发） | 集成缺失需补开发 |
+| D3 测试正确性 | 阶段 7（测试验证） | 测试失败需修复测试 |
+| D4 验收标准 | 阶段 6（开发） | 验收未满足需补开发 |
+| D5 TODO/FIXME | 阶段 6（开发） | TODO 未实现需补开发 |
+| D6 文档意图 | 阶段 6（开发） | 文档偏离需调整代码 |
+
+- **迭代上限**：最大迭代次数限制（默认 3 次，可配置），防止无限循环
+- **上下文累计**：跨迭代保留产出（`_accumulated_artifacts`），后续阶段可访问前序产出
+- **真实执行**：所有阶段真实执行，禁 mock/占位/简化
+
+**核心组件**：
+- 检查器：`scripts/doc_code_consistency_checker.py`（DocCodeConsistencyChecker）
+- Handler：`scripts/autonomous/handlers/review_handler.py`（ReviewHandler）
+- **循环控制器**：`scripts/workflow_loop_controller.py`（WorkflowLoopController + RollbackStrategy）
+- **CLI 入口**：`scripts/run_workflow_loop.py`（命令行入口脚本）
+- Prompt 模板：`docs/spec/role-prompts/doc-code-review.md`
+- 报告模板：`docs/roles/doc-code-review/DOC_CODE_REVIEW_TEMPLATE.md`
+- 设计文档：`docs/dev/DOC_CODE_REVIEW_STAGE.md`（§10 八阶段循环章节）
+
+**CLI 使用示例**：
+
+```bash
+# 基本用法
+python3 scripts/run_workflow_loop.py \
+  --project-root /path/to/project \
+  --prd-path docs/prd.md \
+  --architecture-path docs/architecture.md \
+  --test-command "python3 -m pytest -v"
+
+# 自定义最大迭代次数
+python3 scripts/run_workflow_loop.py \
+  --project-root /path/to/project \
+  --max-iterations 5 \
+  --verbose
+```
+
+**与 RalphLoopController 的关系**：
+- 外层使用 `WorkflowLoopController` 编排八阶段
+- 内层阶段 6（开发）可注入 `RalphLoopController` 做 plan→dev→verify→fix 小循环
+- `WorkflowStage.to_stage_kind()` 提供两者之间的映射（详见设计文档 §10.3.2）
 
 **绝对禁止**：
 ❌ 未经过设计阶段直接开始编码
 ❌ 文档未编写或未完成就开始开发
 ❌ 未经过设计评审直接实施
 ❌ 使用通用的 AI 美学（AI slop）
+❌ 开发完成后不对照文档检查就发布（v2.8 新增）
+❌ 代码中残留 TODO/FIXME 未实现就发布（v2.8 新增）
 
 ## 高级功能
 
@@ -732,7 +807,7 @@ python3 scripts/trae_agent_dispatch.py \
 Trae Multi-Agent Dispatcher 提供了：
 - ✅ 智能角色识别（5 个核心角色 + AI 语义匹配）
 - ✅ 多角色协同 + 共识机制
-- ✅ 七阶段标准工作流程
+- ✅ 八阶段标准工作流程（v2.8 新增阶段 8：文档对照代码审查）
 - ✅ Karpathy 四大核心原则强制执行（v2.4）
 - ✅ Cybernetics 工程控制论三环控制（v2.5）
 - ✅ Ponytail 决策梯 + 16 条不可简化红线（v2.6）
