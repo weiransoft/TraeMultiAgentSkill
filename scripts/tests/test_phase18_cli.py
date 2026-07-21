@@ -54,9 +54,9 @@ class TestAutonomousFlagsDefaults(unittest.TestCase):
         self.assertEqual(args.auto_max_iterations, 50)
 
     def test_03_auto_max_tokens_default(self):
-        """--auto-max-tokens 默认 500000。"""
+        """--auto-max-tokens 默认 0（不限制）。"""
         args = _parse([])
-        self.assertEqual(args.auto_max_tokens, 500_000)
+        self.assertEqual(args.auto_max_tokens, 0)
 
     def test_04_auto_stop_when_default(self):
         """--auto-stop-when 默认空字符串。"""

@@ -69,9 +69,10 @@ class AIAssistant:
         self.provider = provider
         self.config = config or {}
         
-        # 默认配置
+        # 默认配置：max_tokens=None 表示不限（让模型按自身最大输出能力生成）。
+        # 可由 config['max_tokens'] 覆盖为正整数以强约束输出长度。
         self.default_config = {
-            'max_tokens': 4096,
+            'max_tokens': None,  # None = 不限制（默认）；正整数 = 显式上限
             'temperature': 0.7,
             'top_p': 0.9,
             'timeout': 30000,  # 毫秒
@@ -315,18 +316,23 @@ class AIAssistant:
             )
         
         # 构建 OpenAI 兼容请求体
+        # max_tokens=None（不限）时省略该字段，由模型使用自身默认上限；
+        # max_tokens 为正整数时显式包含该字段以强约束输出长度。
         messages = []
         if context:
             messages.append({"role": "system", "content": context})
         messages.append({"role": "user", "content": prompt})
-        
+
+        max_tokens_cfg = self.default_config.get('max_tokens')
         request_body = {
             "model": model,
             "messages": messages,
-            "max_tokens": self.default_config.get('max_tokens', 4096),
             "temperature": self.default_config.get('temperature', 0.7),
             "top_p": self.default_config.get('top_p', 0.9),
         }
+        # 仅在显式配置正整数上限时携带 max_tokens 字段
+        if isinstance(max_tokens_cfg, int) and max_tokens_cfg > 0:
+            request_body["max_tokens"] = max_tokens_cfg
         
         headers = {"Content-Type": "application/json"}
         if api_key:
@@ -396,11 +402,20 @@ class AIAssistant:
         
         full_prompt = f"{context}\n\n{prompt}" if context else prompt
         inputs = tokenizer(full_prompt, return_tensors="pt")
-        
+
+        # transformers 不接受 None（max_new_tokens 必须是正整数）。
+        # 当 max_tokens=None（不限）时使用 4096 作为本地模型的安全默认上限，
+        # 避免无界生成导致 OOM；用户可显式配置更大值。
+        max_tokens_cfg = self.default_config.get('max_tokens')
+        if isinstance(max_tokens_cfg, int) and max_tokens_cfg > 0:
+            max_new_tokens = max_tokens_cfg
+        else:
+            max_new_tokens = 4096  # 不限时的本地模型安全默认上限
+
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=self.default_config.get('max_tokens', 4096),
+                max_new_tokens=max_new_tokens,
                 temperature=self.default_config.get('temperature', 0.7),
                 top_p=self.default_config.get('top_p', 0.9),
                 do_sample=True,

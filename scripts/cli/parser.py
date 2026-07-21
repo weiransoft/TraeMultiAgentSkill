@@ -338,8 +338,8 @@ def parse_arguments():
     parser.add_argument(
         "--auto-max-tokens",
         type=int,
-        default=500000,
-        help="autonomous 模式 token 预算（默认 500000）",
+        default=0,
+        help="autonomous 模式 token 预算（0=不限制，默认 0；正整数=显式预算上限）",
     )
     parser.add_argument(
         "--auto-stop-when",
@@ -495,8 +495,8 @@ def parse_arguments():
     parser.add_argument(
         "--loop-max-tokens",
         type=int,
-        default=500000,
-        help="Loop Engineering Token 预算（默认 500000）",
+        default=0,
+        help="Loop Engineering Token 预算（0=不限制，默认 0；正整数=显式预算上限）",
     )
     parser.add_argument(
         "--loop-sampling-read-ratio",

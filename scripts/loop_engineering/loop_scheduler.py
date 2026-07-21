@@ -69,8 +69,8 @@ class LoopScheduler:
         Returns:
             SchedulingDecision: 调度决策。
         """
-        # 1. Token 预算硬上限
-        if cumulative_tokens >= self._config.max_tokens:
+        # 1. Token 预算硬上限（max_tokens=0 表示不限制）
+        if self._config.max_tokens > 0 and cumulative_tokens >= self._config.max_tokens:
             self._info(
                 f"Token 预算耗尽：{cumulative_tokens} >= {self._config.max_tokens}"
             )

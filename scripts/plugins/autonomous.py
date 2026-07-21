@@ -190,7 +190,8 @@ class RalphAutonomousPlugin(GoalCommandPlugin):
             stage_order = list(valid_stages)
         return LoopConfig(
             max_iterations=int(getattr(args, "auto_max_iterations", 50)),
-            max_tokens=int(getattr(args, "auto_max_tokens", 500_000)),
+            # auto_max_tokens 默认 0（与 LoopConfig 对齐，0=不限制）
+            max_tokens=int(getattr(args, "auto_max_tokens", 0)),
             stop_when=str(getattr(args, "auto_stop_when", "")),
             stage_order=stage_order,
             backoff_base_sec=float(getattr(args, "auto_backoff_base", 1.0)),

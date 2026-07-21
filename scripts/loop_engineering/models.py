@@ -91,7 +91,7 @@ class LoopEngineeringConfig:
         discovery_mode: Discovery 工作模式。
         evaluator_mode: Evaluator 严格程度。
         max_iterations: 最大迭代次数（硬上限，避免无限循环）。
-        max_tokens: 最大 token 消耗预算（硬上限）。
+        max_tokens: 最大 token 消耗预算（硬上限），0 表示不限制（默认）。
         human_checkpoint_every: 每 N 轮触发一次人类检查点，0 表示关闭。
         sampling_read_ratio: 抽样阅读比例（0.0-1.0）。
         stop_when: 自然语言停止条件，供 Scheduler 参考。
@@ -110,7 +110,8 @@ class LoopEngineeringConfig:
     discovery_mode: DiscoveryMode = DiscoveryMode.AUTO
     evaluator_mode: EvaluatorMode = EvaluatorMode.STRICT
     max_iterations: int = 50
-    max_tokens: int = 500_000
+    # max_tokens=0 表示不限制（默认）；正整数表示显式预算上限。
+    max_tokens: int = 0
     human_checkpoint_every: int = 5
     sampling_read_ratio: float = 0.1
     stop_when: str = ""
@@ -130,8 +131,9 @@ class LoopEngineeringConfig:
         """校验配置字段的合法性。"""
         if self.max_iterations < 1:
             raise ValueError(f"max_iterations 必须 >= 1，当前：{self.max_iterations}")
-        if self.max_tokens < 1:
-            raise ValueError(f"max_tokens 必须 >= 1，当前：{self.max_tokens}")
+        # max_tokens=0 表示不限制；负数为非法值
+        if self.max_tokens < 0:
+            raise ValueError(f"max_tokens 必须 >= 0（0=不限制），当前：{self.max_tokens}")
         if not 0.0 <= self.sampling_read_ratio <= 1.0:
             raise ValueError(
                 f"sampling_read_ratio 必须在 [0, 1] 之间，当前：{self.sampling_read_ratio}"

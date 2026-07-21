@@ -132,7 +132,8 @@ class TestLoopConfig(unittest.TestCase):
         """LoopConfig 默认值合理。"""
         c = LoopConfig()
         self.assertEqual(c.max_iterations, 50)
-        self.assertEqual(c.max_tokens, 500_000)
+        # max_tokens 默认 0（表示不限制）
+        self.assertEqual(c.max_tokens, 0)
         self.assertEqual(c.stop_when, "")
         self.assertEqual(len(c.stage_order), 4)
         self.assertEqual(c.consecutive_failure_abort, 3)

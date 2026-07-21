@@ -358,41 +358,55 @@ class RoleMatcher:
     def _call_ai_assistant(self, prompt: str) -> str:
         """
         调用 AI 助手
-        
+
         Args:
             prompt: 提示词
-            
+
         Returns:
             str: AI 响应
+
+        max_tokens 语义（与 AIConfig 对齐）：
+        - None  : 不限制，从请求体省略 max_tokens 字段，由模型使用自身默认上限
+        - int>0 : 显式上限（单位：token）
         """
+        # 从 self.options / 配置中读取 max_tokens（默认 None=不限）
+        max_tokens_cfg = None
+        if hasattr(self, 'options') and isinstance(self.options, dict):
+            raw = self.options.get('max_tokens')
+            if isinstance(raw, int) and raw > 0:
+                max_tokens_cfg = raw
+
+        def _build_kwargs(system_content: str) -> dict:
+            """构建 chat.completions.create 的 kwargs，按需注入 max_tokens。"""
+            kwargs = {
+                "model": "gpt-4",
+                "messages": [
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+            }
+            # 仅在显式配置正整数上限时携带 max_tokens（None=不限，省略字段）
+            if max_tokens_cfg is not None:
+                kwargs["max_tokens"] = max_tokens_cfg
+            return kwargs
+
         # 尝试使用 Trae AI 助手
         try:
             # 检查是否有 Trae AI 客户端
             if hasattr(self, 'ai_client') and self.ai_client:
                 response = self.ai_client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "你是一个专业的角色匹配专家，擅长分析任务需求并匹配最适合的角色。"},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.3,
-                    max_tokens=2000
+                    **_build_kwargs("你是一个专业的角色匹配专家，擅长分析任务需求并匹配最适合的角色。")
                 )
                 return response.choices[0].message.content
-            
+
             # 尝试使用 ai_semantic_matcher
             if self.ai_matcher and hasattr(self.ai_matcher, 'ai_client'):
                 response = self.ai_matcher.ai_client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "你是一个专业的角色匹配专家。"},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.3,
-                    max_tokens=2000
+                    **_build_kwargs("你是一个专业的角色匹配专家。")
                 )
                 return response.choices[0].message.content
-                
+
         except Exception as e:
             print(f"⚠️  AI 调用失败：{e}")
         

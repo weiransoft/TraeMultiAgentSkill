@@ -20,40 +20,82 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
 
+# ============================================================================
+# LLM 输出 token 上限配置语义
+# ----------------------------------------------------------------------------
+# - None  : 不限制（默认值）。表示让模型按自身最大输出能力生成，
+#           适用于长文本生成、代码审查、复杂推理等需要完整输出的场景。
+#           实现层会从请求体中省略 max_tokens 字段，由模型使用其默认上限。
+# - int>0 : 显式上限（单位：token）。用于强约束输出长度的场景，
+#           如角色匹配、摘要、分类等需要短输出的任务。
+# - 0/负数: 非法值，from_dict 会抛 ValueError。
+# ============================================================================
+# 配置示例（YAML）：
+#   config:
+#     max_tokens: null      # null = 不限制（默认）
+#     max_tokens: 4096      # 显式上限 4096 token
+# ============================================================================
+MAX_TOKENS_UNLIMITED: Optional[int] = None  # 全局常量：不限制 token
+
+
 @dataclass
 class AIConfig:
-    """AI 配置"""
+    """AI 配置（max_tokens=None 表示不限，默认不限）"""
     enabled: bool = True
     provider: str = "trae"
     features: List[str] = field(default_factory=list)
-    max_tokens: int = 4096
+    # None 表示不限 token（默认），int>0 表示显式上限
+    max_tokens: Optional[int] = MAX_TOKENS_UNLIMITED
     temperature: float = 0.7
     top_p: float = 0.9
     use_cache: bool = True
     fallback_enabled: bool = True
     timeout_ms: int = 30000
     log_level: str = "info"
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'AIConfig':
-        """从字典创建配置"""
+        """从字典创建配置
+
+        max_tokens 语义：
+        - 缺省 / null  → None（不限）
+        - 正整数        → 显式上限
+        - 0 / 负数 / 非数值 → 抛 ValueError
+        """
         config = cls()
-        
+
         if 'ai_integration' in data:
             ai_data = data['ai_integration']
             config.enabled = ai_data.get('enabled', True)
             config.provider = ai_data.get('provider', 'trae')
             config.features = ai_data.get('features', [])
-            
+
             if 'config' in ai_data:
                 cfg = ai_data['config']
-                config.max_tokens = cfg.get('max_tokens', 4096)
+                # max_tokens 默认 None（不限）；显式 null 也视为不限
+                raw_max_tokens = cfg.get('max_tokens', MAX_TOKENS_UNLIMITED)
+                if raw_max_tokens is None:
+                    config.max_tokens = MAX_TOKENS_UNLIMITED
+                else:
+                    try:
+                        tokens_int = int(raw_max_tokens)
+                    except (TypeError, ValueError) as e:
+                        raise ValueError(
+                            f"max_tokens 必须是正整数或 null（不限），"
+                            f"当前值：{raw_max_tokens!r}"
+                        ) from e
+                    if tokens_int <= 0:
+                        raise ValueError(
+                            f"max_tokens 必须是正整数或 null（不限），"
+                            f"当前值：{tokens_int}"
+                        )
+                    config.max_tokens = tokens_int
                 config.temperature = cfg.get('temperature', 0.7)
                 config.top_p = cfg.get('top_p', 0.9)
                 config.use_cache = cfg.get('use_cache', True)
                 config.fallback_enabled = cfg.get('fallback_enabled', True)
                 config.timeout_ms = cfg.get('timeout_ms', 30000)
-        
+
         return config
 
 

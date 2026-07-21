@@ -61,7 +61,8 @@ class TestLoopEngineeringConfig(unittest.TestCase):
         self.assertEqual(cfg.discovery_mode, DiscoveryMode.AUTO)
         self.assertEqual(cfg.evaluator_mode, EvaluatorMode.STRICT)
         self.assertEqual(cfg.max_iterations, 50)
-        self.assertEqual(cfg.max_tokens, 500_000)
+        # max_tokens 默认 0（表示不限制）
+        self.assertEqual(cfg.max_tokens, 0)
         self.assertEqual(cfg.human_checkpoint_every, 5)
         self.assertAlmostEqual(cfg.sampling_read_ratio, 0.1)
         self.assertTrue(cfg.project_root.is_absolute())
@@ -78,9 +79,15 @@ class TestLoopEngineeringConfig(unittest.TestCase):
             LoopEngineeringConfig(max_iterations=0)
 
     def test_invalid_max_tokens(self):
-        """max_tokens 非法应抛 ValueError。"""
+        """max_tokens 非法（负数）应抛 ValueError；0 是合法值（不限）。"""
         with self.assertRaises(ValueError):
             LoopEngineeringConfig(max_tokens=-1)
+        # 0 是合法值，不抛错
+        cfg = LoopEngineeringConfig(max_tokens=0)
+        self.assertEqual(cfg.max_tokens, 0)
+        # 正整数也合法
+        cfg = LoopEngineeringConfig(max_tokens=500_000)
+        self.assertEqual(cfg.max_tokens, 500_000)
 
     def test_invalid_sampling_ratio(self):
         """sampling_read_ratio 越界应抛 ValueError。"""

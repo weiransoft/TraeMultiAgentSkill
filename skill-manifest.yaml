@@ -1,7 +1,7 @@
 name: multi-agent-team
-version: 2.8.1
+version: 2.7.0
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + 八阶段工作流 + 文档对照代码审查）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
@@ -14,9 +14,6 @@ description: |
   - Dynamic Workflows 6 大动态工作流模式
   - 插件热加载 V3 架构
   - UI/UX 巡检分析与视觉回归测试脚本（v2.7）
-  - 八阶段标准工作流（v2.8）：需求→架构→UI→测试设计→任务分解→开发→测试验证→文档对照审查
-  - 文档对照代码审查（v2.8）：六大维度检查（D1-D6）确保文档设计完整落地
-  - 八阶段整体构建为一个 Loop（v2.8.1）：WorkflowLoopController + RollbackStrategy 回退策略
   - 多角色代码走读与 3D 代码地图可视化
   - 双层动态上下文管理（长期记忆 + 工作记忆）
   - AI 语义理解驱动的智能角色匹配
@@ -55,8 +52,6 @@ ai_capabilities:
   visual_regression: true        # 脚本层（像素级对比）
   tfidf_similarity: true         # 脚本层（本地降级算法）
   hashing_similarity: true       # 脚本层（本地降级算法）
-  doc_code_consistency_review: true # 脚本层（v2.8 六大维度检查）
-  workflow_loop_control: true    # 脚本层（v2.8.1 八阶段循环 + 回退策略）
 
 capabilities:
   - name: product-manager
@@ -385,7 +380,7 @@ ai_integration:
     - natural_language_processing
     - code_analysis
   config:
-    max_tokens: 4096
+    max_tokens: null          # null = 不限制（默认）；正整数 = 显式上限
     temperature: 0.7
     top_p: 0.9
     use_cache: true
@@ -516,55 +511,6 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
-    - version: 2.8.1
-      date: "2026-07-21"
-      changes:
-        - 八阶段整体构建为一个 Loop：WorkflowLoopController + RollbackStrategy 回退策略
-        - 新增 scripts/workflow_loop_controller.py（252 行业务代码）+ scripts/run_workflow_loop.py CLI 入口
-        - 回退策略：D1/D2/D4/D5/D6 → DEVELOPMENT，D3 → TEST_VERIFICATION
-        - 最大迭代次数限制（默认 3 次，可配置）+ 累计上下文跨迭代传递
-        - WorkflowStage.to_stage_kind() 建立与 Ralph StageKind 的映射
-        - 设计文档 §10 八阶段循环章节（10.1-10.10 + §11 变更履历）
-        - 16 个测试用例覆盖回退策略、循环控制、累计上下文、端到端集成等
-        - 通过架构师 review：修复 3 个 P0 阻断 + 6 个 P1 重要问题
-
-    - version: 2.8.0
-      date: "2026-07-21"
-      changes:
-        - 八阶段工作流新增阶段 8：文档对照代码审查
-        - 新增 scripts/doc_code_consistency_checker.py（DocCodeConsistencyChecker）
-        - 六大维度检查：D1 功能完成度 / D2 集成完整性 / D3 测试正确性 / D4 验收标准 / D5 TODO-FIXME / D6 文档意图
-        - 新增 scripts/autonomous/handlers/review_handler.py（ReviewHandler）
-        - StageKind 新增 REVIEW 枚举值
-        - 设计文档 docs/dev/DOC_CODE_REVIEW_STAGE.md
-        - SKILL.md / README.md / workflows/definitions.json 同步更新
-        - 27 个测试用例覆盖全部六大维度
-
-    - version: 2.7.1
-      date: "2026-07-18"
-      changes:
-        - AI 诚实降级：消除脚本层全部模拟 AI 响应
-        - 真实语义匹配：向量相似度替代关键词重叠
-        - 双宿主清单同步：sync_manifests.py CI 校验脚本
-        - Claude Code 真实 SubAgent：.claude/agents/ 5 角色定义
-        - v1 死代码清算：删除 workflow_engine.py 等 3 个遗留文件（1195 行）
-
-    - version: 2.7.0
-      date: "2026-06-20"
-      changes:
-        - UI/UX 巡检分析：4 大检测维度覆盖前端质量门禁
-        - 视觉回归与显示完整性：像素级 Diff + 显示错误检测
-
-    - version: 2.6.0
-      date: "2026-06-15"
-      changes:
-        - Ponytail 决策梯 + Autonomous Mode + 插件热加载
-
-    - version: 2.5.0
-      date: "2026-05-20"
-      changes:
-        - Cybernetics 工程控制论增强 + Dynamic Workflows v1.7
-
     - version: 2.4.1
       date: "2026-04-15"
       changes:
@@ -613,4 +559,4 @@ metadata:
         - 简单的上下文管理
 
 created_at: "2026-03-16T00:00:00"
-updated_at: "2026-07-21T00:00:00"
+updated_at: "2026-04-15T00:00:00"

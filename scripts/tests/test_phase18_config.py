@@ -32,7 +32,8 @@ class TestAutonomousConfigDefaults(unittest.TestCase):
         """默认值符合预期。"""
         c = AutonomousConfig()
         self.assertEqual(c.max_iterations, 50)
-        self.assertEqual(c.max_tokens, 500_000)
+        # max_tokens 默认 0（表示不限制）
+        self.assertEqual(c.max_tokens, 0)
         self.assertEqual(c.test_command, "python3 -m unittest discover -s tests -p 'test_*.py'")
         self.assertTrue(c.auto_commit)
         self.assertTrue(c.sleep_guard_enabled)

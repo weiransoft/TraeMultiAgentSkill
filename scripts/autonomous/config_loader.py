@@ -21,7 +21,7 @@ class AutonomousConfig:
 
     字段说明：
     - max_iterations: 最大迭代次数
-    - max_tokens: token 预算
+    - max_tokens: token 预算（0=不限制，默认）
     - stop_when: 停止条件（自然语言）
     - stage_order: 阶段顺序
     - backoff_base_sec: 退避基数
@@ -44,7 +44,8 @@ class AutonomousConfig:
     """
 
     max_iterations: int = 50
-    max_tokens: int = 500_000
+    # max_tokens=0 表示不限制（默认）；正整数表示显式预算上限。
+    max_tokens: int = 0
     stop_when: str = ""
     stage_order: List[str] = field(default_factory=lambda: ["plan", "dev", "verify", "fix"])
     backoff_base_sec: float = 1.0
@@ -70,7 +71,8 @@ class AutonomousConfig:
     loop_evaluator_mode: str = "strict"
     loop_human_checkpoint_every: int = 5
     loop_max_iterations: int = 50
-    loop_max_tokens: int = 500_000
+    # loop_max_tokens=0 表示不限制（默认）；正整数表示显式预算上限。
+    loop_max_tokens: int = 0
     loop_sampling_read_ratio: float = 0.1
     extra: Dict[str, Any] = field(default_factory=dict)
 

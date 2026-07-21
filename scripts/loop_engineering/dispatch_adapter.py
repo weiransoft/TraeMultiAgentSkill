@@ -161,7 +161,8 @@ class LoopDispatchAdapter:
             # 关键：关闭 autonomous 模式，避免命中 RalphAutonomousPlugin
             autonomous=False,
             auto_max_iterations=50,
-            auto_max_tokens=500000,
+            # auto_max_tokens=0 表示不限制（与 LoopConfig/AutonomousConfig 对齐）
+            auto_max_tokens=0,
             auto_stop_when="",
             auto_test_command="python3 -m unittest discover -s tests -p 'test_*.py'",
             auto_stage_order="plan,dev,verify,fix",
@@ -187,7 +188,8 @@ class LoopDispatchAdapter:
             loop_evaluator="strict",
             loop_human_checkpoint_every=5,
             loop_max_iterations=50,
-            loop_max_tokens=500000,
+            # loop_max_tokens=0 表示不限制（与 LoopConfig/AutonomousConfig 对齐）
+            loop_max_tokens=0,
             loop_sampling_read_ratio=0.1,
             loop_stop_when="",
         )

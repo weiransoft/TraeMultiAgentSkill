@@ -43,7 +43,7 @@ class LoopConfig:
 
     字段说明：
     - max_iterations: 硬上限
-    - max_tokens: token 预算
+    - max_tokens: token 预算（0=不限制，默认）
     - stop_when: 自然语言停止条件
     - stage_order: 阶段顺序
     - backoff_base_sec: 失败退避基数
@@ -55,7 +55,8 @@ class LoopConfig:
     """
 
     max_iterations: int = 50
-    max_tokens: int = 500_000
+    # max_tokens=0 表示不限制（默认）；正整数表示显式预算上限。
+    max_tokens: int = 0
     stop_when: str = ""
     stage_order: List[StageKind] = field(
         default_factory=lambda: [StageKind.PLAN, StageKind.DEV, StageKind.VERIFY, StageKind.FIX]
@@ -404,8 +405,8 @@ class RalphLoopController:
         # 1. max_iterations
         if self._run_state.state.iter_index >= self._config.max_iterations:
             return True
-        # 2. max_tokens
-        if self._run_state.state.cumulative_tokens >= self._config.max_tokens:
+        # 2. max_tokens（0 表示不限制）
+        if self._config.max_tokens > 0 and self._run_state.state.cumulative_tokens >= self._config.max_tokens:
             return True
         # 3. stop_when（已通过 _is_stop_when_matched 判断）
         # 4. RunState.status
