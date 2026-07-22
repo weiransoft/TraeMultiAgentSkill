@@ -11,10 +11,10 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 > **能力实现方式说明（v2.7.1 诚实标注）**：
 > - **提示词层 AI（宿主 LLM 完成）**：任务语义理解、角色智能匹配、多角色共识决策、架构设计审查——由 Trae/Claude 宿主大模型直接执行，脚本仅提供候选清单与规则约束。
 > - **脚本层确定性工具（Python 实现）**：代码地图扫描、UI/UX 巡检、视觉回归对比、决策梯合规检查、TFIDF/Hashing 文本相似度——为无 LLM 的独立进程，提供可复现的确定性结果。
-> - **降级模式说明**：当脚本层需要语义相似度但无网络/模型时，自动降级到 TFIDF/Hashing 本地算法；SubAgent 调用在 Claude Code 侧为模拟适配（`fallback_mode: simulation`），真实并行子代理由宿主 Task 机制实现。
+> - **降级模式说明**：当脚本层需要语义相似度但无网络/模型时，自动降级到 TFIDF/Hashing 本地算法；SubAgent 调用在无真实 claude 命令时返回错误（`fallback_mode: error`），真实并行子代理由宿主 Task 机制实现。
 
 **v2.7.1 修订（AI 诚实化 + 代码清算 + 双宿主同步）**:
-- 🤥→✅ AI 诚实降级：`ai_assistant.py` / `ai_semantic_matcher.py` 移除全部模拟响应，无 AI 客户端时明确抛错并降级到确定性匹配，不再伪装 AI 输出
+- 🤥→✅ AI 诚实降级：`ai_assistant.py` / `ai_semantic_matcher.py` 移除全部模拟响应，无 AI 客户端时明确抛错并降级到确定性匹配，不再伪装 AI 输出；`claude_code_subagent_adapter.py` 移除 `_simulate_subagent_call`，无真实 subagent 时返回 `success=False`
 - 🔢 真实语义匹配：`role_matcher.py` 从关键词重叠升级为本地 embedder（TFIDF/Hashing）向量余弦相似度
 - 🛡️ embedder 三级降级链：`goal_orchestrator.py` SentenceTransformer → TFIDF → Hashing，无网络/无模型时自动降级
 - 🎭 Claude Code 真实 SubAgent：`.claude/agents/` 新增 5 角色定义文件，替代脚本模拟
@@ -134,21 +134,51 @@ AI (English): "📋 Task received, starting analysis..."
 10. **八阶段标准工作流程**: 需求分析→架构设计→UI设计→测试设计→任务分解→开发实现→测试验证→文档对照代码审查
 11. **UI 设计**: 创建独特、生产级的 UI 界面，避免通用的 AI "slop" 美学
 
+## 核心入口与门面（v2.8.3 确认）
+
+> **架构收敛**：facade.py 是统一调度门面，所有外部调用入口最终都汇聚到 facade。
+
+### 入口层次（从外到内）
+
+| 入口 | 状态 | 用途 |
+|------|------|------|
+| `scripts/trae_agent_dispatch.py` | ⚠️ v2.8.3 起弃用（DeprecationWarning） | v1 兼容入口，仅向后保留 |
+| `scripts/trae_agent_dispatch_v2.py` | ✅ 推荐 CLI 入口 | V3 薄壳（< 50 行），委托给 facade.main_compat |
+| `scripts/facade.py` | ✅ 统一门面（Python 入口） | re-export 11 个旧符号 + main_compat + hot reload watcher |
+| `scripts/dispatch/legacy.py` | 内部实现层 | 5 个 dispatch 函数 + 助手（god module 搬迁产物） |
+| `scripts/dispatcher/goal_dispatcher.py` | 内部 V3 dispatcher | 插件化调度核心 |
+
+### Python 集成推荐
+
+```python
+# 推荐：直接从 facade 导入
+from facade import main_compat, dispatch_agent_v2, log
+
+# 或从薄壳导入（同样可用，会 re-export 自 facade）
+from trae_agent_dispatch_v2 import main_compat, dispatch_agent_v2
+```
+
+### 绝对禁止
+
+❌ 业务代码直接 import `dispatch.legacy`（内部实现层，可能被重构）
+❌ 业务代码直接 import `dispatcher.goal_dispatcher`（内部实现层）
+❌ 新代码使用 `trae_agent_dispatch.py`（v1 已弃用）
+
 ## 快速开始
 
 ### 基础使用
 ```bash
 # 自动调度（推荐）
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "设计系统架构"
 
 # 指定角色
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "实现功能" \
     --agent solo_coder
 
 # 多角色共识
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "启动新项目" \
     --consensus true
 ```
@@ -156,7 +186,7 @@ python3 scripts/trae_agent_dispatch.py \
 ### 完整项目流程
 ```bash
 # 启动完整项目（自动执行 7 个阶段）
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "启动项目：安全浏览器广告拦截功能" \
     --project-full-lifecycle
 ```
@@ -164,20 +194,20 @@ python3 scripts/trae_agent_dispatch.py \
 ### AI 增强模式 (v2.1 新增)
 ```bash
 # 使用 AI 语义匹配（默认）
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "设计微服务架构，支持高并发和弹性扩展" \
     --agent auto  # AI 会自动匹配最合适的角色
 
 # 查看 AI 匹配结果和解释
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "实现用户认证和权限管理" \
     --agent auto \
     --explain  # 显示 AI 匹配原因和置信度
 
 # 使用传统关键词匹配（向后兼容）
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "编写单元测试" \
-    --agent test_expert \
+    --agent test-expert \
     --match-strategy keyword
 ```
 
@@ -186,6 +216,27 @@ python3 scripts/trae_agent_dispatch.py \
 > **宿主 LLM 调度指令（提示词层，Trae/Claude 主 Agent 必读）**：
 > 以下匹配决策与拓扑路由由你（宿主大模型）直接执行，脚本层仅提供确定性工具。
 > 不要调用 `ai_semantic_matcher.py` 的模拟路径——它已在 v2.7.0 改造为诚实降级。
+
+### 任务规模分级门禁（v2.8.2 — 第一道路由）
+
+> **Karpathy Simplicity First 的前置执行**：在角色匹配之前，先判断任务规模，避免杀鸡用牛刀。
+
+接到任务后，**首先**按以下信号评估任务规模，选择执行路径：
+
+| 档位 | 判定信号 | 执行路径 | 禁止行为 |
+|------|---------|---------|---------|
+| **S（分钟级）** | 单文件修改、问答、小修复、单函数重构 | 直接派单角色执行，完成后验证 | ❌ 禁止启动工作流/循环/共识/代码地图 |
+| **M（小时级）** | 单功能开发、Bug 修复+验证、模块重构 | 三阶段迷你流：设计要点 → 开发 → 测试验证 | ❌ 禁止启动八阶段流程/autonomous 模式 |
+| **L（天级）** | 新项目、跨模块改造、架构迁移、用户明确要求完整流程 | 完整八阶段 Loop（WorkflowLoopController） | — |
+
+**判定信号清单**（按顺序检查，停在第一个满足的）：
+1. 用户明确要求完整流程 / 启动项目 → **L**
+2. 涉及 ≥ 3 个模块或 ≥ 5 个文件 → **L**
+3. 涉及 2 个模块或 3-4 个文件 → **M**
+4. 涉及 1 个文件或纯问答 → **S**
+5. 不确定 → 默认 **M**（宁可多验证，不可遗漏）
+
+**与拓扑路由的关系**：S/M/L 分级是第一道路由（决定流程规模），角色匹配是第二道路由（决定谁来执行），拓扑路由是第三道路由（决定执行模式）。
 
 ### 角色智能匹配规则（宿主 LLM 执行）
 
@@ -274,27 +325,27 @@ ai_integration:
 ### 1. 架构师 (Architect)
 **职责**: 设计系统性、前瞻性、可落地、可验证的架构
 **触发关键词**: 架构、设计、选型、审查、性能、瓶颈、模块、接口、部署
-**详细 prompt**: `docs/roles/architect/prompt.md`
+**详细 prompt**: `docs/roles/architect/ARCHITECTURE_DESIGN_TEMPLATE.md`
 
 ### 2. 产品经理 (Product Manager)
 **职责**: 定义用户价值清晰、需求明确、可落地、可验收的产品
 **触发关键词**: 需求、产品、PRD、用户故事、验收标准、竞品分析
-**详细 prompt**: `docs/roles/product-manager/prompt.md`
+**详细 prompt**: `docs/roles/product-manager/PRD_TEMPLATE.md`
 
 ### 3. 测试专家 (Test Expert)
 **职责**: 确保全面、深入、自动化、可量化的质量保障
 **触发关键词**: 测试、质量、验收、自动化、性能测试、缺陷、评审、门禁
-**详细 prompt**: `docs/roles/test-expert/prompt.md`
+**详细 prompt**: `docs/roles/test-expert/TEST_PLAN_TEMPLATE.md`
 
 ### 4. 独立开发者 (Solo Coder)
 **职责**: 编写完整、高质量、可维护、可测试的代码
 **触发关键词**: 实现、开发、代码、修复、优化、重构、单元测试、文档
-**详细 prompt**: `docs/roles/solo-coder/prompt.md`
+**详细 prompt**: `docs/roles/solo-coder/DEVELOPMENT_TEMPLATE.md`
 
 ### 5. UI 设计师 (UI Designer)
 **职责**: 创建独特、生产级的 UI 界面，具有高设计质量，避免通用的 AI "slop" 美学
 **触发关键词**: UI设计、界面设计、前端设计、视觉设计、UI/UX、UI原型、界面美化、UI优化、UI重构
-**详细 prompt**: `docs/roles/ui-designer/prompt.md`
+**详细 prompt**: `docs/roles/ui-designer/UI_DESIGNER_PROMPT.md`
 
 ## 八阶段标准工作流程（v2.8 新增阶段 8：文档对照代码审查）
 
@@ -575,7 +626,7 @@ bash scripts/tests/scripts/run_ponytail_tests.sh
 
 **17 个 CLI flag**:
 ```bash
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --auto-mode \
     --auto-goal "实现用户登录功能" \
     --auto-max-iterations 10 \
@@ -595,8 +646,9 @@ python3 scripts/trae_agent_dispatch.py \
 
 > **来源**: Anthropic Multi-Agent Research + 项目实践
 > **目的**: 根据任务特征自动选择最优工作流模式
+> **v2.8.3 更新**: 6 大模式作为提示词层概念保留，由宿主 LLM 执行路由决策。脚本层 12 个实现模块（`scripts/dynamic_workflow/`）已全部归档——零外部引用，确认为死代码。仅保留 `semantic_embedder.py`（移至 `scripts/` 根目录）提供 TFIDF/Hashing 确定性相似度。
 
-**6 大模式**:
+**6 大模式**（宿主 LLM 执行）:
 | 模式 | 适用场景 | 执行方式 |
 |------|---------|---------|
 | classifier-dispatch | 任务分类后分发 | 分类器 → 角色分发 |
@@ -606,36 +658,20 @@ python3 scripts/trae_agent_dispatch.py \
 | tournament | 锦标赛选择 | 多方案竞争 → 最优胜出 |
 | loop-until-done | 循环直到完成 | 迭代直到成功标准满足 |
 
-**12 个实现模块**（`scripts/dynamic_workflow/`）:
-- `pattern_composer.py` — 模式组合器
-- `pattern_executor.py` — 模式执行器
-- `pattern_tier_resolver.py` — 模式层级解析器
-- `subagent_sandbox.py` — Subagent 沙箱
-- `model_router.py` — 模型路由器
-- `token_budget_guard.py` — Token 预算守护
-- `semantic_embedder.py` — 语义嵌入器（TFIDF/Hashing/SentenceTransformer）
-- `skill_injector.py` — Skill 注入器
-- `interruption_recovery.py` — 中断恢复
-- `workflow_step_adapter.py` — 工作流步骤适配器
-- `worktree_manager.py` — Worktree 管理器
-- `guard.py` — 守护组件
-
 详细方案见 `docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md`。
 
 ### Cybernetics 工程控制论（v2.5 — 三环控制模型）
 
 > **来源**: 钱学森工程控制论 + ICLR 2026 Profile-Aware Maneuvering
 > **目的**: 通过反馈控制环实现自适应执行
+> **v2.8.3 更新**: 4 个低耦合文件已归档（cybernetics_integration / cybernetics_bridge / hierarchical_control / context_fingerprint_integration）。3 个高耦合核心组件保留。
 
-**6 个核心组件**（`scripts/` 根目录）:
-| 组件 | 功能 |
-|------|------|
-| `feedback_control_loop.py` | 反馈控制环（感知-决策-执行-反馈） |
-| `performance_fingerprint.py` | 性能画像（执行案例记录 + 相似案例检索） |
-| `guard_coordinator.py` | 守护协调器（执行前验证 + 异常检测） |
-| `hierarchical_control.py` | 分层控制（战略层/战术层/执行层） |
-| `cybernetics_integration.py` | Cybernetics 集成入口 |
-| `context_fingerprint_integration.py` | 上下文画像集成 |
+**保留的核心组件**（`scripts/` 根目录）:
+| 组件 | 功能 | 引用数 |
+|------|------|--------|
+| `performance_fingerprint.py` | 性能画像（执行案例记录 + 相似案例检索） | 23 |
+| `feedback_control_loop.py` | 反馈控制环（感知-决策-执行-反馈） | 11 |
+| `guard_coordinator.py` | 守护协调器（执行前验证 + 异常检测） | 5 |
 
 **三环控制模型**:
 - **战略层**: 长期目标 + 资源规划
@@ -779,7 +815,7 @@ docs/
 ### 角色识别错误
 ```bash
 # 明确指定角色
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "..." \
     --agent architect
 ```
@@ -787,7 +823,7 @@ python3 scripts/trae_agent_dispatch.py \
 ### 共识未触发
 ```bash
 # 显式要求共识
-python3 scripts/trae_agent_dispatch.py \
+python3 scripts/trae_agent_dispatch_v2.py \
     --task "..." \
     --consensus true
 ```

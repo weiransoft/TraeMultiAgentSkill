@@ -28,7 +28,7 @@ except ImportError:
 
 # 导入本地确定性 embedder（TFIDF/Hashing，无网络依赖）
 try:
-    from dynamic_workflow.semantic_embedder import TFIDFEmbedder, HashingEmbedder
+    from semantic_embedder import TFIDFEmbedder, HashingEmbedder
     EMBEDDER_AVAILABLE = True
 except ImportError:
     EMBEDDER_AVAILABLE = False
@@ -851,8 +851,8 @@ def create_default_roles() -> List[RoleDefinition]:
         ),
         
         RoleDefinition(
-            role_id="tester",
-            name="测试工程师",
+            role_id="test-expert",
+            name="测试专家",
             description="负责测试用例设计和执行",
             capabilities=[
                 "测试用例设计",
@@ -893,27 +893,6 @@ def create_default_roles() -> List[RoleDefinition]:
             priority=6
         ),
         
-        RoleDefinition(
-            role_id="devops",
-            name="DevOps 工程师",
-            description="负责部署和运维",
-            capabilities=[
-                "持续集成",
-                "持续部署",
-                "监控告警",
-                "性能调优",
-                "安全管理"
-            ],
-            skills=[
-                "Docker",
-                "Kubernetes",
-                "CI/CD",
-                "Linux",
-                "监控工具"
-            ],
-            keywords=["部署", "运维", "CI/CD", "监控", "容器"],
-            priority=5
-        )
     ]
 
 

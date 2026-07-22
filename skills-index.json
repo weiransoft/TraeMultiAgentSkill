@@ -1,7 +1,7 @@
 {
-  "version": "2.8.1",
+  "version": "2.8.3",
   "name": "multi-agent-team",
-  "description": "多角色智能体调度器 - 基于任务类型自动调度到架构师、产品经理、测试专家、Solo Coder 或 UI 设计师。支持 Karpathy 四大核心原则、Ponytail 决策梯（少写多余代码）、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、跨平台 Agent 适配、多角色代码走读、3D 代码地图可视化。v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略）。",
+  "description": "多角色智能体调度器 - 基于任务类型自动调度到架构师、产品经理、测试专家、Solo Coder 或 UI 设计师。支持 Karpathy 四大核心原则、Ponytail 决策梯（少写多余代码）、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、跨平台 Agent 适配、多角色代码走读、3D 代码地图可视化。v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本。",
   "author": "Claw Team",
   "license": "MIT",
   "enabled": true,
@@ -40,13 +40,7 @@
     "可访问性",
     "A11y",
     "Claude Code",
-    "跨平台",
-    "八阶段工作流",
-    "文档对照审查",
-    "WorkflowLoop",
-    "回退策略",
-    "RollbackStrategy",
-    "D1-D6 检查"
+    "跨平台"
   ],
   "triggers": {
     "automatic": {
@@ -71,10 +65,7 @@
         "前端设计",
         "Karpathy",
         "代码走读",
-        "原则检查",
-        "文档对照",
-        "八阶段.*审查",
-        "WorkflowLoop"
+        "原则检查"
       ]
     },
     "manual": {
@@ -285,14 +276,6 @@
     "visualRegression": {
       "enabled": true,
       "description": "视觉回归与显示完整性（v2.7）：scripts/visual_regression.py 3 大检测维度（像素级 Diff + SSIM/数据显示不全/显示错误），PIL ImageChops + Playwright DOM 检查，YAGNI 失败安全"
-    },
-    "docCodeReview": {
-      "enabled": true,
-      "description": "文档对照代码审查（v2.8）：scripts/doc_code_consistency_checker.py 六大维度检查（D1 功能完成度/D2 集成完整性/D3 测试正确性/D4 验收标准/D5 TODO-FIXME 清零/D6 文档意图遵从），支持 PRD/架构/SPEC/测试计划 Markdown 表格解析 + 多语言代码扫描（Python/JS/TS/Java/Go/Rust）"
-    },
-    "workflowLoop": {
-      "enabled": true,
-      "description": "八阶段整体构建为一个 Loop（v2.8.1）：scripts/workflow_loop_controller.py（WorkflowLoopController + RollbackStrategy）+ scripts/run_workflow_loop.py CLI 入口。审查失败 → 根据缺口维度精准回退到对应阶段（D1/D2/D4/D5/D6→DEVELOPMENT，D3→TEST_VERIFICATION），最大迭代次数 3 次硬上限，累计上下文跨迭代传递"
     }
   },
   "dependencies": {

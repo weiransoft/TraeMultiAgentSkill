@@ -112,9 +112,8 @@ class ClaudeCodeSubAgentAdapter:
                     'platform': 'claude_code_subprocess'
                 }
             
-            # 方案 2: 使用 Python 模拟 subagent 调用
-            # 这是降级方案，当 claude 命令不可用时使用
-            return self._simulate_subagent_call(agent_type, task, context)
+            # 方案 2: 无可用 subagent 命令时返回错误（v2.8.1 诚实化：不再模拟）
+            return self._fallback_no_subagent(agent_type, task, context)
             
         except subprocess.TimeoutExpired:
             return {
@@ -198,8 +197,8 @@ class ClaudeCodeSubAgentAdapter:
         
         当无法检测平台时使用
         """
-        # 尝试使用 Python 脚本调用
-        return self._simulate_subagent_call(agent_type, task, context)
+        # 无平台检测到时返回错误（v2.8.1 诚实化：不再模拟）
+        return self._fallback_no_subagent(agent_type, task, context)
     
     def _build_agent_prompt(self, agent_type: str, task: str,
                            context: Optional[Dict] = None) -> str:
@@ -297,7 +296,7 @@ class ClaudeCodeSubAgentAdapter:
 - SMART 验收标准：具体、可衡量、可实现
 - 竞品分析规则：至少 5 个竞品对比''',
             
-            'tester': '''你是一位资深测试专家，职责是确保全面、深入、自动化、可量化的质量保障。
+            'test-expert': '''你是一位资深测试专家，职责是确保全面、深入、自动化、可量化的质量保障。
 
 核心原则：
 - 测试金字塔：70% 单元 +20% 集成 +10%E2E
@@ -348,40 +347,40 @@ class ClaudeCodeSubAgentAdapter:
         
         return None
     
-    def _simulate_subagent_call(self, agent_type: str, task: str,
+    def _fallback_no_subagent(self, agent_type: str, task: str,
                                context: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        模拟 subagent 调用
-        
-        这是降级方案，当无法调用真实 subagent 时使用
-        
+        无可用 subagent 时的降级处理（v2.8.1 诚实化改造）
+
+        当 claude 命令不可用或平台无法识别时，将提示词写入文件供手动处理，
+        但返回 success=False，不再伪装成功。
+
         Args:
             agent_type: agent 类型
             task: 任务
             context: 上下文
-            
+
         Returns:
-            Dict: 模拟结果
+            Dict: 降级结果（success=False）
         """
-        # 构建提示词
+        # 构建提示词，写入文件供用户手动处理
         prompt = self._build_agent_prompt(agent_type, task, context)
-        
-        # 输出到文件，供用户手动处理
+
         output_file = self.skill_root / 'logs' / f'subagent_call_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
         output_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(f"# Subagent Call Simulation\n")
+            f.write(f"# Subagent Call Fallback (no real subagent available)\n")
             f.write(f"# Platform: {self.platform}\n")
             f.write(f"# Agent Type: {agent_type}\n")
             f.write(f"# Timestamp: {datetime.now().isoformat()}\n\n")
             f.write(prompt)
-        
+
         return {
-            'success': True,
-            'output': f'Subagent 调用已保存到：{output_file}\n\n由于当前环境不支持直接调用 subagent，请手动处理该文件。',
+            'success': False,
+            'error': f'当前环境无可用 subagent（platform={self.platform}）。提示词已保存到：{output_file}，请手动处理或通过宿主 LLM Task 机制执行。',
             'prompt_file': str(output_file),
-            'platform': 'simulation'
+            'platform': 'none'
         }
 
 

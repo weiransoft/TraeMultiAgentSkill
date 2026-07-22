@@ -10,12 +10,8 @@ Semantic Embedder 单元测试（Phase 6：升级 generate-filter 真实语义�
 - SentenceTransformerEmbedder 优雅降级（未安装时抛 ImportError）
 - EmbeddingCache LRU 命中/未命中
 - create_embedder 工厂函数（auto / tfidf / hashing / sentence_transformer）
-- _fuzzy_similarity 接受 embedder 参数
-- _dedup_candidates 接受 embedder 参数
-- GenerateFilterExecutor 接受 embedder 配置
 - 跨语言文本相似度
 - 边界场景（空文本 / 长文本 / 重复调用）
-- 性能（候选数 100 时延 < 1s）
 
 Phase 7 新增（真实 embedding 集成）：
 - 加载 paraphrase-multilingual-MiniLM-L12-v2 多语言模型
@@ -50,11 +46,6 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-# 动态加载 semantic_embedder
-DYNAMIC_WORKFLOW_DIR = SCRIPTS_DIR / "dynamic_workflow"
-if str(DYNAMIC_WORKFLOW_DIR) not in sys.path:
-    sys.path.insert(0, str(DYNAMIC_WORKFLOW_DIR))
-
 import semantic_embedder  # noqa: E402
 from semantic_embedder import (  # noqa: E402
     Embedder,
@@ -64,11 +55,6 @@ from semantic_embedder import (  # noqa: E402
     create_embedder,
     get_default_embedder,
 )
-from pattern_executor import (  # noqa: E402
-    _dedup_candidates,
-    _fuzzy_similarity,
-    _normalize_for_dedup,
-)
 
 
 # ============================================================================
@@ -76,14 +62,7 @@ from pattern_executor import (  # noqa: E402
 # ============================================================================
 
 class TestHelperFunctions(unittest.TestCase):
-    """测试工具函数：_tokenize, _cosine_similarity, _normalize_for_dedup"""
-
-    def test_01_normalize_basic(self):
-        """_normalize_for_dedup 基本归一化"""
-        self.assertEqual(_normalize_for_dedup("Hello World"), "helloworld")
-        self.assertEqual(_normalize_for_dedup("  多   个   空格  "), "多个空格")
-        self.assertEqual(_normalize_for_dedup(""), "")
-        self.assertEqual(_normalize_for_dedup(None), "")
+    """测试工具函数：_tokenize, _cosine_similarity"""
 
     def test_02_tokenize_english(self):
         """_tokenize 英文分词"""
@@ -475,263 +454,6 @@ class TestFactoryFunctions(unittest.TestCase):
 
 
 # ============================================================================
-# 7. _fuzzy_similarity 集成 embedder 测试
-# ============================================================================
-
-class TestFuzzySimilarityWithEmbedder(unittest.TestCase):
-    """测试 _fuzzy_similarity 接受 embedder 参数"""
-
-    def setUp(self):
-        import semantic_embedder
-        self.embedder = TFIDFEmbedder(corpus=[
-            "the quick brown fox",
-            "the quick brown dog",
-            "hello world",
-        ])
-
-    def test_01_no_embedder_uses_lcs(self):
-        """无 embedder：使用 LCS"""
-        # 两个相似但不同文本，LCS 应能识别
-        sim = _fuzzy_similarity(
-            "the quick brown fox",
-            "the quick brown dog"
-        )
-        # LCS 相似度 > 0
-        self.assertGreater(sim, 0.5)
-
-    def test_02_with_embedder_uses_semantic(self):
-        """有 embedder：使用 embedder.similarity"""
-        # 使用 mock embedder 验证调用
-        mock_embedder = MagicMock()
-        mock_embedder.similarity = MagicMock(return_value=0.92)
-        sim = _fuzzy_similarity("a", "b", embedder=mock_embedder)
-        self.assertEqual(sim, 0.92)
-        mock_embedder.similarity.assert_called_once_with("a", "b")
-
-    def test_03_embedder_fails_falls_back_to_lcs(self):
-        """embedder.similarity 抛错时 fallback 到 LCS"""
-        mock_embedder = MagicMock()
-        mock_embedder.similarity = MagicMock(side_effect=RuntimeError("fail"))
-        sim = _fuzzy_similarity("hello world", "hello", embedder=mock_embedder)
-        # 应 fallback 到 LCS，不抛错
-        self.assertGreaterEqual(sim, 0.0)
-        self.assertLessEqual(sim, 1.0)
-
-    def test_04_identical_texts_with_embedder(self):
-        """相同文本：返回 1.0（不调用 embedder）"""
-        mock_embedder = MagicMock()
-        sim = _fuzzy_similarity("same", "same", embedder=mock_embedder)
-        self.assertEqual(sim, 1.0)
-        mock_embedder.similarity.assert_not_called()
-
-    def test_05_empty_text_returns_zero(self):
-        """空文本返回 0.0"""
-        self.assertEqual(_fuzzy_similarity("", "text"), 0.0)
-        self.assertEqual(_fuzzy_similarity("text", ""), 0.0)
-        self.assertEqual(_fuzzy_similarity("", "", embedder=self.embedder), 0.0)
-
-
-# ============================================================================
-# 8. _dedup_candidates 集成 embedder 测试
-# ============================================================================
-
-class TestDedupCandidatesWithEmbedder(unittest.TestCase):
-    """测试 _dedup_candidates 接受 embedder 参数"""
-
-    def setUp(self):
-        import semantic_embedder
-        self.embedder = TFIDFEmbedder(corpus=[
-            "the quick brown fox",
-            "the quick brown dog",
-            "completely different text",
-            "another unrelated sentence",
-        ])
-
-    def test_01_exact_strategy_no_embedder(self):
-        """exact 策略：不使用 embedder"""
-        candidates = ["hello", "Hello", "world"]
-        result = _dedup_candidates(candidates, strategy="exact")
-        self.assertEqual(len(result), 2)
-
-    def test_02_fuzzy_strategy_uses_lcs(self):
-        """fuzzy 策略：使用 LCS"""
-        candidates = [
-            "the quick brown fox",
-            "the quick brown dog",  # 相似
-            "completely different text",
-        ]
-        result = _dedup_candidates(
-            candidates, strategy="fuzzy", threshold=0.5
-        )
-        # 第一个和第二个 LCS 相似度 > 0.5 → 去重
-        self.assertEqual(len(result), 2)
-
-    def test_03_semantic_strategy_uses_embedder(self):
-        """semantic 策略：使用 embedder"""
-        candidates = [
-            "the quick brown fox",
-            "the quick brown dog",  # TFIDF 视作相似
-            "completely different text",
-        ]
-        result = _dedup_candidates(
-            candidates,
-            strategy="semantic",
-            threshold=0.5,
-            embedder=self.embedder,
-        )
-        # 第一个和第二个 TFIDF 相似度 > 0.5 → 去重
-        self.assertEqual(len(result), 2)
-
-    def test_04_semantic_strategy_without_embedder_falls_back(self):
-        """semantic 策略无 embedder：fallback 到 fuzzy"""
-        candidates = [
-            "the quick brown fox",
-            "the quick brown dog",
-            "completely different text",
-        ]
-        result = _dedup_candidates(
-            candidates, strategy="semantic", threshold=0.5
-        )
-        # 行为与 fuzzy 相同
-        self.assertEqual(len(result), 2)
-
-    def test_05_semantic_embedder_fails_falls_back(self):
-        """semantic + embedder 抛错：fallback 到 fuzzy"""
-        mock_embedder = MagicMock()
-        mock_embedder.similarity = MagicMock(side_effect=RuntimeError("fail"))
-        candidates = ["hello", "hello world", "different"]
-        # 不应抛错
-        result = _dedup_candidates(
-            candidates, strategy="semantic", embedder=mock_embedder
-        )
-        self.assertGreater(len(result), 0)
-
-    def test_06_unknown_strategy_falls_back_to_exact(self):
-        """未知策略 fallback 到 exact"""
-        candidates = ["hello", "Hello", "world"]
-        result = _dedup_candidates(candidates, strategy="unknown_xyz")
-        self.assertEqual(len(result), 2)
-
-    def test_07_threshold_affects_dedup(self):
-        """threshold 影响去重结果"""
-        candidates = [
-            "the quick brown fox",
-            "the quick brown dog",
-        ]
-        # 阈值 0.99 → 不去重
-        result_high = _dedup_candidates(
-            candidates, strategy="fuzzy", threshold=0.99
-        )
-        # 阈值 0.0 → 全部去重（极端）
-        result_low = _dedup_candidates(
-            candidates, strategy="fuzzy", threshold=0.0
-        )
-        # 实际：阈值 0.0 → 所有相似度都 >= 0.0 → 全部视为重复
-        self.assertEqual(len(result_low), 1)
-
-
-# ============================================================================
-# 9. GenerateFilterExecutor 集成 embedder 测试
-# ============================================================================
-
-class TestGenerateFilterExecutorEmbedder(unittest.TestCase):
-    """测试 GenerateFilterExecutor 接受 embedder 配置"""
-
-    def setUp(self):
-        # Mock dispatch_agent_v2
-        import pattern_executor
-        from performance_fingerprint import PerformanceFingerprint
-        import tempfile
-        self._dispatch_patcher = patch.object(
-            pattern_executor, "dispatch_agent_v2", lambda *a, **k: True
-        )
-        self._dispatch_patcher.start()
-        self.tmp = tempfile.mkdtemp()
-        self.fp = PerformanceFingerprint(
-            agent_id="test_gf_emb", storage_path=self.tmp
-        )
-
-    def tearDown(self):
-        self._dispatch_patcher.stop()
-        import shutil
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-    def test_01_executor_accepts_embedder_dict(self):
-        """GenerateFilterExecutor 接受 embedder 配置"""
-        from pattern_executor import GenerateFilterExecutor
-        executor = GenerateFilterExecutor(fingerprint=self.fp)
-        # 不应抛错
-        embedder = executor._resolve_embedder(
-            dedup_strategy="semantic",
-            parameters={"embedder": {"type": "tfidf"}},
-        )
-        self.assertIsNotNone(embedder)
-        from semantic_embedder import TFIDFEmbedder
-        self.assertIsInstance(embedder, TFIDFEmbedder)
-
-    def test_02_executor_accepts_embedder_instance(self):
-        """GenerateFilterExecutor 接受 Embedder 实例"""
-        from pattern_executor import GenerateFilterExecutor
-        from semantic_embedder import TFIDFEmbedder
-        executor = GenerateFilterExecutor(fingerprint=self.fp)
-        user_embedder = TFIDFEmbedder(corpus=["a", "b"])
-        embedder = executor._resolve_embedder(
-            dedup_strategy="semantic",
-            parameters={"embedder": user_embedder},
-        )
-        # 应直接返回用户注入的实例
-        self.assertIs(embedder, user_embedder)
-
-    def test_03_non_semantic_strategy_no_embedder(self):
-        """非 semantic 策略：不解析 embedder"""
-        from pattern_executor import GenerateFilterExecutor
-        executor = GenerateFilterExecutor(fingerprint=self.fp)
-        embedder = executor._resolve_embedder(
-            dedup_strategy="fuzzy",
-            parameters={"embedder": {"type": "tfidf"}},  # 即使配置了也不用
-        )
-        self.assertIsNone(embedder)
-
-    def test_04_no_embedder_config_returns_none(self):
-        """未配置 embedder：返回 None（fallback 到 fuzzy）"""
-        from pattern_executor import GenerateFilterExecutor
-        executor = GenerateFilterExecutor(fingerprint=self.fp)
-        embedder = executor._resolve_embedder(
-            dedup_strategy="semantic", parameters={}
-        )
-        self.assertIsNone(embedder)
-
-    def test_05_invalid_embedder_config_falls_back(self):
-        """无效 embedder 配置：fallback 到 None"""
-        from pattern_executor import GenerateFilterExecutor
-        executor = GenerateFilterExecutor(fingerprint=self.fp)
-        # 无效类型
-        embedder = executor._resolve_embedder(
-            dedup_strategy="semantic",
-            parameters={"embedder": {"type": "unknown_xyz"}},
-        )
-        # fallback 到 None
-        self.assertIsNone(embedder)
-
-    def test_06_execute_with_tfidf_embedder(self):
-        """端到端：semantic 策略 + TFIDFEmbedder"""
-        from pattern_executor import GenerateFilterExecutor
-        executor = GenerateFilterExecutor(fingerprint=self.fp)
-        task = {"description": "test", "filter_criteria": ["c1"]}
-        # semantic 策略 + TFIDF embedder
-        result = executor.execute(
-            task,
-            parameters={
-                "generator_count": 3,
-                "dedup_strategy": "semantic",
-                "embedder": {"type": "tfidf"},
-            },
-        )
-        # 不应抛错
-        self.assertIsNotNone(result)
-
-
-# ============================================================================
 # 10. 性能与边界测试
 # ============================================================================
 
@@ -743,18 +465,6 @@ class TestPerformanceAndEdgeCases(unittest.TestCase):
         self.embedder = TFIDFEmbedder(corpus=[
             f"text variant {i}" for i in range(50)
         ])
-
-    def test_01_performance_100_candidates(self):
-        """性能：100 候选 < 1s"""
-        candidates = [f"text variant {i % 10}" for i in range(100)]
-        start = time.perf_counter()
-        result = _dedup_candidates(
-            candidates, strategy="semantic", embedder=self.embedder
-        )
-        elapsed = time.perf_counter() - start
-        self.assertLess(elapsed, 1.0)  # < 1 秒
-        # 去重后候选数应 <= 10（10 个 unique）
-        self.assertLessEqual(len(result), 10)
 
     def test_02_hashing_embedder_large_corpus(self):
         """HashingEmbedder 处理大语料库"""
@@ -1043,33 +753,6 @@ class TestRealSentenceTransformerEmbedding(unittest.TestCase):
             real_sim - tfidf_sim, 0.5,
             f"真实模型应显著优于 TFIDF: real={real_sim:.4f}, "
             f"tfidf={tfidf_sim:.4f}"
-        )
-
-    def test_16_embedder_with_real_model_in_dedup(self):
-        """真实模型在 _dedup_candidates 场景下的语义去重"""
-        from pattern_executor import _dedup_candidates
-        candidates = [
-            "I love programming",      # 0
-            "I enjoy coding",          # 1 = paraphrase of 0
-            "the weather is nice",     # 2
-            "today is sunny",          # 3 = paraphrase of 2
-            "completely unrelated",    # 4
-        ]
-        # 真实模型在阈值 0.6 下应能识别 paraphrase
-        result = _dedup_candidates(
-            candidates,
-            strategy="semantic",
-            threshold=0.5,
-            embedder=self.embedder,
-        )
-        # 期望去重后约 3 个
-        self.assertLessEqual(
-            len(result), 4,
-            f"去重过多: {len(result)} / {len(candidates)}"
-        )
-        self.assertGreaterEqual(
-            len(result), 2,
-            f"去重过少: {len(result)} / {len(candidates)}"
         )
 
     def test_17_real_embedder_cache_hit_rate(self):

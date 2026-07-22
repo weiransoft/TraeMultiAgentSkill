@@ -1,5 +1,5 @@
 name: multi-agent-team
-version: 2.7.0
+version: 2.8.3
 description: |
   Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归）
   
@@ -27,14 +27,14 @@ description: |
 author: Trae Team
 status: active
 ai_enhanced: true
-# v2.7.0 诚实标注：AI 能力分层说明
+# v2.8.1 诚实标注：AI 能力分层说明
 # - 提示词层 AI：由宿主 LLM（Trae/Claude）直接执行语义理解、角色匹配、共识决策
 # - 脚本层确定性：Python 工具提供代码扫描、UI 检测、视觉回归、TFIDF/Hashing 相似度
-# - 降级模式：无网络/模型时脚本自动降级到本地算法；Claude Code SubAgent 为模拟适配
+# - 降级模式：无网络/模型时脚本自动降级到本地算法；Claude Code SubAgent 无真实命令时返回错误
 ai_capability_note: |
   本技能的"AI 智能"由宿主大模型在提示词层完成，脚本层仅提供确定性工具。
   角色匹配的语义理解依赖宿主 LLM；脚本中的 TFIDF/Hashing 为本地降级实现。
-  Claude Code 侧 SubAgent 调用为模拟模式（fallback_mode: simulation），
+  Claude Code 侧 SubAgent 调用在无真实命令时返回错误（fallback_mode: error），
   真实并行子代理由宿主 Task 机制实现。
 ai_capabilities:
   semantic_matching: true        # 宿主 LLM 提示词层
@@ -135,44 +135,7 @@ capabilities:
           type: object
           description: 组件设计
 
-  - name: developer
-    description: |
-      开发工程师角色，负责代码实现和功能开发
-      
-      核心能力：
-      - 代码实现
-      - 功能开发
-      - 代码优化
-      - Bug 修复
-      - 单元测试编写
-    input_schema:
-      type: object
-      properties:
-        design:
-          type: object
-          description: 设计文档
-        requirements:
-          type: object
-          description: 需求文档
-        coding_standards:
-          type: object
-          description: 编码规范
-    output_schema:
-      type: object
-      properties:
-        code:
-          type: string
-          description: 源代码
-        unit_tests:
-          type: array
-          items:
-            type: string
-          description: 单元测试代码
-        documentation:
-          type: string
-          description: 代码文档
-
-  - name: tester
+  - name: test-expert
     description: |
       测试工程师角色，负责测试用例设计和执行
       
@@ -291,41 +254,6 @@ capabilities:
           type: object
           description: 设计系统组件
 
-  - name: devops
-    description: |
-      DevOps 工程师角色，负责部署和运维
-      
-      核心能力：
-      - 持续集成/持续部署（CI/CD）
-      - 监控告警
-      - 性能调优
-      - 安全管理
-      - 容器化部署
-    input_schema:
-      type: object
-      properties:
-        code:
-          type: string
-          description: 源代码
-        environment:
-          type: string
-          description: 部署环境
-        monitoring_requirements:
-          type: object
-          description: 监控需求
-    output_schema:
-      type: object
-      properties:
-        deployment:
-          type: object
-          description: 部署配置
-        ci_cd_pipeline:
-          type: object
-          description: CI/CD 流水线
-        monitoring_config:
-          type: object
-          description: 监控配置
-
   - name: ai-assistant
     description: |
       AI 助手角色，提供大模型语义理解和智能推理能力
@@ -408,7 +336,7 @@ workflows:
 
       - step_id: testing
         name: 测试验证
-        role: tester
+        role: test-expert
         action: execute_tests
 
   - workflow_id: rapid-prototype-workflow
@@ -426,7 +354,7 @@ workflows:
     steps:
       - step_id: analysis
         name: Bug 分析
-        role: tester
+        role: test-expert
         action: analyze_bug
 
       - step_id: fix
@@ -436,7 +364,7 @@ workflows:
 
       - step_id: verification
         name: 验证
-        role: tester
+        role: test-expert
         action: verify_fix
 
 context_management:

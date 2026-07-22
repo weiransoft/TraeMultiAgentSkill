@@ -1653,9 +1653,6 @@ SOFTWARE.
 
 | 版本 | 日期 | 核心特性 |
 |------|------|---------|
-| v2.8.1 | 2026 年 7 月 | 八阶段整体构建为一个 Loop（`workflow_loop_controller.py`，WorkflowLoopController + RollbackStrategy，最大 3 次迭代，累计上下文跨迭代传递），CLI 入口 `run_workflow_loop.py` |
-| v2.8 | 2026 年 7 月 | 八阶段工作流阶段 8：文档对照代码审查（`doc_code_consistency_checker.py`，六大维度 D1-D6，多语言代码扫描），ReviewHandler |
-| v2.7.1 | 2026 年 7 月 | AI 诚实降级、真实语义匹配（TFIDF/Hashing embedder）、双宿主清单同步、v1 死代码清算 |
 | v2.7 | 2026 年 6 月 | UI/UX 巡检分析（`uiux_analyzer.py`，4 大检测维度）、视觉回归与显示完整性（`visual_regression.py`，3 大检测维度） |
 | v2.6 | 2026 年 6 月 | Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载 |
 | v2.5 | 2026 年 5 月 | Cybernetics 工程控制论增强（三环控制模型、反馈控制环、性能画像、守护协调器） |

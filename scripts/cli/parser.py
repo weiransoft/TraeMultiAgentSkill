@@ -90,10 +90,9 @@ def parse_arguments():
         choices=[
             "architect",
             "product-manager",
-            "tester",
+            "test-expert",
             "solo-coder",
             "ui-designer",
-            "devops",
             "auto",
         ],
         default="auto",

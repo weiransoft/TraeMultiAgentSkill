@@ -18,19 +18,13 @@ echo "║                                                                ║"
 echo "╚════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Step 1: Dynamic Workflows 测试（Phase 1+2+3+4+5+6+7+8+9+10+11）
+# Step 1: V2 回归测试
 echo ""
-echo "─── Step 1: Dynamic Workflows Phase 1+2+3+4+5+6+7+8+9+10+11 测试 ───"
-echo ""
-bash "${SCRIPT_DIR}/run_dynamic_workflow_tests.sh"
-
-# Step 2: V2 回归测试
-echo ""
-echo "─── Step 2: V2 回归测试 ───"
+echo "─── Step 1: V2 回归测试 ───"
 echo ""
 bash "${SCRIPT_DIR}/run_v2_regression.sh"
 
-# Step 3: 总览
+# Step 2: 总览
 echo ""
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║                                                                ║"

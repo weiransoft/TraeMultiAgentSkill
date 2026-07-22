@@ -244,7 +244,7 @@ class TestCheckpointAndHandoffIntegration(unittest.TestCase):
         handoff2 = self.engine.handoff(
             instance_id,
             from_agent="solo-coder",
-            to_agent="tester",
+            to_agent="test-expert",
             completed_work=[
                 "用户模块开发完成",
                 "商品模块开发完成",

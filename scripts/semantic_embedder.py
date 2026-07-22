@@ -21,6 +21,7 @@ Phase 6 升级：引入 Embedder 抽象 + 3 种实现，真正计算文本语义
 
 作者：trae-multi-agent 融合 Phase 6
 创建日期：2026-06-04
+v2.8.3：从 dynamic_workflow/ 移到 scripts/ 根目录（dynamic_workflow 包已删除）
 """
 
 from __future__ import annotations
@@ -33,9 +34,9 @@ from abc import ABC, abstractmethod
 from collections import Counter, OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
-# 模块级 logger（避免循环依赖）
+# 模块级 logger
 import logging
-logger = logging.getLogger("dynamic_workflow.semantic_embedder")
+logger = logging.getLogger("semantic_embedder")
 
 
 # ============================================================================

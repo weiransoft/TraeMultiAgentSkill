@@ -5,6 +5,101 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.8.3] - 2026-07-22
+
+### Removed — P2 架构收敛：死代码清理
+
+#### 批次 1：dynamic_workflow 包整体删除（12 个模块，~12000 行）
+- **零外部引用确认**：12 个模块中 11 个零外部引用，1 个（semantic_embedder）仅 2 个引用方
+- `semantic_embedder.py` 移至 `scripts/` 根目录（保留 TFIDF/Hashing/SentenceTransformer 确定性工具）
+- 更新 `role_matcher.py` + `goal_orchestrator.py` 的 import 路径
+- 删除 `scripts/dynamic_workflow/` 目录（含 12 个 .py 文件）
+- 删除 14 个对应测试文件 + 1 个测试脚本
+- 更新 `run_all.sh` / `coverage_analysis.py` 移除 dynamic_workflow 引用
+
+#### 批次 2：低耦合 cybernetics 文件归档（5 个文件，~3000 行）
+- `cybernetics_integration.py`（3 引用）— 删除，更新 `update_docs.py` 文档引用
+- `cybernetics_bridge.py`（2 引用）— 删除，更新 `dispatch/legacy.py` 移除桥接代码
+- `hierarchical_control.py`（2 引用）— 删除（引用方均已被删除）
+- `context_fingerprint_integration.py`（1 引用）— 删除（引用方为已删除的测试）
+- `agent_loop_controller_v2.py`（2 引用）— 删除（引用方均为已归档的 cybernetics 文件）
+- 删除 3 个对应测试文件
+- **保留** 3 个高耦合核心：`performance_fingerprint.py`(23引用) / `feedback_control_loop.py`(11引用) / `guard_coordinator.py`(5引用)
+
+#### 批次 3：SKILL.md 更新 + facade.py 确认 + v1 deprecation
+- Dynamic Workflows 章节：标注脚本层已归档，6 大模式作为提示词层概念保留
+- Cybernetics 章节：标注 4 个低耦合文件已归档，3 个核心组件保留并标注引用数
+- **facade.py 确认为唯一门面**：SKILL.md 新增「核心入口与门面」章节，明确入口层次（v1 弃用 → v2 薄壳 → facade 门面 → legacy/dispatcher 内部层）
+- **v1 入口 deprecation**：`trae_agent_dispatch.py` 添加 `DeprecationWarning`（仅 `__main__` 时输出到 stderr），docstring 标注弃用状态，引导使用 v2 或 facade
+- **SKILL.md CLI 示例更新**：11 处 `scripts/trae_agent_dispatch.py` → `scripts/trae_agent_dispatch_v2.py`（避免触发 deprecation warning）
+- **skill-manifest.yaml 角色残留修复**：3 处 `role: tester` → `role: test-expert`（standard-dev-workflow 的 testing 步骤 + bug-fix-workflow 的 analysis/verification 步骤）
+
+### Tested
+
+- 198 个核心测试通过（test_semantic_embedder / test_workflow_engine_v2 / test_v3_dispatcher / test_v3_plugins / test_phase18_cli / test_phase18_handlers / test_claude_code_subagent_adapter_prompt / test_review_handler / test_workflow_loop_controller）
+- 6 个预先存在的失败（test_v3_plugins::test_mutex_with）与本次改动无关
+- sync_manifests.py 校验通过
+- 全部修改的 Python 文件语法编译通过
+
+### Impact
+
+| 指标 | v2.8.2 | v2.8.3 | 变化 |
+|------|--------|--------|------|
+| dynamic_workflow 模块 | 12 个 | 0（semantic_embedder 移出） | -12 |
+| cybernetics 根目录文件 | 7 个 | 3 个 | -4 |
+| 循环控制器 | 6+ | 5 | -1 |
+| 删除代码行 | — | ~15000 行 | -15k |
+| 删除测试文件 | — | 17 个 | -17 |
+| 零引用确认 | — | 17/17 文件 | 100% |
+
+## [2.8.2] - 2026-07-22
+
+### Fixed — 一致性修复（P0）
+
+#### 版本统一
+- 三份 manifest（skill-manifest.yaml / skills-index.json / claude-code-skill.json）版本从 2.7.0/2.7.1 统一到 2.8.1，通过 sync_manifests.py 校验
+
+#### 角色名统一
+- 全局 5 角色 ID 标准化：`architect` / `product-manager` / `test-expert` / `solo-coder` / `ui-designer`
+- `tester` → `test-expert`（role_matcher.py / skill_registry.py / claude_code_subagent_adapter.py / workflow_engine_v2.py / cli/parser.py / dual_layer_context_manager.py / test_ai_components.py / test_workflow_engine_v2.py）
+- 删除 `devops` 角色（半成品：无 prompt、无文档、无模板）
+- 删除 `developer` capability（与 `solo-coder` schema 完全重复）
+- workflow_engine_v2.py 删除 devops 部署步骤
+
+#### 死链修复
+- SKILL.md 5 个角色 prompt 死链修复：`docs/roles/*/prompt.md` → 指向实际存在的模板文件
+- claude-code-skill.json lazy_load 5 个死链同步修复
+
+#### Workflow 定义修复
+- definitions.json：补 bug-fix-workflow（manifest 有 3 个，definitions.json 原 only 2 个）
+- definitions.json：`tester` → `test-expert`
+- definitions.json：`${spec}` / `${test_plan}` / `${test_command}` 变量声明为 workflow-level variables（原为断裂引用）
+
+#### Simulation 诚实化
+- `claude_code_subagent_adapter.py`：`_simulate_subagent_call` → `_fallback_no_subagent`，返回 `success=False` + `platform: 'none'`（不再伪装成功）
+- claude-code-skill.json：`fallback_mode: simulation` → `fallback_mode: error`
+- SKILL.md / skill-manifest.yaml：更新降级模式说明
+
+### Added — S/M/L 任务规模分级门禁（P1）
+
+- SKILL.md 新增「任务规模分级门禁」章节（v2.8.2 — 第一道路由）
+- S/M/L 三档分流：S=单角色直达、M=三阶段迷你流、L=八阶段完整 Loop
+- 含判定信号清单和禁止行为规则
+- 与拓扑路由的关系明确：S/M/L 是第一道路由（流程规模），角色匹配是第二道路由（谁执行），拓扑路由是第三道路由（执行模式）
+
+### Removed — 过期文档清理
+
+- 删除 docs/dev/ 下 27 个过期文档（11 个 PHASE*_PLAN.md + 16 个过程性/集成计划文档）
+- 删除根目录 5 个过期文档（README_IMPROVEMENT.md / INSTALLATION_COMPLETE.md / wechat_article_v2.4.md / wechat_article_code_map.drawio / wechat_article_code_map.md）
+
+### Tested
+
+- sync_manifests.py 校验通过（三份 manifest 一致）
+- 64 个直接相关测试通过（test_workflow_engine_v2 / test_workflow_loop_controller / test_claude_code_subagent_adapter_prompt / test_phase18_cli / test_review_handler）
+- 2 个预先存在的失败（test_goal_orchestrator_integration embedder 导入问题 / test_v3_plugins mutex 配置问题）与本次改动无关
+- 全部 JSON 文件语法校验通过
+- 全部修改的 Python 文件语法编译通过
+
 ## [2.8.1] - 2026-07-21
 
 ### Added

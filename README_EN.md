@@ -1,27 +1,6 @@
 # Trae Multi-Agent Skill
 
-🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup. v2.8 adds eight-stage workflow + doc-code consistency review (six dimensions D1-D6). v2.8.1 builds the eight-stage workflow as a Loop (WorkflowLoopController + RollbackStrategy).
-
-## 🎉 July 2026 Latest Updates (v2.8.1)
-
-> Background: Built the entire eight-stage workflow as a loop based on v2.8.0 Stage 8 (doc-code consistency review)
-> Principle: Precise rollback to corresponding stage on review failure, avoiding full-flow invalidation; no simulation/placeholder/mock
-
-- ✅ **Eight-Stage Workflow as a Loop (v2.8.1)** - Precise rollback on review failure
-  - 🔄 **Loop Controller**: `scripts/workflow_loop_controller.py` (WorkflowLoopController + RollbackStrategy)
-  - 🎯 **Precise Rollback**: D1/D2/D4/D5/D6 → DEVELOPMENT (Stage 6), D3 → TEST_VERIFICATION (Stage 7)
-  - 🔢 **Iteration Limit**: Max 3 iterations (configurable, hard cap prevents infinite loops)
-  - 💾 **Accumulated Context**: `_accumulated_artifacts` passed across iterations
-  - 🔗 **CLI Entry**: `scripts/run_workflow_loop.py` command-line execution
-  - 🧪 **Tests**: 16 test cases (W1-W11 + W4a-W4e) all passing, includes end-to-end integration test
-  - 📄 Detailed design: [docs/dev/DOC_CODE_REVIEW_STAGE.md §10](docs/dev/DOC_CODE_REVIEW_STAGE.md)
-
-- ✅ **Eight-Stage Workflow + Doc-Code Review (v2.8)** - Stage 8 added
-  - 📋 **Six Dimensions**: D1 Feature completeness / D2 Integration integrity / D3 Test correctness / D4 Acceptance criteria / D5 TODO-FIXME cleanup / D6 Document intent compliance
-  - 🔍 **Multi-language Scan**: Python / JavaScript / TypeScript / Java / Go / Rust
-  - 📄 **Document Parsing**: PRD / Architecture / SPEC / Test plan Markdown tables
-  - 🎭 **ReviewHandler**: Integrated into Ralph loop as optional 5th stage
-  - 🧪 **Tests**: 27 test cases covering all six dimensions
+🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup.
 
 ## 🎉 July 2026 Latest Revision (v2.7.1)
 
@@ -1100,9 +1079,6 @@ Thanks to all contributors and users for their support!
 
 | Version | Date | Core Features |
 |---------|------|---------------|
-| v2.8.1 | July 2026 | Eight-stage workflow as a Loop (`workflow_loop_controller.py`, WorkflowLoopController + RollbackStrategy, max 3 iterations, accumulated context across iterations), CLI entry `run_workflow_loop.py` |
-| v2.8 | July 2026 | Eight-stage workflow Stage 8: Doc-Code Consistency Review (`doc_code_consistency_checker.py`, six dimensions D1-D6, multi-language code scan), ReviewHandler |
-| v2.7.1 | July 2026 | AI Honest Degradation, Real Semantic Matching (TFIDF/Hashing embedder), Dual-Host Manifest Sync, v1 Dead Code Cleanup |
 | v2.7 | June 2026 | UI/UX Audit Analysis (`uiux_analyzer.py`, 4 detection dimensions), Visual Regression & Display Integrity (`visual_regression.py`, 3 detection dimensions) |
 | v2.6 | June 2026 | Ponytail Decision Ladder (less redundant code), Autonomous Iteration Mode, Dynamic Workflows 6 Modes, Plugin Hot-Reload |
 | v2.5 | May 2026 | Engineering Cybernetics Enhancement (three-ring control model, feedback control loop, performance fingerprint, guard coordinator) |

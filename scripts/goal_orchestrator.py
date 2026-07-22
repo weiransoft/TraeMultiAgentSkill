@@ -1056,7 +1056,7 @@ class GoalIterationReuser:
             embedder_instance: Any = None
             # 第一层：尝试 SentenceTransformer（高精度语义，需网络/本地缓存）
             try:
-                from dynamic_workflow.semantic_embedder import (
+                from semantic_embedder import (
                     SentenceTransformerEmbedder,
                 )
                 embedder_instance = SentenceTransformerEmbedder(
@@ -1069,7 +1069,7 @@ class GoalIterationReuser:
                 )
                 # 第二层：降级到 TFIDF embedder（纯本地，不联网）
                 try:
-                    from dynamic_workflow.semantic_embedder import (
+                    from semantic_embedder import (
                         create_default_embedder,
                     )
                     embedder_instance = create_default_embedder()
@@ -1080,7 +1080,7 @@ class GoalIterationReuser:
                     )
                     # 第三层：降级到 HashingEmbedder（纯本地，零外部依赖）
                     try:
-                        from dynamic_workflow.semantic_embedder import HashingEmbedder
+                        from semantic_embedder import HashingEmbedder
                         embedder_instance = HashingEmbedder(n_features=512)
                     except Exception as e_hash:
                         logger.warning(

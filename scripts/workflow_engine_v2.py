@@ -419,7 +419,7 @@ class WorkflowEngineV2:
                 step_id=f"step_{step_id}",
                 name="测试设计",
                 description="制定测试策略和测试用例",
-                role_id="tester",
+                role_id="test-expert",
                 action="design_tests",
                 conditions={}
             ))
@@ -443,22 +443,11 @@ class WorkflowEngineV2:
                 step_id=f"step_{step_id}",
                 name="测试验证",
                 description="执行测试用例，验证功能",
-                role_id="tester",
+                role_id="test-expert",
                 action="execute_tests",
                 conditions={}
             ))
             step_id += 1
-        
-        # 7. 部署发布
-        if is_deployment or (is_development and not is_testing):
-            steps.append(WorkflowStep(
-                step_id=f"step_{step_id}",
-                name="部署发布",
-                description="部署和发布系统",
-                role_id="devops",
-                action="deploy",
-                conditions={}
-            ))
         
         # 如果没有识别到任何类型，添加通用开发步骤
         if not steps:

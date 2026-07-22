@@ -99,28 +99,10 @@ def dispatch_agent_v2(agent_type: str, task: str, task_id: Optional[str] = None,
     if progress is None:
         progress = {}
 
-    # Cybernetics 增强桥接
-    bridge = None
+    # Cybernetics 增强桥接（v2.8.3：cybernetics_bridge 已归档，不再使用）
     validation = {"passed": True}
-    if cybernetics_enabled:
-        try:
-            from cybernetics_bridge import CyberneticsBridge
-            bridge = CyberneticsBridge(project_root=project_root)
-        except Exception as e:
-            log(f'⚠️  Cybernetics 桥接层初始化失败，将使用无增强模式：{e}', 'WARNING')
-            bridge = None
 
     try:
-        # 执行前验证（Guard + Karpathy）
-        if bridge:
-            task_dict = bridge._build_task_dict(agent_type, task, task_id)
-            validation = bridge._pre_execute_check(task_dict)
-            if not validation.get('passed', True):
-                log(f'⚠️  Guard 验证警告：{validation.get("warnings", [])}', 'WARNING')
-                if validation.get('karpathy_violations'):
-                    for v in validation['karpathy_violations']:
-                        log(f'  📛 Karpathy 违规：{v.get("description", "")}', 'WARNING')
-
         # 检测运行环境，优先使用 Claude Code SubAgent
         if CLAUDE_CODE_ADAPTER_AVAILABLE:
             log('🚀 使用 Claude Code SubAgent 适配器', 'SUCCESS')
@@ -129,20 +111,6 @@ def dispatch_agent_v2(agent_type: str, task: str, task_id: Optional[str] = None,
             # 降级到原有逻辑
             log('⚠️  使用双层上下文管理器（Trae IDE）', 'WARNING')
             result = _dispatch_via_trae(agent_type, task, task_id, project_root, progress)
-
-        # 执行后处理（反馈收集 + 性能画像更新）
-        if bridge:
-            try:
-                task_dict = bridge._build_task_dict(agent_type, task, task_id)
-                bridge._post_execute_process(
-                    task_dict=task_dict,
-                    success=result,
-                    strategy=bridge.strategy_resolver.select_strategy(task_dict),
-                    validation=validation,
-                    execution_time=0.0
-                )
-            except Exception as e:
-                log(f'⚠️  Cybernetics 执行后处理异常：{e}', 'WARNING')
 
         return result
 

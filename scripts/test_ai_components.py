@@ -229,7 +229,7 @@ class TestRoleMatcherWithAI(unittest.TestCase):
         )
         
         self.tester = RoleDefinition(
-            role_id='tester',
+            role_id='test-expert',
             name='测试专家',
             description='负责测试和质量保障',
             capabilities=['test_design', 'automation', 'quality_assurance'],

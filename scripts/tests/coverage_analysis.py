@@ -37,8 +37,6 @@ def categorize_file(filename: str) -> str:
         return "facade"
     if "trae_agent_dispatch_v2.py" in filename:
         return "compat-shell"
-    if "dynamic_workflow/" in filename:
-        return "dynamic-workflow"
     if name == "test_ai_components.py" or name == "test_v2_components.py":
         return "test-scripts-root"  # 这些是根目录的 test 脚本，不计入核心
     return "other"

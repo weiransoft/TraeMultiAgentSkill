@@ -1,11 +1,11 @@
 {
-  "version": "1.0",
-  "updated_at": "2026-03-23T12:00:00.000000",
+  "version": "1.1",
+  "updated_at": "2026-07-22T12:00:00.000000",
   "definitions": {
     "standard-dev-workflow": {
       "workflow_id": "standard-dev-workflow",
       "name": "标准开发工作流",
-      "description": "产品 → 架构 → 开发 → 测试的完整流程",
+      "description": "产品 → 架构 → 开发 → 测试 → 文档对照审查的完整流程",
       "steps": [
         {
           "step_id": "prd",
@@ -62,7 +62,7 @@
           "step_id": "testing",
           "name": "测试验证",
           "description": "执行测试用例",
-          "role_id": "tester",
+          "role_id": "test-expert",
           "action": "execute_tests",
           "inputs": {
             "code": "${code}"
@@ -103,7 +103,11 @@
           "status": "pending"
         }
       ],
-      "variables": {},
+      "variables": {
+        "spec": null,
+        "test_plan": null,
+        "test_command": null
+      },
       "conditions": {},
       "metadata": {},
       "created_at": "2026-03-23T12:00:00.000000"
@@ -135,6 +139,66 @@
       "conditions": {},
       "metadata": {},
       "created_at": "2026-03-23T12:00:00.000000"
+    },
+    "bug-fix-workflow": {
+      "workflow_id": "bug-fix-workflow",
+      "name": "Bug 修复工作流",
+      "description": "Bug 分析 → 修复 → 验证的简化流程",
+      "steps": [
+        {
+          "step_id": "analysis",
+          "name": "Bug 分析",
+          "description": "分析 Bug 根因和影响范围",
+          "role_id": "test-expert",
+          "action": "analyze_bug",
+          "inputs": {},
+          "outputs": {
+            "bug_analysis": null
+          },
+          "conditions": {},
+          "timeout": 3600,
+          "retry_count": 3,
+          "status": "pending"
+        },
+        {
+          "step_id": "fix",
+          "name": "Bug 修复",
+          "description": "根据分析结果修复 Bug",
+          "role_id": "solo-coder",
+          "action": "fix_bug",
+          "inputs": {
+            "analysis": "${bug_analysis}"
+          },
+          "outputs": {
+            "fix_code": null
+          },
+          "conditions": {},
+          "timeout": 3600,
+          "retry_count": 3,
+          "status": "pending"
+        },
+        {
+          "step_id": "verification",
+          "name": "验证",
+          "description": "验证 Bug 修复是否有效",
+          "role_id": "test-expert",
+          "action": "verify_fix",
+          "inputs": {
+            "code": "${fix_code}"
+          },
+          "outputs": {
+            "verification_result": null
+          },
+          "conditions": {},
+          "timeout": 3600,
+          "retry_count": 3,
+          "status": "pending"
+        }
+      ],
+      "variables": {},
+      "conditions": {},
+      "metadata": {},
+      "created_at": "2026-07-22T12:00:00.000000"
     }
   }
 }

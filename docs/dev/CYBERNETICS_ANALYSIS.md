@@ -1,5 +1,19 @@
 # Cybernetics 增强方案 - 代码更新分析总结
 
+> ⚠️ **部分归档通知（v2.8.3 — 2026-07-22）**：
+> 本文档列出的 6 个核心组件中，4 个低耦合文件已在 v2.8.3 架构收敛中归档删除：
+> - `hierarchical_control.py`（2 引用）— 已删除
+> - `cybernetics_integration.py`（3 引用）— 已删除
+> - `context_fingerprint_integration.py`（1 引用）— 已删除
+> - `agent_loop_controller_v2.py`（2 引用）— 已删除
+>
+> **保留的 3 个高耦合核心组件**（仍在使用）：
+> - `performance_fingerprint.py`（23 个引用方）
+> - `feedback_control_loop.py`（11 个引用方）
+> - `guard_coordinator.py`（5 个引用方）
+>
+> 本文档作为历史设计档案保留，下方代码清单中标注"已删除"的文件不再存在于代码库中。
+
 ## 📋 概述
 
 本文档总结了 Cybernetics 工程控制论增强方案的全部代码更新，包括：

@@ -403,8 +403,8 @@ def main():
                 output_schema={"type": "object", "properties": {"code": {"type": "string"}}}
             ),
             SkillCapability(
-                name="tester",
-                description="测试工程师角色，负责测试用例设计和执行",
+                name="test-expert",
+                description="测试专家角色，负责测试用例设计和执行",
                 input_schema={"type": "object", "properties": {"requirements": {"type": "object"}}},
                 output_schema={"type": "object", "properties": {"test_results": {"type": "array"}}}
             )

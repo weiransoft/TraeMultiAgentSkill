@@ -36,17 +36,10 @@ def add_cybernetics_to_skill_md():
 ### 使用方式
 
 ```python
-from cybernetics_integration import CyberneticsIntegration, CyberneticsConfig
+# v2.8.3: cybernetics_integration 已归档，以下为历史示例
+# from cybernetics_integration import CyberneticsIntegration, CyberneticsConfig
 
 # 创建配置
-config = CyberneticsConfig(
-    feedback_loop_enabled=True,
-    fingerprint_enabled=True,
-    guard_enabled=True,
-    hierarchical_enabled=False
-)
-
-# 创建集成实例
 integration = CyberneticsIntegration(
     agent_id="my_agent",
     config=config,
@@ -136,15 +129,8 @@ def add_cybernetics_to_readme():
 
 **使用示例**:
 ```python
-from cybernetics_integration import CyberneticsIntegration
-
-integration = CyberneticsIntegration(agent_id="my_agent")
-
-# 带反馈执行
-result = integration.execute_with_feedback(task, executor)
-
-# 获取建议
-recommendations = integration.get_recommendations(task)
+# v2.8.3: cybernetics_integration 已归档，以下为历史示例
+# from cybernetics_integration import CyberneticsIntegration
 ```
 
 **预期收益**: 执行成功率 +8%，方差 -67%，人工介入 -70%

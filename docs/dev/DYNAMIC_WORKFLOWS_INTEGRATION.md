@@ -1,5 +1,11 @@
 # Dynamic Workflows × trae-multi-agent 融合增强方案
 
+> ⚠️ **归档通知（v2.8.3 — 2026-07-22）**：
+> 本文档描述的 `scripts/dynamic_workflow/` 包（12 个模块，~12000 行）已在 v2.8.3 架构收敛中整体删除。
+> 仅 `semantic_embedder.py` 被保留并迁移至 `scripts/` 根目录（被 `role_matcher.py` 和 `goal_orchestrator.py` 引用）。
+> 6 大动态工作流模式（classifier-dispatch / fan-out-aggregate / adversarial-verify / generate-filter / tournament / loop-until-done）作为**提示词层概念**保留在 SKILL.md 的「动态工作流拓扑路由决策表」中，由宿主 LLM 直接执行，不再依赖脚本层执行器。
+> 本文档作为历史设计档案保留，不再反映当前代码状态。
+
 > **文档类型**：技术分析 + 融合方案  
 > **版本**：v1.7（Phase 17 实施完成 + 覆盖度提升 v2）  
 > **审查报告**：[ARCHITECT_REVIEW_DYNAMIC_WORKFLOWS.md](file:///Users/wangwei/claw/.trae/skills/trae-multi-agent/docs/dev/ARCHITECT_REVIEW_DYNAMIC_WORKFLOWS.md)  

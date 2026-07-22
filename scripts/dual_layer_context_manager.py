@@ -775,9 +775,8 @@ class TaskContext:
             'architect': 'docs/roles/architect',
             'product-manager': 'docs/roles/product-manager',
             'solo-coder': 'docs/roles/solo-coder',
-            'tester': 'docs/roles/test-expert',
-            'ui-designer': 'docs/roles/ui-designer',
-            'devops': 'docs/roles/devops'
+            'test-expert': 'docs/roles/test-expert',
+            'ui-designer': 'docs/roles/ui-designer'
         }
         
         # 获取角色目录
