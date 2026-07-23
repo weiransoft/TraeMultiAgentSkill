@@ -195,6 +195,10 @@ def _dispatch_via_claude_code(agent_type: str, task: str, task_id: Optional[str]
             return True
         else:
             error_msg = result.get('error', '未知错误')
+            # v2.8.4：传递超时信息，供 handler/loop_controller 熔断判断
+            timed_out = result.get('timed_out', False)
+            if timed_out:
+                error_msg = f'host_llm_timeout: {error_msg}'
             log(f'❌ SubAgent 调用失败：{error_msg}', 'ERROR')
 
             if actual_task_id:

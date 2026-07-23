@@ -1,5 +1,5 @@
 name: multi-agent-team
-version: 2.8.3
+version: 2.8.4
 description: |
   Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归）
   
@@ -439,6 +439,18 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.8.4
+      date: "2026-07-23"
+      changes:
+        - 新增 Trae 宿主 LLM SubAgent 调度协议（HostLLMBridge）：通过文件协议桥接宿主 LLM 的 Task 工具，解决 Trae 环境下无 claude CLI 的 SubAgent 调用问题
+        - claude_code_subagent_adapter.py 平台检测优先级调整：host_llm > claude_code > unknown，Trae 环境自动走文件协议桥接
+        - autonomous/loop_controller.py 新增连续失败熔断：连续 2 次相同原因的 retriable 自动升级为 fatal 终止循环，避免无限重试
+        - autonomous/handlers/dev_handler.py summary 包含 dispatch_failed 关键词供熔断检测
+        - dispatch/legacy.py 失败路径透传 timed_out 信息（host_llm_timeout 前缀）
+        - SKILL.md 新增「Trae 宿主 LLM SubAgent 调度协议」章节（工作流程 / 轮询契约 / subagent_type 映射 / 原子写入 / 熔断机制 / 平台检测优先级）
+        - 新增 29 个单元测试（test_host_llm_bridge.py）覆盖 create_request / write_response / wait_for_response / read_marker / read_request / validate_request_id / 并发 / 端到端
+        - 架构师审查 3 个阻断性问题已修复（stdout 标记丢失 / 轮询契约缺失 / 无限重试）
+
     - version: 2.4.1
       date: "2026-04-15"
       changes:
@@ -487,4 +499,4 @@ metadata:
         - 简单的上下文管理
 
 created_at: "2026-03-16T00:00:00"
-updated_at: "2026-04-15T00:00:00"
+updated_at: "2026-07-23T00:00:00"

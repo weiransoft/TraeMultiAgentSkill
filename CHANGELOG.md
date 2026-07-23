@@ -5,6 +5,63 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.8.4] - 2026-07-23
+
+### Added — Trae 宿主 LLM SubAgent 调度协议（HostLLMBridge）
+
+> **背景**：Trae 环境下无 `claude` CLI，`ClaudeCodeSubAgentAdapter._fallback_no_subagent` 返回 `success=False`，导致 autonomous 循环无限重试。真实子代理只能由宿主 LLM 通过 Task 工具调度。本版本通过文件协议桥接这一鸿沟。
+
+#### 核心新增：HostLLMBridge 文件协议
+- 新增 `scripts/host_llm_bridge.py`（525 行）：解耦 Python 脚本与宿主 LLM 的 Task 工具
+  - `create_request()`：写入 `request_{id}.json` + `protocol.marker`（含 request_id / agent_type / task / prompt / 超时）
+  - `wait_for_response()`：轮询 `response_{id}.json`，JSON 解析失败重试 3 次（0.1s 间隔），超时返回 `timeout=True`
+  - `write_response()`：原子写入（`tempfile` + `os.replace`），写入后清除 `protocol.marker`
+  - `read_marker()` / `read_request()` / `clear_marker()`：供宿主 LLM 轮询使用
+  - `validate_request_id()`：正则 `^[a-zA-Z0-9_]+$` 防路径遍历攻击
+  - CLI 子命令：`read-marker` / `read-request` / `write-response` / `clear-marker`
+- 新增设计文档 `docs/dev/HOST_LLM_BRIDGE_DESIGN.md`（v2.8.4 修订版 R1）
+
+#### 平台检测与适配
+- `claude_code_subagent_adapter.py` 平台检测优先级调整：`host_llm` > `claude_code` > `unknown`
+  - `TRAE_ENV` / `TRAE_AGENT_PATH` → `host_llm`（文件协议桥接）
+  - `CLAUDE_CODE_ENV` / `ANTHROPIC_ENV` → `claude_code`（claude CLI subprocess）
+  - 无 → `unknown`（诚实降级 `_fallback_no_subagent`）
+- 新增 `_invoke_via_host_llm()`：调用 `HostLLMBridge.create_request` → `wait_for_response`
+- `_invoke_via_trae()` 标记 deprecated，委托给 `_invoke_via_host_llm`（删除旧递归实现）
+
+#### 失败熔断与超时透传
+- `autonomous/loop_controller.py::_should_stop()` 新增连续失败熔断：
+  - 连续 2 次迭代均为 `retriable` 且原因包含相同关键词（timeout / host_llm_timeout / dispatch_failed / 无可用 subagent）→ 升级为 `fatal` 终止循环
+  - 避免宿主 LLM 未启动轮询时脚本无限重试浪费资源
+- `autonomous/handlers/dev_handler.py` summary 包含 `dispatch_failed` 关键词供熔断检测
+- `dispatch/legacy.py::_dispatch_via_claude_code` 失败路径透传 `timed_out` 信息（`host_llm_timeout:` 前缀）
+
+#### SKILL.md 协议章节
+- 新增「Trae 宿主 LLM SubAgent 调度协议（v2.8.4 新增）」章节，包含：
+  - 工作流程图（8 步）：RunCommand(blocking=false) → 脚本写请求 → 宿主 LLM 轮询 marker → Task 执行子代理 → 写 response → 脚本读结果
+  - 宿主 LLM 轮询契约：启动后 2 秒首检，之后每 5 秒检查 `protocol.marker`
+  - Task 工具 subagent_type 映射表（architect → search，其余 → general_purpose_task）
+  - 强制原子写入要求（禁止 `echo > response.json`）
+  - 熔断机制说明
+  - 平台检测优先级表
+
+### Tested
+
+- 新增 29 个单元测试（`scripts/tests/test_host_llm_bridge.py`）全部通过：
+  - TestCreateRequest(2) / TestWriteResponse(3) / TestWaitForResponse(3) / TestReadMarker(3)
+  - TestReadRequest(2) / TestValidateRequestId(12) / TestConcurrentRequests(1) / TestEndToEnd(3)
+- 回归测试 83 个全部通过：test_host_llm_bridge + test_workflow_engine_v2 + test_v3_dispatcher + test_claude_code_subagent_adapter_prompt + test_workflow_loop_controller
+- 回归测试 98 个全部通过：test_phase18_loop_controller + test_phase18_handlers + test_phase18_dispatcher_adapter + test_phase18_integration + test_v3_integration
+- sync_manifests.py 校验通过（三份 manifest 版本一致）
+- 全部修改的 Python 文件语法编译通过
+
+### Architecture Review
+
+经架构师审查（Task general_purpose_task）发现 3 个阻断性问题，已全部修订：
+1. **P2.1 stdout 标记被日志淹没** → 改为独立 `protocol.marker` 文件，不依赖 stdout
+2. **P2.2 宿主 LLM 轮询契约未定义** → 定义 2s 首检、5s 间隔的轮询契约
+3. **P4.1 超时后无限 retriable** → 增加连续 2 次相同原因熔断逻辑
+
 ## [2.8.3] - 2026-07-22
 
 ### Removed — P2 架构收敛：死代码清理

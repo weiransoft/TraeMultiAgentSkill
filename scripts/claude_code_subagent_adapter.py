@@ -42,19 +42,24 @@ class ClaudeCodeSubAgentAdapter:
         
     def _detect_platform(self) -> str:
         """
-        检测运行平台
-        
+        检测运行平台（v2.8.4 修订：优先级 host_llm > claude_code > unknown）
+
+        平台检测优先级（架构师审查 P5.1）：
+        - host_llm：Trae 环境（TRAE_ENV / TRAE_AGENT_PATH），通过文件协议桥接宿主 LLM
+        - claude_code：Claude Code 环境（CLAUDE_CODE_ENV / ANTHROPIC_ENV），使用 claude CLI
+        - unknown：未知环境，降级到 _fallback_no_subagent
+
         Returns:
-            str: 平台名称 ('claude_code', 'trae', 'unknown')
+            str: 平台名称 ('host_llm', 'claude_code', 'unknown')
         """
-        # 检测是否在 Claude Code 环境中
+        # 优先检测 Trae 环境（host_llm 桥接，因为 TRAE_ENV 是更强的环境信号）
+        if os.environ.get('TRAE_ENV') or os.environ.get('TRAE_AGENT_PATH'):
+            return 'host_llm'
+
+        # Claude Code 环境
         if os.environ.get('CLAUDE_CODE_ENV') or os.environ.get('ANTHROPIC_ENV'):
             return 'claude_code'
-        
-        # 检测是否在 Trae IDE 环境中
-        if os.environ.get('TRAE_ENV') or os.environ.get('TRAE_AGENT_PATH'):
-            return 'trae'
-        
+
         # 默认未知
         return 'unknown'
     
@@ -71,10 +76,11 @@ class ClaudeCodeSubAgentAdapter:
         Returns:
             Dict: 执行结果
         """
-        if self.platform == 'claude_code':
+        if self.platform == 'host_llm':
+            # v2.8.4：Trae 环境通过文件协议桥接宿主 LLM 的 Task 工具
+            return self._invoke_via_host_llm(agent_type, task, context)
+        elif self.platform == 'claude_code':
             return self._invoke_via_claude_code(agent_type, task, context)
-        elif self.platform == 'trae':
-            return self._invoke_via_trae(agent_type, task, context)
         else:
             # 未知平台，尝试使用通用方法
             return self._invoke_generic(agent_type, task, context)
@@ -128,68 +134,86 @@ class ClaudeCodeSubAgentAdapter:
                 'platform': 'claude_code'
             }
     
-    def _invoke_via_trae(self, agent_type: str, task: str,
-                        context: Optional[Dict] = None) -> Dict[str, Any]:
-        """
-        通过 Trae IDE 调用 subagent
-        
-        使用原有的 DualLayerContextManager 机制
+    def _invoke_via_host_llm(self, agent_type: str, task: str,
+                            context: Optional[Dict] = None) -> Dict[str, Any]:
+        """通过宿主 LLM 桥接协议调用 SubAgent（v2.8.4 新增）
+
+        在 Trae IDE 环境中，Python 脚本无法直接调用宿主 LLM 的 Task 工具。
+        本方法通过文件协议（HostLLMBridge）与宿主 LLM 通信：
+
+        1. 构建 prompt
+        2. 创建调度请求（写入 request 文件 + protocol.marker）
+        3. 轮询等待宿主 LLM 写入的 response 文件
+        4. 返回结果
+
+        宿主 LLM（Trae AI 助手）的职责：
+        - 每隔 5 秒读取 protocol.marker 文件
+        - 检测到请求后通过 Task 工具执行子代理
+        - 将结果通过 HostLLMBridge.write_response() 写入 response 文件
+
+        Args:
+            agent_type: agent 类型
+            task: 任务描述
+            context: 上下文信息（可包含 timeout_seconds 自定义超时）
+
+        Returns:
+            Dict: 执行结果，包含 success/output/error/platform/request_id/timed_out
         """
         try:
-            # 导入 Trae 的组件
-            sys.path.insert(0, str(self.skill_root))
-            from dual_layer_context_manager import DualLayerContextManager
-            from role_matcher import RoleMatcher
-            
-            # 初始化上下文管理器
-            context_manager = DualLayerContextManager(str(self.skill_root))
-            
-            # 创建任务定义
-            from dual_layer_context_manager import TaskDefinition
-            task_def = TaskDefinition(
-                task_id=f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                description=task,
-                role=agent_type
+            from host_llm_bridge import HostLLMBridge
+
+            bridge = HostLLMBridge()
+            prompt = self._build_agent_prompt(agent_type, task, context)
+
+            # 从 context 读取超时配置，默认 600 秒（架构师审查 P4.2）
+            timeout = 600
+            if context and isinstance(context, dict):
+                timeout = context.get('timeout_seconds', 600)
+
+            # 创建调度请求（写入文件 + protocol.marker）
+            request_id = bridge.create_request(
+                agent_type, task, context, prompt, timeout_seconds=timeout
             )
-            
-            # 启动任务
-            context_manager.start_task(task_def)
-            
-            # 这里需要实际调用 Trae 的 agent
-            # 但由于这是在 Python 中，我们需要使用其他方式
-            # 通常是调用 trae_agent_dispatch_v2.py
-            
-            dispatch_script = self.skill_root / 'scripts' / 'trae_agent_dispatch_v2.py'
-            if dispatch_script.exists():
-                result = subprocess.run(
-                    [sys.executable, str(dispatch_script), 
-                     '--task', task, 
-                     '--agent', agent_type],
-                    capture_output=True,
-                    text=True,
-                    timeout=300
-                )
-                
-                return {
-                    'success': result.returncode == 0,
-                    'output': result.stdout,
-                    'error': result.stderr,
-                    'platform': 'trae'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'找不到调度脚本：{dispatch_script}',
-                    'platform': 'trae'
-                }
-                
+
+            # 轮询等待结果文件
+            result = bridge.wait_for_response(request_id, timeout=timeout)
+
+            return {
+                'success': result.get('success', False),
+                'output': result.get('output', ''),
+                'error': result.get('error', ''),
+                'platform': 'host_llm',
+                'request_id': request_id,
+                'timed_out': result.get('timeout', False)
+            }
+
+        except ImportError:
+            return {
+                'success': False,
+                'error': 'host_llm_bridge 模块不可用，请确保 scripts/host_llm_bridge.py 存在',
+                'platform': 'host_llm'
+            }
         except Exception as e:
             return {
                 'success': False,
-                'error': f'Trae Subagent 调用失败：{str(e)}',
-                'platform': 'trae'
+                'error': f'HostLLM 桥接调用失败：{str(e)}',
+                'platform': 'host_llm'
             }
-    
+
+    def _invoke_via_trae(self, agent_type: str, task: str,
+                        context: Optional[Dict] = None) -> Dict[str, Any]:
+        """[DEPRECATED v2.8.4] 使用 _invoke_via_host_llm 替代
+
+        原有实现通过 subprocess 调用 trae_agent_dispatch_v2.py，会导致递归调用。
+        v2.8.4 起统一使用 _invoke_via_host_llm 的文件协议桥接方案。
+        """
+        import warnings
+        warnings.warn(
+            "_invoke_via_trae 已弃用（v2.8.4），请使用 _invoke_via_host_llm",
+            DeprecationWarning, stacklevel=2
+        )
+        return self._invoke_via_host_llm(agent_type, task, context)
+
     def _invoke_generic(self, agent_type: str, task: str,
                        context: Optional[Dict] = None) -> Dict[str, Any]:
         """

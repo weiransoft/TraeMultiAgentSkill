@@ -154,9 +154,10 @@ class DevHandler(StageHandler):
                 },
             )
         # 失败时返回 retriable（允许下一轮重试）
+        # v2.8.4：summary 包含 dispatch_failed 关键词，供 loop_controller 熔断判断
         return StageResult(
             kind="retriable",
-            summary="dev 执行失败（_dispatch_via_claude_code 返回 False）",
+            summary="dev 执行失败（dispatch_failed: _dispatch_via_claude_code 返回 False）",
             error="_dispatch_via_claude_code failed",
         )
 

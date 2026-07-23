@@ -1,6 +1,6 @@
 {
   "name": "multi-agent-team",
-  "version": "2.8.3",
+  "version": "2.8.4",
   "description": "Multi-Agent Team Dispatcher - 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持 Claude Code SubAgent 调用、Karpathy 四大核心原则、Ponytail 决策梯、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、UI/UX 巡检与视觉回归。",
   "author": "Claw Team",
   "license": "MIT",

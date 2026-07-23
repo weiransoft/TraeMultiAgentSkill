@@ -164,6 +164,91 @@ from trae_agent_dispatch_v2 import main_compat, dispatch_agent_v2
 ❌ 业务代码直接 import `dispatcher.goal_dispatcher`（内部实现层）
 ❌ 新代码使用 `trae_agent_dispatch.py`（v1 已弃用）
 
+## Trae 宿主 LLM SubAgent 调度协议（v2.8.4 新增）
+
+> **问题**：Trae 环境下无 `claude` 命令行工具，`ClaudeCodeSubAgentAdapter` 的 `_fallback_no_subagent` 返回 `success=False`，导致 autonomous 循环无限重试。
+>
+> **解决方案**：通过文件协议（`HostLLMBridge`）桥接宿主 LLM 的 Task 工具，脚本生成调度请求 → 宿主 LLM 通过 Task 执行子代理 → 结果回传。
+
+### 工作流程
+
+```
+宿主 LLM (Trae 对话)
+    │
+    ├─1─> RunCommand(blocking=false): python3 -u trae_agent_dispatch_v2.py --autonomous ...
+    │
+    │     [脚本内部]
+    │     ├─> _invoke_via_host_llm → HostLLMBridge.create_request()
+    │     │   → 写入 request_{id}.json + protocol.marker
+    │     ├─> HostLLMBridge.wait_for_response(id, timeout=600)
+    │     │   → 轮询等待 response_{id}.json
+    │     │
+    │     │     [宿主 LLM — 并行执行]
+    │     │     ├─2─> 每 5 秒读取 protocol.marker 文件
+    │     │     ├─3─> 读取 request_{id}.json 获取完整提示词
+    │     │     ├─4─> Task(subagent_type, query=task) → 执行子代理
+    │     │     ├─5─> HostLLMBridge.write_response(id, result) → 原子写入
+    │     │     │
+    │     │     [脚本继续]
+    │     │     └─6─> 读取 response_{id}.json → 返回结果
+    │     └─7─> autonomous 循环继续
+    │
+    └─8─> CheckCommandStatus → 脚本完成
+```
+
+### 宿主 LLM 轮询契约
+
+当通过 `RunCommand(blocking=false)` 运行 autonomous 脚本后，宿主 LLM **必须**遵循以下轮询契约：
+
+1. **启动后 2 秒**首次检查：读取 `logs/host_llm_bridge/protocol.marker` 文件
+2. **之后每 5 秒**检查一次 `protocol.marker` 文件
+3. **检查到 marker** 后：
+   a. 读取 marker JSON 获取 `request_id` 和 `request_file`
+   b. 读取 `request_file` 获取完整提示词
+   c. 通过 Task 工具执行子代理（subagent_type 根据角色选择）
+   d. 调用 `HostLLMBridge.write_response()` 写入结果
+   e. 调用 `HostLLMBridge.clear_marker()` 清除标记
+4. **marker 不存在**时：继续等待（脚本可能还在执行前序步骤）
+5. **脚本结束**时：停止轮询
+
+**重要**：protocol.marker 是独立文件，**不依赖 CheckCommandStatus 的 stdout**。使用 `Read` 工具直接读取文件。
+
+### Task 工具 subagent_type 映射
+
+| skill 角色名 | Task subagent_type | 说明 |
+|-------------|-------------------|------|
+| architect | search | 架构分析需要代码搜索 |
+| product-manager | general_purpose_task | 产品分析 |
+| test-expert | general_purpose_task | 测试设计 |
+| solo-coder | general_purpose_task | 代码实现 |
+| ui-designer | general_purpose_task | UI 设计 |
+
+### 写入结果（强制原子写入）
+
+宿主 LLM **必须**使用 `HostLLMBridge.write_response()` 写入结果，**禁止**直接 `echo > response.json`：
+
+```bash
+# 通过命令行调用（推荐）
+python3 scripts/host_llm_bridge.py write-response <request_id> \
+    --success true --output "结果内容" --bridge-dir logs/host_llm_bridge
+```
+
+### 熔断机制（连续失败保护）
+
+当连续 2 次迭代均为 `retriable` 且原因包含超时/dispatch 失败关键词时，`loop_controller` 自动终止循环（升级为 fatal），避免无限重试浪费资源。
+
+### 平台检测优先级
+
+| 环境变量 | 平台 | 调度方式 |
+|---------|------|---------|
+| `TRAE_ENV` 或 `TRAE_AGENT_PATH` | `host_llm` | 文件协议桥接宿主 LLM Task 工具 |
+| `CLAUDE_CODE_ENV` 或 `ANTHROPIC_ENV` | `claude_code` | claude CLI subprocess |
+| 无 | `unknown` | `_fallback_no_subagent`（诚实降级） |
+
+### 设计文档
+
+详细设计见 `docs/dev/HOST_LLM_BRIDGE_DESIGN.md`。
+
 ## 快速开始
 
 ### 基础使用

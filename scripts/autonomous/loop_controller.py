@@ -401,7 +401,12 @@ class RalphLoopController:
         )
 
     def _should_stop(self) -> bool:
-        """判断是否应停止（短路求值）。"""
+        """判断是否应停止（短路求值）。
+
+        v2.8.4 新增：连续 retriable 熔断机制（架构师审查 P4.1）。
+        当连续 2 次迭代均为 retriable 且原因相似（超时/dispatch 失败）时，
+        升级为 fatal 终止循环，避免无限重试浪费资源。
+        """
         # 1. max_iterations
         if self._run_state.state.iter_index >= self._config.max_iterations:
             return True
@@ -412,6 +417,24 @@ class RalphLoopController:
         # 4. RunState.status
         if self._run_state.state.status in ("completed", "aborted", "failed"):
             return True
+
+        # 5. 连续 retriable 熔断（v2.8.4 新增 — 架构师审查 P4.1）
+        # 当连续 2 次迭代均为 retriable 且包含超时/dispatch 失败关键词时，终止循环
+        # 避免宿主 LLM 不响应时无限重试（每次超时 600 秒，2 次即 20 分钟）
+        if len(self._prev_results) >= 2:
+            last_two = self._prev_results[-2:]
+            if all(r.kind == "retriable" for r in last_two):
+                # 检查是否包含超时/dispatch 失败关键词（相同原因判定）
+                timeout_keywords = ["timeout", "host_llm_timeout", "dispatch_failed", "无可用 subagent"]
+                last_summary = last_two[-1].summary.lower()
+                prev_summary = last_two[-2].summary.lower()
+                # 两次结果都包含相同类别的超时/dispatch 关键词 → 认为是相同原因
+                for kw in timeout_keywords:
+                    if kw in last_summary and kw in prev_summary:
+                        self._log("error",
+                            f"连续 2 次 retriable（关键词={kw}），升级为 fatal 终止循环")
+                        return True
+
         return False
 
     def _is_stop_when_matched(self) -> bool:
