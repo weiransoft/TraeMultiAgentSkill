@@ -1,9 +1,7 @@
 # Trae Multi-Agent Skill 实现状态
-
 ## 版本信息
-
-- **当前版本**: 2.7.1
-- **发布日期**: 2026-07-18
+- **当前版本**: 2.9.0
+- **发布日期**: 2026-09-28
 - **状态**: ✅ 已完成（所有计划功能 100% 实现）
 
 ## v2.7.1 修订（AI 诚实化 + 真实语义匹配 + 双宿主同步 + v1 死代码清算）
@@ -51,6 +49,27 @@
 
 - 单元测试：193 通过 / 22 跳过 / 0 失败
 - `sync_manifests.py --report`：三清单一致
+
+## v2.9.0 新增功能（既有系统理解能力 SU）
+
+- **状态**: ✅ 完整实现
+- **CLI 入口**: `scripts/system_understanding.py`（六阶段编排：preflight → login → collect → relations → llm_bridge → render；退出码状态机 0/2/3/4/5/130）
+- **模块目录**: `scripts/su/`（能力包，18 个模块文件）
+  - `browser_login.py` — Playwright 自动登录（会话维持、自动重登 ≤3 次、`--storage-state` 旁路）
+  - `site_crawler.py` / `url_key.py` / `action_tier.py` / `route_policy.py` / `wait_ready.py` — 图式 BFS 遍历（url_key 去重、动作三级分级、网络层拦截非 GET 与白名单外域）
+  - `db_inspector.py` / `db_guard.py` — MySQL/PostgreSQL 只读内省 + 隐式 FK 三重预筛推断 + SQL 白名单校验器
+  - `redis_inspector.py` / `redis_guard.py` — SCAN 键模式聚类 + 命令只读白名单
+  - `relation_analyzer.py` / `api_observer.py` — UI↔API↔DB 三角关联与 API 形态观测
+  - `document_renderer.py` — 10 节《系统功能理解文档》+ understanding.json + Mermaid 图源
+  - `state_store.py` — SQLite（WAL）断点续跑状态库
+  - `config.py` / `preflight.py` / `limiter.py` / `deps.py` / `dto.py` — 三级配置通道、预检、预算/限速、软依赖探测
+- **两阶段宿主 LLM 工作流**: `--skip-llm-phase` 采集 → 宿主 LLM 按 `docs/spec/role-prompts/su-llm-backfill.md` 回填 findings → `--render-only` 收口渲染
+- **五条安全红线**: 凭据不落盘明文（统一 redact 管线）、DB 严格只读、Redis 只读白名单、浏览器拦截全部非 GET 与白名单外域、危险按钮零点击
+- **测试覆盖**: 14 个单测模块（`test_su_*.py`，400+ 测试用例），全部通过
+  - `test_su_config` / `test_su_url_key` / `test_su_action_tier` / `test_su_route_guard` / `test_su_readonly_guard` / `test_su_implicit_fk` / `test_su_redis_patterns` / `test_su_relation` / `test_su_site_crawler` / `test_su_api_observer` / `test_su_doc_render` / `test_su_state` / `test_su_degrade` / `test_su_e2e_site`
+  - 单测脚本: `scripts/tests/scripts/run_system_understanding.sh`
+  - e2e 脚本: `scripts/tests/scripts/run_system_understanding_e2e.sh`（场景 [0]-[7] PASS；场景 [8] 需外部注入 DSN，缺省 SKIP）；两者均已接入 `run_all.sh`
+- **文档**: `docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md` / `docs/spec/role-prompts/su-llm-backfill.md`（PROMPT-SU-001 契约）/ `docs/dev/SYSTEM_UNDERSTANDING_PRD.md` / `docs/dev/SYSTEM_UNDERSTANDING_ARCHITECTURE.md`
 
 ## 核心实现
 
@@ -209,134 +228,105 @@
 - **文档**: `docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md` / `docs/dev/PATTERNS_REFERENCE.md` / `docs/dev/ARCHITECT_REVIEW_DYNAMIC_WORKFLOWS.md`
 
 ### v2.4 新增功能
-
 #### 1. Karpathy 四大核心原则执行检查器
 - **文件**: `scripts/karpathy_principle_enforcer.py`
 - **功能**: 原则合规性检查、违规检测与提醒、验证检查点管理、执行报告生成
 - **四大原则**: Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven Execution
 - **状态**: ✅ 已完成
-
 #### 2. Claude Code SubAgent 适配器
 - **文件**: `scripts/claude_code_subagent_adapter.py`
 - **功能**: 在 Claude Code / Trae IDE 环境中统一调用 subagent
 - **平台检测**: claude_code / trae / unknown
 - **状态**: ✅ 已完成
-
 ### v2.3 新增功能
-
 #### 1. 多角色代码走读
 - **文件**: `scripts/multi_role_code_walkthrough.py`
 - **功能**: 5 个角色多视角分析代码，生成对齐后的统一代码地图
 - **状态**: ✅ 已完成
-
 #### 2. 真正的多角色协作分析器
 - **文件**: `scripts/multi_role_collaborative_analyzer.py`
 - **功能**: 集成 Trae Agent 调度系统，各角色独立真实分析
 - **状态**: ✅ 已完成
-
 #### 3. 代码地图生成器 v2.1
 - **文件**: `scripts/code_map_generator_v2.py`
 - **功能**: 多语言分析、Workspace 支持、架构分层检测、调用关系追踪
 - **状态**: ✅ 已完成
-
 #### 4. 角色专属 Prompt 模板
 - **目录**: `docs/spec/role-prompts/`
 - **模板**: 架构师、产品经理、独立开发者、UI 设计师、测试专家
 - **状态**: ✅ 已完成
-
 #### 5. 3D 代码地图可视化
 - **文件**: `docs/code-map-visualizer.html`
 - **功能**: Three.js 3D 引擎、动态流动效果、深色/浅色主题切换
 - **状态**: ✅ 已完成
-
 #### 6. 任务可视化页面
 - **文件**: `docs/task-visualizer.html`
 - **功能**: 任务状态统计、角色卡片、依赖关系、交接记录、协同关系图
 - **状态**: ✅ 已完成
-
 ### v2.2 新增功能（长程 Agent 支持）
-
 #### 1. 检查点管理器
 - **文件**: `scripts/checkpoint_manager.py`
 - **功能**: 定期保存任务状态、断点恢复、数据完整性校验（SHA256）、自动过期清理
 - **状态**: ✅ 已完成
-
 #### 2. 任务清单管理器
 - **文件**: `scripts/task_list_manager.py`
 - **功能**: 任务拆解、优先级排序、依赖关系管理、进度跟踪、Markdown 导出
 - **状态**: ✅ 已完成
-
 #### 3. 增强版工作流引擎
 - **文件**: `scripts/workflow_engine_v2.py`
 - **功能**: 集成 Checkpoint + TaskList + Handoff、智能任务拆分、断点恢复
 - **状态**: ✅ 已完成
-
 ### v2.1 新增功能（AI 增强）
-
 #### 1. AI 语义匹配器
 - **文件**: `scripts/ai_semantic_matcher.py`
 - **功能**: 使用 AI 进行智能角色匹配
 - **状态**: ✅ 已完成并测试
-
 #### 2. AI 助手工具类
 - **文件**: `scripts/ai_assistant.py`
 - **功能**: 统一的 AI 能力接口
 - **状态**: ✅ 已完成并测试
-
 #### 3. AI 配置和初始化
 - **文件**: `scripts/ai_initializer.py`
 - **功能**: AI 组件配置和生命周期管理
 - **状态**: ✅ 已完成并测试
-
 #### 4. 增强角色匹配器
 - **文件**: `scripts/role_matcher.py`
 - **功能**: 集成 AI 语义匹配、多种匹配策略
 - **状态**: ✅ 已完成并测试
-
 ### v2.0 核心组件
-
 #### 1. 双层上下文管理器
 - **文件**: `scripts/dual_layer_context_manager.py`
 - **功能**: 全局上下文 + 任务上下文
 - **状态**: ✅ 已完成
-
 #### 2. 技能注册表
 - **文件**: `scripts/skill_registry.py`
 - **功能**: 技能注册和发现
 - **状态**: ✅ 已完成
-
 #### 3. 工作流引擎
 - **文件**: `scripts/workflow_engine.py`
 - **功能**: 工作流编排和执行
 - **状态**: ✅ 已完成
-
 #### 4. Agent Loop 控制器
 - **文件**: `scripts/agent_loop_controller_v2.py`
 - **功能**: 双层上下文增强的 Agent 循环控制
 - **状态**: ✅ 已完成
-
 #### 5. Agent 调度器
 - **文件**: `scripts/trae_agent_dispatch_v2.py`
 - **功能**: Agent 调度和分发
 - **状态**: ✅ 已完成
-
 ### v1.x 基础组件
-
 #### 1. 规范驱动开发工具
 - **文件**: `scripts/spec_tools.py`
 - **功能**: 规范初始化、分析、更新、验证
 - **状态**: ✅ 已完成
-
 #### 2. 项目理解工具
 - **文件**: `scripts/project_understanding.py`
 - **功能**: 项目文档和代码快速理解
 - **状态**: ✅ 已完成
-
 #### 3. 任务完成检查器
 - **文件**: `scripts/task_completion_checker.py`
 - **功能**: 任务完成状态检查和进度跟踪
 - **状态**: ✅ 已完成
-
 ### 测试覆盖
 
 #### v2.6 测试总览
@@ -375,20 +365,16 @@
 - **测试组件**: task_list_manager (9), checkpoint_manager (7), workflow_engine_v2 (5)
 - **通过率**: 100%
 - **状态**: ✅ 已完成
-
 #### AI 组件测试
 - **文件**: `scripts/test_ai_components.py`
 - **测试数**: 17 个
 - **通过率**: 100%
 - **状态**: ✅ 已完成
-
 #### V2 组件测试
 - **文件**: `scripts/test_v2_components.py`
 - **功能**: 双层上下文、技能注册、工作流测试
 - **状态**: ✅ 已完成
-
 ## 文档结构
-
 ### 核心文档（skill 根目录）
 - ✅ `README.md` - 中文主文档
 - ✅ `README_EN.md` - 英文主文档
@@ -398,7 +384,6 @@
 - ✅ `skill-manifest.yaml` - 技能清单
 - ✅ `skills-index.json` - 技能索引
 - ✅ `.gitignore` - Git 忽略配置
-
 ### 开发文档（docs/dev/）
 - ✅ `AI_INTEGRATION_SUMMARY.md` - AI 集成总结
 - ✅ `SIMPLESKILL_IMPROVEMENT_PLAN.md` - 改进计划
@@ -428,7 +413,6 @@
 - ✅ `test-expert/` - 测试专家文档
 - ✅ `solo-coder/` - 独立开发者文档（含执行记录）
 - ✅ `ui-designer/` - UI 设计师文档
-
 ### 规范文档（docs/spec/）
 - ✅ `SPEC.md` - 项目规范
 - ✅ `SPEC_TEMPLATE.md` - 规范模板
@@ -449,7 +433,6 @@
 - ✅ `VISUALIZATION.md` - 可视化指南
 
 ## 配置状态
-
 ### AI 集成配置
 ```yaml
 ai_integration:
@@ -485,15 +468,12 @@ ai_capabilities:
   autonomous_mode: true                 # v2.6 Phase 18 自主模式
   ponytail_decision_ladder: true        # v2.6 Phase 19 决策梯
 ```
-
 ### 匹配策略
 - ✅ `ai_enhanced` - AI 增强混合匹配（默认）
 - ✅ `semantic` - 纯 AI 语义匹配
 - ✅ `keyword` - 传统关键词匹配
 - ✅ `hybrid` - 传统混合匹配
-
 ## 性能指标
-
 ### 测试结果
 - **v2.6 总测试数**: 647+ 个测试，100% 通过
   - Phase 19 Ponytail: 98 个测试
@@ -507,7 +487,6 @@ ai_capabilities:
 - **缓存命中率**: 40-60%
 - **响应时间降低**: 50-70%
 - **API 调用减少**: 30-50%
-
 ## 技术亮点
 
 1. **Ponytail 决策梯强制执行** (v2.6 Phase 19)
@@ -813,8 +792,9 @@ results = matcher.match(requirement)
 
 ## 总结
 
-Trae Multi-Agent Skill v2.6 已成功实现：
+Trae Multi-Agent Skill v2.9.0 已成功实现：
 
+0. ✅ **既有系统理解能力 SU** (v2.9.0) - 黑盒 Web 系统全只读反向理解：18 模块 + 五条安全红线 + 两阶段宿主 LLM 工作流 + 400+ 测试用例
 1. ✅ **Ponytail 决策梯** (Phase 19) - 6 步决策梯 + 16 条红线 + 三种模式，少写多余代码
 2. ✅ **Autonomous Mode 自主模式** (Phase 18) - 9 大核心组件 + 17 个 CLI flag，全自主循环
 3. ✅ **插件热加载** (Phase 17) - 3 种加载路径 + 5 个 V3 插件，运行时动态扩展
@@ -829,4 +809,4 @@ Trae Multi-Agent Skill v2.6 已成功实现：
 12. ✅ **完整的测试覆盖** (v2.6) - 647+ 个测试 100% 通过
 13. ✅ **完善的文档体系** (v2.6) - 中英文双语、多层级文档
 
-v2.6 所有计划功能 100% 完成，所有测试通过，文档完整。技能持续迭代，质量稳定可控。
+v2.9.0 所有计划功能 100% 完成，所有测试通过，文档完整。技能持续迭代，质量稳定可控。

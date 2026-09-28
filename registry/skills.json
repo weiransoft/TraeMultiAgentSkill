@@ -1,6 +1,6 @@
 {
-  "version": "2.4.1",
-  "updated_at": "2026-05-03T00:00:00.000000",
+  "version": "2.9.0",
+  "updated_at": "2026-09-28T00:00:00.000000",
   "skills": {
     "test-skill": {
       "name": "test-skill",
@@ -24,6 +24,79 @@
       "metadata": {},
       "created_at": "2026-03-17T22:21:59.077118",
       "updated_at": "2026-03-17T22:21:59.077124"
+    },
+    "system-understanding": {
+      "name": "system-understanding",
+      "version": "2.9.0",
+      "description": "既有系统反向理解（SU）：黑盒 Web 系统 Playwright 登录 + 图式 BFS 页面遍历 + DB/Redis 只读内省 + 三角关联分析 + 10 节《系统功能理解文档》。两阶段工作流：--skip-llm-phase 确定性采集 + 宿主 LLM 回填 findings + --render-only 收口渲染。软依赖（playwright/pymysql/psycopg2/redis）缺失时诚实降级，禁 mock。",
+      "author": "Trae Team",
+      "status": "active",
+      "capabilities": [
+        {
+          "name": "system_understanding",
+          "description": "黑盒 Web 系统反向理解：Playwright 登录 + BFS 页面遍历 + DB/Redis 只读内省 + 三角关联 + 10 节理解文档",
+          "input_schema": {
+            "type": "object",
+            "description": "凭据配置 JSON（system 必填，database/redis 可选）",
+            "properties": {
+              "system": {
+                "type": "object",
+                "description": "目标系统凭据（base_url/login_url/username/password/login_selectors/success_hint）"
+              },
+              "database": {
+                "type": "object",
+                "description": "MySQL/PostgreSQL 只读连接配置（可选）"
+              },
+              "redis": {
+                "type": "object",
+                "description": "Redis 只读采集配置（可选）"
+              }
+            }
+          },
+          "output_schema": {
+            "type": "object",
+            "description": "UNDERSTANDING.md（10 节）+ understanding.json（机读脱敏）+ diagrams/（navigation.mmd、er.mmd）"
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "playwright",
+          "version": ">=1.40.0",
+          "optional": true,
+          "description": "浏览器登录与页面遍历；缺失时 UI/API 透镜致命降级（退出码 5）"
+        },
+        {
+          "name": "pymysql",
+          "version": ">=1.1.0",
+          "optional": true,
+          "description": "MySQL 只读内省；缺失时跳过 DB 透镜并显式声明"
+        },
+        {
+          "name": "psycopg2-binary",
+          "version": ">=2.9",
+          "optional": true,
+          "description": "PostgreSQL 只读内省；缺失时跳过 DB 透镜并显式声明"
+        },
+        {
+          "name": "redis",
+          "version": ">=5.0.0",
+          "optional": true,
+          "description": "Redis 只读采集；缺失时跳过 Redis 透镜并显式声明"
+        }
+      ],
+      "metadata": {
+        "cli_entry": "scripts/system_understanding.py",
+        "package": "scripts/su/",
+        "prd": "docs/dev/SYSTEM_UNDERSTANDING_PRD.md",
+        "architecture": "docs/dev/SYSTEM_UNDERSTANDING_ARCHITECTURE.md",
+        "llm_contract": "docs/spec/role-prompts/su-llm-backfill.md",
+        "guide": "docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md",
+        "unit_tests": "scripts/tests/scripts/run_system_understanding.sh",
+        "e2e_tests": "scripts/tests/scripts/run_system_understanding_e2e.sh"
+      },
+      "created_at": "2026-09-28T00:00:00.000000",
+      "updated_at": "2026-09-28T00:00:00.000000"
     }
   }
 }

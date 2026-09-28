@@ -1,11 +1,9 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档）。
 ---
-
 # Multi-Agent Team Dispatcher (AI-Enhanced)
-
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
 
 > **能力实现方式说明（v2.7.1 诚实标注）**：
@@ -22,6 +20,11 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 - 🧹 v1 死代码清算：删除 `workflow_engine.py` / `code_map_generator.py` / `test_v2_components.py`，`dispatch/legacy.py` 切换到 `WorkflowEngineV2`
 - 📦 依赖显式化：`requirements.txt` 标注软依赖（playwright / Pillow / sentence-transformers 均为可选）
 
+**v2.9 新增（既有系统理解能力 SU）**:
+- 🔍 黑盒 Web 系统反向理解：Playwright 自动登录 + 图式 BFS 页面遍历 + DB/Redis 只读内省 + UI↔API↔DB 三角关联，产出 10 节《系统功能理解文档》
+- 🚫 五条安全红线：凭据不落盘明文、DB 严格只读、Redis 只读白名单、浏览器网络层拦截全部非 GET 与白名单外域、危险按钮零点击
+- 🤖 两阶段工作流：脚本层零 LLM 采集证据，宿主 LLM 按 `docs/spec/role-prompts/su-llm-backfill.md` 契约回填语义结论，CLI `--render-only` 校验收口
+
 **v2.5 新增（Cybernetics 工程控制论增强）**:
 > 参考来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  
 > 理论依据：钱学森工程控制论（系统工程、系统学）、ICLR 2026 Profile-Aware Maneuvering 架构、Norbert Wiener 控制论、Ashby 必要多样性定律  
@@ -29,7 +32,6 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 > - 💫 反馈控制环：感知-决策-执行-反馈完整闭环
 > - 📊 性能画像：执行案例记录、相似案例检索
 > - 🛡️ 守护协调器：执行前验证、异常检测、AI增强风险评估
-
 **v2.4 新增（Karpathy 四大核心原则）**:
 - 🧠 **Think Before Coding（三思而后行）**: 明确假设、呈现权衡、遇到不清就问
 - 🎯 **Simplicity First（简单优先）**: 最小代码、无 speculative features、无过度抽象
@@ -54,38 +56,29 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 - 📋 任务可视化页面：实时展现各角色任务状态、进度、依赖关系、交接过程
 - 🎨 3D 代码地图可视化：基于 Three.js 的交互式代码结构可视化，支持流动动画和主题切换
 - ✅ 文档与代码一致性检查：审查报告中新增文档与代码差异检查清单
-
 ## Karpathy 四大核心原则（行为准则）
-
 > **来源**: Andrej Karpathy 对 LLM 编程常见陷阱的观察
 > **目的**: 减少 LLM 编程中的错误、过度复杂、无关修改等问题
-
 所有角色必须遵守以下四大原则，详见各角色介绍中的「Karpathy 原则应用」表格。
-
 | 原则 | 核心要求 | 禁止行为 |
 |------|---------|---------|
 | 🧠 Think Before Coding | 明确假设、问清楚、不隐藏困惑 | ❌ 假设用户意图、默默选择方案 |
 | 🎯 Simplicity First | 最小代码、无 speculative features | ❌ 过度抽象、预留未来代码 |
 | 🔬 Surgical Changes | 只改必要的、保持风格一致 | ❌ 溢出修改、顺手改无关代码 |
 | ✅ Goal-Driven | 定义成功标准、验证检查点 | ❌ 不知道何时完成、跳过验证 |
-
 **速查**:
 - 需求不明确 → 停下来问清楚
 - 考虑添加抽象 → 问"真的需要吗？"
 - 修改代码 → 只改必要的行
 - 开始实现 → 定义成功标准
-
 详细说明和示例见 `docs/guides/KARPATHY_PRINCIPLES.md`。
-
 ## 多语言支持 (Multi-Language Support)
-
 ### 语言识别规则
 **自动识别用户语言**:
 - 用户使用中文 → 所有响应使用中文
 - 用户使用英文 → 所有响应使用英文
 - 用户混合使用 → 以首次使用的语言为准
 - 用户明确要求切换 → 立即切换到目标语言
-
 ### 响应语言规则
 **所有输出必须使用用户相同的语言**:
 - 角色定义和 Prompt
@@ -93,16 +86,13 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 - 审查报告和问题清单
 - 错误信息和成功提示
 - 文档和注释
-
 **示例**:
 ```
 用户（中文）: "设计系统架构"
 AI（中文）: "📋 已接收任务，开始分析..."
-
 用户（English）: "Design system architecture"
 AI (English): "📋 Task received, starting analysis..."
 ```
-
 ### 角色名称映射
 **中文 → 英文**:
 - 架构师 → Architect
@@ -110,18 +100,13 @@ AI (English): "📋 Task received, starting analysis..."
 - 测试专家 → Test Expert
 - 独立开发者 → Solo Coder
 - UI 设计师 → UI Designer
-
 ## 核心能力
-
 ### AI 增强能力 (v2.1 新增)
-
 1. **AI 语义理解驱动的角色匹配**: 使用大模型理解任务的深层语义，而非简单关键词匹配
 2. **可解释的智能决策**: 提供匹配原因和置信度评分，决策过程透明可解释
 3. **上下文感知的智能推理**: 基于历史经验和领域知识进行智能推理
 4. **自然语言交互界面**: 支持自然语言对话，理解用户意图
-
 ### 基础能力
-
 1. **智能角色调度**: 根据任务描述自动识别需要的角色
 2. **多角色协同**: 组织多个角色共同完成复杂任务
 3. **上下文感知**: 根据项目阶段和历史上下文选择角色
@@ -133,6 +118,7 @@ AI (English): "📋 Task received, starting analysis..."
 9. **规范驱动开发**: 基于项目规范和文档进行开发
 10. **八阶段标准工作流程**: 需求分析→架构设计→UI设计→测试设计→任务分解→开发实现→测试验证→文档对照代码审查
 11. **UI 设计**: 创建独特、生产级的 UI 界面，避免通用的 AI "slop" 美学
+12. **既有系统理解（黑盒 Web 系统）**: Playwright 登录 + BFS 页面遍历 + DB/Redis 只读内省 + 三角关联 + 10 节《系统功能理解文档》
 
 ## 核心入口与门面（v2.8.3 确认）
 
@@ -250,24 +236,20 @@ python3 scripts/host_llm_bridge.py write-response <request_id> \
 详细设计见 `docs/dev/HOST_LLM_BRIDGE_DESIGN.md`。
 
 ## 快速开始
-
 ### 基础使用
 ```bash
 # 自动调度（推荐）
 python3 scripts/trae_agent_dispatch_v2.py \
     --task "设计系统架构"
-
 # 指定角色
 python3 scripts/trae_agent_dispatch_v2.py \
     --task "实现功能" \
     --agent solo_coder
-
 # 多角色共识
 python3 scripts/trae_agent_dispatch_v2.py \
     --task "启动新项目" \
     --consensus true
 ```
-
 ### 完整项目流程
 ```bash
 # 启动完整项目（自动执行 7 个阶段）
@@ -275,27 +257,23 @@ python3 scripts/trae_agent_dispatch_v2.py \
     --task "启动项目：安全浏览器广告拦截功能" \
     --project-full-lifecycle
 ```
-
 ### AI 增强模式 (v2.1 新增)
 ```bash
 # 使用 AI 语义匹配（默认）
 python3 scripts/trae_agent_dispatch_v2.py \
     --task "设计微服务架构，支持高并发和弹性扩展" \
     --agent auto  # AI 会自动匹配最合适的角色
-
 # 查看 AI 匹配结果和解释
 python3 scripts/trae_agent_dispatch_v2.py \
     --task "实现用户认证和权限管理" \
     --agent auto \
     --explain  # 显示 AI 匹配原因和置信度
-
 # 使用传统关键词匹配（向后兼容）
 python3 scripts/trae_agent_dispatch_v2.py \
     --task "编写单元测试" \
     --agent test-expert \
     --match-strategy keyword
 ```
-
 ## AI 集成说明 (v2.1)
 
 > **宿主 LLM 调度指令（提示词层，Trae/Claude 主 Agent 必读）**：
@@ -364,7 +342,6 @@ python3 scripts/trae_agent_dispatch_v2.py \
 - **知识问答**: 宿主 LLM 直接回答
 
 ### AI 配置
-
 ```yaml
 ai_integration:
   enabled: true
@@ -387,26 +364,19 @@ ai_integration:
     use_cache: true
     fallback_to_keyword: true  # 脚本层降级链：embedder → 关键词
 ```
-
 ### 性能优化
-
 - **缓存机制**: 相同请求直接返回缓存结果
 - **降级策略**: 脚本层 embedder 不可用时自动降级到关键词匹配；AI 语义理解始终由宿主 LLM 提供，无降级
 - **批量处理**: 支持批量请求，减少 API 调用次数
-
 ## 角色介绍
-
 ### 通用行为准则（所有角色必须遵守）
-
 **Karpathy 四大核心原则**:
-
 | 原则 | 核心要求 | 禁止行为 |
 |------|---------|---------|
 | 🧠 Think Before Coding | 明确假设、问清楚、不隐藏困惑 | ❌ 假设用户意图、默默选择方案 |
 | 🎯 Simplicity First | 最小代码、无 speculative features | ❌ 过度抽象、预留未来代码 |
 | 🔬 Surgical Changes | 只改必要的、保持风格一致 | ❌ 溢出修改、顺手改无关代码 |
 | ✅ Goal-Driven | 定义成功标准、验证检查点 | ❌ 不知道何时完成、跳过验证 |
-
 ### 1. 架构师 (Architect)
 **职责**: 设计系统性、前瞻性、可落地、可验证的架构
 **触发关键词**: 架构、设计、选型、审查、性能、瓶颈、模块、接口、部署
@@ -534,52 +504,41 @@ python3 scripts/run_workflow_loop.py \
 ❌ 代码中残留 TODO/FIXME 未实现就发布（v2.8 新增）
 
 ## 高级功能
-
 ### 代码走读与审查 (v2.3)
-
 ```bash
 # 执行真正的多角色协作代码走读（使用 Trae Agent 调度）
 python3 scripts/multi_role_collaborative_analyzer.py /path/to/project --workspace /workspace
-
 # 简化的多角色代码走读
 python3 scripts/multi_role_code_walkthrough.py /path/to/project --workspace /workspace
 ```
-
 **真正的多角色协作分析流程**:
-
 1. **阶段一：项目扫描**
    - 递归扫描项目目录
    - 识别源代码文件、配置文件、文档文件
    - 统计项目基本信息
    - 检测技术栈和框架
    - 识别项目模块
-
 2. **阶段二：调用 Trae Agent 调度**
    - 使用 `trae_agent_dispatch_v2.py` 分发任务
    - 每个角色使用专属 prompt 模板
    - 角色包括：架构师、产品经理、独立开发者、UI 设计师、测试专家
    - 各角色独立执行真实分析
-
 3. **阶段三：文档对齐**
    - 收集各角色分析结果
    - 识别共识点与差异点
    - 合并统一的代码地图
    - 生成代码走读审查报告
-
 **输出文档**:
-
 | 文档 | 内容 |
 |------|------|
 | `<project>-ALIGNED-CODE-MAP.md` | 统一代码地图：项目概览、架构分层、多角色分析结果、对齐结果 |
 | `<project>-CODE-REVIEW-REPORT.md` | 代码走读审查报告：审查概述、架构评审、代码质量评估、文档一致性检查、改进建议 |
-
 **代码地图内容** (核心结构，不含审查风险):
 - 项目概览
 - 架构视图
 - 代码结构
 - 多角色视角摘要
 - 分析共识
-
 **审查报告内容** (含风险和建议):
 - 审查概览
 - 架构评审
@@ -588,46 +547,32 @@ python3 scripts/multi_role_code_walkthrough.py /path/to/project --workspace /wor
 - **文档与代码一致性检查清单** ← v2.3 新增
 - 改进建议
 - 附录
-
 ### 3D 代码地图可视化 (v2.3)
-
 基于 Three.js 的交互式代码结构可视化，支持流动动画和主题切换。
-
 ```bash
 # 生成可视化数据
 python3 scripts/code_map_generator_v2.py /path/to/project --visual
 # 打开可视化页面
 ~/.trae/skills/docs/code-map-visualizer.html
 ```
-
 **功能**: 3D 场景渲染、前后端分层、调用链路、动态流动效果、主题切换
 **详细说明**: `docs/guides/VISUALIZATION.md`
-
 ### 任务可视化页面 (v2.3)
-
 实时展现各角色任务状态、进度、依赖关系、交接过程。
-
 ```bash
 ~/.trae/skills/docs/task-visualizer.html
 ```
-
 **功能**: 任务统计、角色卡片、依赖关系、交接时间线、协同关系图
 **详细说明**: `docs/guides/VISUALIZATION.md`
-
 ### 代码地图生成
-
 ```bash
 python3 scripts/code_map_generator_v2.py /path/to/project --workspace /workspace
-
 # 输出: <project>-CODE_MAP.md
 ```
-
 ### 项目理解
-
 ```bash
 python3 scripts/project_understanding.py /path/to/project
 ```
-
 ### 规范驱动开发
 ```bash
 python3 scripts/spec_tools.py init
@@ -883,6 +828,23 @@ python3 scripts/visual_regression.py \
 
 **失败安全设计**: 任一检查器异常被 try/except 隔离，不影响主流程与其他检查；返回的 `error` 字段记录异常原因供排查。
 
+### 既有系统理解能力（v2.9 新增 — 黑盒系统反向理解）
+
+对无文档、无源码的遗留黑盒 Web 系统（配套 MySQL/PostgreSQL + Redis）做**全只读**反向理解：Playwright 自动登录后以图式 BFS 遍历页面（url_key 去重、动作分级、破坏性请求网络级拦截），并行进行 DB 只读内省（表/列/索引/采样/隐式外键推断）与 Redis 只读键模式采集，再做 UI↔API↔表↔Redis 三角关联分析，最终渲染固定 10 节《系统功能理解文档》（UNDERSTANDING.md）与机读 understanding.json + Mermaid 图。采用两阶段工作流：确定性脚本层零 LLM 调用、不出语义结论，语义结论由宿主 LLM 按提示词契约回填后经 `--render-only` 校验收口。
+
+```bash
+# 阶段 A：确定性采集（凭据推荐 JSON 配置文件，chmod 600）
+python3 scripts/system_understanding.py --config config.json --skip-llm-phase
+# 阶段 B：宿主 LLM 读取脱敏产物 understanding.json，按
+#   docs/spec/role-prompts/su-llm-backfill.md 契约产出 findings 写回该文件
+# 阶段 C：收口渲染（不启动浏览器、不连库，校验 findings 后重渲染全部产物）
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --render-only
+```
+
+**五条安全红线（不可协商）**: ① 凭据不进 LLM 上下文、不落盘明文（统一 redact 管线 + 日志全程脱敏）；② DB 会话只读 + 语句白名单校验器，严禁任何 DDL/DML；③ Redis 命令硬编码只读白名单；④ 浏览器网络层拦截全部非 GET 请求与白名单外域；⑤ 危险按钮（删除/提交/支付等）零点击、只记录。软依赖（playwright/pymysql/psycopg2/redis）缺失时诚实降级并给出安装命令，绝不以假数据冒充已采集结果。
+
+详细使用指南见 `docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md`。
+
 ## 文档结构
 
 ```
@@ -904,16 +866,6 @@ python3 scripts/trae_agent_dispatch_v2.py \
     --task "..." \
     --agent architect
 ```
-
-### 共识未触发
-```bash
-# 显式要求共识
-python3 scripts/trae_agent_dispatch_v2.py \
-    --task "..." \
-    --consensus true
-```
-
-## 扩展开发
 
 ### 添加新角色
 1. 在 `roles.json` 中添加角色配置
@@ -937,5 +889,6 @@ Trae Multi-Agent Dispatcher 提供了：
 - ✅ 插件热加载 V3 架构（Phase 17）
 - ✅ 代码走读与审查 + 3D 代码地图可视化
 - ✅ UI 设计（避免 AI slop）
+- ✅ 既有系统理解能力 SU（v2.9，黑盒 Web 系统全只读反向理解 + 10 节理解文档）
 
 通过智能调度 + 自主编排 + 决策梯约束，减少用户干预，提升协作效率！

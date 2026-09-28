@@ -1,6 +1,20 @@
 # Trae Multi-Agent Skill
 
-🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup.
+🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup. v2.9 adds System Understanding (SU) — fully read-only reverse engineering of black-box web systems.
+
+## 🎉 September 2026 Latest Updates (v2.9)
+
+- ✅ **System Understanding (SU) (v2.9)** - Reverse-engineers legacy black-box web systems (with MySQL/PostgreSQL + Redis) that have no docs and no source code, fully read-only with zero side effects
+  - 🔐 **Playwright auto-login + graph-style BFS page traversal**: `url_key` normalization/dedup, DOM-pruned snapshots, three-tier action classification (T1 allow / T2 explicit GET forms / T3 dangerous actions record-only), network-layer interception of all non-GET requests and non-allowlisted origins; `--storage-state` bypass for captcha/2FA scenarios
+  - 🗄️ **Read-only DB introspection**: MySQL/PostgreSQL tables/columns/comments/PK/explicit FK/indexes/row estimates/sampling (value-level redaction) + implicit FK inference (triple pre-filter); session-level read-only + SQL statement allowlist validator
+  - ⚡ **Read-only Redis collection**: SCAN cursor + hardcoded read-only command allowlist + key-pattern clustering (count/TTL distribution/type)
+  - 🔗 **UI↔API↔DB triangle correlation**: deterministic page ↔ API ↔ table (↔ Redis key-pattern) evidence (overlap/containment scores) for LLM and document references
+  - 📄 **10-section System Understanding document**: overview / feature map / navigation graph / data model / UI↔data mapping / cache & middleware / business-rule digest / API surface / evidence appendix / unverified inferences & coverage gaps, plus machine-readable `understanding.json` and Mermaid sources with full evidence chain
+  - 💾 **Resumable runs**: SQLite (WAL) state store; after SIGINT/crash `--resume` inherits completed pages/tables/keys
+  - 🚫 **Five non-negotiable safety redlines**: credentials never persisted in plaintext (unified redact pipeline), DB strictly read-only, Redis read-only allowlist, browser network layer blocks all non-GET and non-allowlisted origins, zero clicks on dangerous buttons
+  - 🧪 **Tests**: 14 unit-test modules (`scripts/tests/test_su_*.py`) all passing; e2e scenarios [0]-[7] PASS, [8] SKIP without external DSN
+  - Core components: `scripts/system_understanding.py` (CLI entry) + `scripts/su/` (capability package, 18 module files)
+  - 📄 Detailed guide: [docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ## 🎉 July 2026 Latest Revision (v2.7.1)
 
@@ -203,7 +217,19 @@
    - Serves as work initialization context
    - Role-specific insights and recommendations
 
-8. **8-Stage Standard Workflow** 📊
+8. **System Understanding (SU)** 🕵️ (v2.9)
+   - Reverse-engineers legacy black-box web systems with no docs and no source code (with MySQL/PostgreSQL + Redis), fully read-only
+   - Playwright auto-login + graph-style BFS page traversal with `url_key` dedup and three-tier action classification
+   - Read-only DB introspection (incl. implicit FK inference) and Redis SCAN key-pattern clustering
+   - UI↔API↔DB triangle correlation with deterministic evidence scores
+   - Renders a fixed 10-section UNDERSTANDING.md + machine-readable `understanding.json` + Mermaid diagrams
+   - Two-phase workflow: deterministic scripts produce zero semantic conclusions; host LLM backfills findings per `docs/spec/role-prompts/su-llm-backfill.md`, validated by `--render-only`
+   - Resumable via SQLite (WAL) state store (`--resume` / `--fresh`)
+   - Five non-negotiable safety redlines: credential redaction, DB/Redis read-only, non-GET network interception, zero dangerous clicks
+   - Core files: `scripts/system_understanding.py`, `scripts/su/` (18 module files)
+   - Detailed guide: `docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md`
+
+9. **8-Stage Standard Workflow** 📊
    - Stage 1: Requirements Analysis (Product Manager)
    - Stage 2: Architecture Design (Architect)
    - Stage 3: UI Design (UI Designer)
@@ -213,7 +239,7 @@
    - Stage 7: Test Verification (Test Expert)
    - Stage 8: Release Review (Multi-Agent)
 
-9. **Cross-Platform Compatibility** 🌍
+10. **Cross-Platform Compatibility** 🌍
    - Supports Windows, Mac, and Linux
    - Unified path handling and character encoding
    - Cross-platform script execution
@@ -333,6 +359,14 @@ python3 scripts/multi_role_code_walkthrough.py /path/to/project --workspace /wor
 
 # Project understanding
 python3 scripts/project_understanding.py /path/to/project
+
+# System understanding (SU, v2.9) — three-phase workflow
+# Phase A: deterministic collection (login + BFS crawl + DB/Redis introspection)
+python3 scripts/system_understanding.py --config config.json --skip-llm-phase
+# Phase B: host LLM reads sanitized understanding.json and backfills findings
+#   per docs/spec/role-prompts/su-llm-backfill.md contract
+# Phase C: validation + re-render only (no browser, no DB/Redis connections)
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --render-only
 ```
 
 ## 🎭 Agent Roles / 角色介绍
@@ -540,6 +574,24 @@ python3 scripts/project_understanding.py /path/to/project
 #   - Code structure analysis
 #   - Document and dependency analysis
 #   - Role-specific insights and recommendations
+```
+
+### Scenario 8: System Understanding (SU) / 场景 8: 既有系统理解
+
+```bash
+# Phase A: deterministic collection (fully read-only: login + BFS crawl + DB/Redis introspection)
+python3 scripts/system_understanding.py --config config.json --skip-llm-phase
+
+# Phase B: host LLM reads the sanitized understanding.json and writes findings
+#   back into its "findings" section, per docs/spec/role-prompts/su-llm-backfill.md
+
+# Phase C: validate findings and re-render all artifacts (no browser, no DB)
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --render-only
+
+# Output (docs/system-understanding/<system_id>/):
+# - UNDERSTANDING.md: 10-section system understanding document
+# - understanding.json: sanitized machine-readable results
+# - summary.json, state/understanding.sqlite (resume state), diagrams/*.mmd, evidence/
 ```
 
 ## 📦 Installation / 安装说明

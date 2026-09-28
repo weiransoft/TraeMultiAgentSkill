@@ -1,8 +1,8 @@
 #!/bin/bash
 # -*- coding: utf-8 -*-
-# Dynamic Workflows + V2 全量测试入口
-# 顺序：动态工作流 → V2 回归
-# 目的：一键验证 Phase 1+2+3+4+5+6+7+8+9+10+11 集成 + 不破坏 V2
+# Dynamic Workflows + V2 + SU 全量测试入口
+# 顺序：动态工作流 → V2 回归 → SU 单元测试 → SU e2e 集成测试
+# 目的：一键验证 Phase 1+2+3+4+5+6+7+8+9+10+11 集成 + 不破坏 V2 + SU 能力全链路
 
 set -e
 
@@ -24,7 +24,20 @@ echo "─── Step 1: V2 回归测试 ───"
 echo ""
 bash "${SCRIPT_DIR}/run_v2_regression.sh"
 
-# Step 2: 总览
+# Step 2: SU（System Understanding）单元测试（11 模块 + fixture 自测）
+echo ""
+echo "─── Step 2: SU 单元测试 ───"
+echo ""
+bash "${SCRIPT_DIR}/run_system_understanding.sh"
+
+# Step 3: SU e2e 集成测试（fixture 站点 + 真实 SU 进程；playwright 缺失时
+# 场景[1]~[6] 显式 SKIP 不假通过）
+echo ""
+echo "─── Step 3: SU e2e 集成测试 ───"
+echo ""
+bash "${SCRIPT_DIR}/run_system_understanding_e2e.sh"
+
+# Step 4: 总览
 echo ""
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║                                                                ║"

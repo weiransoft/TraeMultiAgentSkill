@@ -9,6 +9,7 @@
 - [场景示例](#-场景示例)
   - [示例 11: Karpathy 原则检查 (v2.4)](#示例-11-karpathy-原则检查-v24)
   - [示例 12: Claude Code 平台调用 (v2.4)](#示例-12-claude-code-平台调用-v24)
+  - [示例 13: 既有系统理解 SU (v2.9)](#示例-13-既有系统理解-su-v29)
 - [最佳实践](#-最佳实践)
 
 ## 🎯 基础示例
@@ -819,6 +820,78 @@ cat docs/project-understanding/architect_understanding.md
 3. 实现熔断和降级
 4. 完善监控和日志
 ```
+
+---
+
+### 示例 13: 既有系统理解 SU (v2.9)
+
+**场景**: 接手一个遗留工单系统——无文档、无源码，只有一个可登录的 Web 管理后台（配套 MySQL 数据库与 Redis 缓存），需要在不动系统一根手指（全程只读）的前提下搞清楚它的功能、数据模型和业务规则。
+
+**第 1 步：准备配置文件** `config.json`（推荐 `chmod 600`，凭据不进 shell 历史）:
+```json
+{
+  "system": {
+    "base_url": "https://ticket.legacy.internal",
+    "login_url": "/login",
+    "username": "<系统账号>",
+    "password": "<系统密码>",
+    "success_hint": ".layout-container"
+  },
+  "database": {
+    "engine": "mysql",
+    "host": "127.0.0.1", "port": 3306, "user": "ro_user", "password": "<只读密码>",
+    "database": "ticket_db"
+  },
+  "redis": {
+    "host": "127.0.0.1", "port": 6379, "password": "<密码>", "db": 0,
+    "key_allowlist": ["ticket:*", "sess:*"]
+  }
+}
+```
+
+**第 2 步：三阶段执行**:
+```bash
+# 阶段 A：确定性采集（登录 + 图式 BFS 遍历 + DB/Redis 只读内省 + 三角关联）
+# --skip-llm-phase：脚本层零 LLM 调用，第 5/7 节写"待 LLM 语义回填"占位，不虚构结论
+python3 scripts/system_understanding.py --config config.json --skip-llm-phase --system-id ticket-legacy
+
+# 阶段 B：宿主 LLM（TRAE 各角色）读取脱敏产物 understanding.json，按
+#   docs/spec/role-prompts/su-llm-backfill.md 契约产出 findings JSON 写回该文件 findings 段
+
+# 阶段 C：收口渲染（不启动浏览器、不连库；findings 校验失败退出码 2 并中文逐条列出）
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id ticket-legacy --render-only
+```
+
+**预期产物** (`docs/system-understanding/ticket-legacy/`):
+```
+📄 UNDERSTANDING.md          # 《系统功能理解文档》（10 节：概览/功能地图/导航图/
+                             #   数据模型/UI↔数据映射/缓存与中间件/业务规则/API 面/
+                             #   证据附录/未验证推断与未覆盖清单）
+📄 understanding.json        # 结构化全量结果（机读、脱敏后）
+📄 summary.json              # 运行摘要（预算消耗、透镜完成度、confidence 分布）
+📁 state/understanding.sqlite  # 断点续跑状态库（SIGINT 后 --resume 续跑）
+📁 snapshots/                # 页面语义骨架快照（剪枝脱敏）
+📁 diagrams/navigation.mmd   # 导航图 + er.mmd ER 图（隐式 FK 标"推断"）
+📁 evidence/evidence-index.json  # 证据编号 → 状态库记录映射
+```
+
+**findings 回填示例**（写入 understanding.json 的 findings 段）:
+```json
+{
+  "findings": [
+    {
+      "claim": "工单列表页（pages:8）的 /api/tickets（api_observations:2）读取 tickets 表（db_tables:5）",
+      "kind": "mapping",
+      "confidence": "high",
+      "evidence_refs": ["pages:8", "api_observations:2", "db_tables:5", "relations:3"],
+      "status": "proposed"
+    }
+  ]
+}
+```
+
+> 登录页有验证码/2FA？人工登录一次导出 storage_state，加 `--storage-state <path>` 旁路自动登录。
+> 详细指南：[docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ---
 

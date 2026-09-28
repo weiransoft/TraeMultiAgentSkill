@@ -20,6 +20,12 @@ python>=3.8
 # flake8>=4.0.0          # Code checking
 # mypy>=0.950            # Type checking
 
+# SU Capability Soft Dependencies (Optional, runtime try-import, honest degradation when missing; see docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
+# playwright>=1.40.0     # Browser login & page traversal (SU capability; honest UI-lens degradation when missing)
+# pymysql>=1.1.0         # MySQL read-only introspection (SU)
+# psycopg2-binary>=2.9   # PostgreSQL read-only introspection (SU)
+# redis>=5.0.0           # Redis read-only collection (SU)
+
 # Note:
 # This skill primarily uses Python standard library, no additional third-party packages required
 # Just ensure Python version >= 3.8

@@ -40,3 +40,13 @@
 # black>=22.0.0          # 代码格式化
 # flake8>=4.0.0          # 代码检查
 # mypy>=0.950            # 类型检查
+
+# SU 能力软依赖（可选，运行时 try-import，缺失时诚实降级，见 docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md）
+# playwright>=1.40.0     # 浏览器登录与页面遍历（SU 能力，缺失时 UI 透镜诚实降级）
+# pymysql>=1.1.0         # MySQL 只读内省（SU）
+# psycopg2-binary>=2.9   # PostgreSQL 只读内省（SU）
+# redis>=5.0.0           # Redis 只读采集（SU）
+
+# 注意：
+# 本技能主要使用 Python 标准库，无需安装额外的第三方包
+# 只需确保 Python 版本 >= 3.8 即可

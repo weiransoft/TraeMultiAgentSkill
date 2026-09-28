@@ -30,6 +30,28 @@
 | 待处理 | Pending |
 | 被阻塞 | Blocked |
 
+## 既有系统理解 SU 命令速查 (v2.9)
+
+| 阶段 | 命令 | 说明 |
+|------|------|------|
+| 采集 | `python3 scripts/system_understanding.py --config config.json --skip-llm-phase` | 登录 + BFS 遍历 + DB/Redis 只读内省，产出骨架文档 |
+| 回填 | 宿主 LLM 按 `docs/spec/role-prompts/su-llm-backfill.md` 契约写 `understanding.json` 的 findings 段 | 脚本不参与语义结论 |
+| 渲染 | `python3 scripts/system_understanding.py --out <前次输出根目录> --system-id <id> --render-only` | 校验 findings 并重渲染全部产物，不启动浏览器/不连库 |
+
+**关键参数**：
+
+| 参数 | 说明 |
+|------|------|
+| `--max-pages N` | 页面预算上限（默认 100） |
+| `--skip-llm-phase` | 只跑确定性采集，产出"待 LLM 语义回填"骨架 |
+| `--render-only` | 仅校验 findings + 幂等重渲染（失败退出码 2） |
+| `--storage-state PATH` | 人工已登录态旁路注入（验证码/2FA 场景） |
+| `--resume` / `--fresh` | 断点续跑（默认）/ 归档旧状态后重跑 |
+
+**退出码**：0 成功；2 配置/findings 校验错误；3 系统不可达；4 登录失败；5 playwright 缺失；130 SIGINT（可 `--resume`）
+
+📄 详细指南：[docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
+
 ## 示例
 
 ### 中文

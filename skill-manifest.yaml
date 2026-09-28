@@ -1,7 +1,7 @@
 name: multi-agent-team
-version: 2.8.4
+version: 2.9.0
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
@@ -23,6 +23,7 @@ description: |
   - 大模型 AI 助手深度集成
   - 长程 Agent 支持（Checkpoint + Handoff + TaskList）
   - Claude Code SubAgent 平台适配
+  - 既有系统反向理解（SU：黑盒 Web 系统只读采集 + 10 节理解文档，v2.9）
 
 author: Trae Team
 status: active
@@ -296,6 +297,49 @@ capabilities:
             type: string
           description: 建议列表
 
+  - name: system_understanding
+    description: |
+      既有系统反向理解（SU）能力：黑盒 Web 系统反向理解
+
+      核心能力：
+      - Playwright 自动登录（会话维持、重登、storage_state 验证码/2FA 旁路）
+      - 图式 BFS 页面遍历（url_key 去重、动作分级 T1/T2/T3、破坏性请求网络级拦截）
+      - DB/Redis 只读内省（MySQL/PostgreSQL SELECT-only 白名单、Redis 只读命令白名单）
+      - UI↔API↔表↔Redis 三角关联分析（确定性证据 + 隐式外键推断）
+      - 10 节《系统功能理解文档》渲染 + 宿主 LLM 两阶段语义回填工作流
+
+      安全红线：凭据不落盘明文（统一 redact 管线）；DB/Redis 严格只读；
+      浏览器网络层拦截全部非 GET 与白名单外域；危险按钮零点击。
+
+    input_schema:
+      type: object
+      description: 凭据配置 JSON（system 必填，database/redis 可选，缺失透镜自动跳过并登记）
+      properties:
+        system:
+          type: object
+          description: 目标系统凭据（base_url/login_url/username/password/login_selectors/success_hint）
+        database:
+          type: object
+          description: MySQL/PostgreSQL 只读连接配置（engine/host/port/user/password/database/schemas，可选）
+        redis:
+          type: object
+          description: Redis 只读采集配置（host/port/password/db/key_allowlist，可选）
+    output_schema:
+      type: object
+      description: 输出产物（docs/system-understanding/<system_id>/ 目录）
+      properties:
+        understanding_md:
+          type: string
+          description: UNDERSTANDING.md《系统功能理解文档》主文档（固定 10 节）
+        understanding_json:
+          type: string
+          description: understanding.json 结构化全量结果（机读、脱敏后，供宿主 LLM 消费）
+        diagrams:
+          type: array
+          items:
+            type: string
+          description: diagrams/ 目录 Mermaid 图源（navigation.mmd 导航图、er.mmd ER 图）
+
 dependencies: []
 
 ai_integration:
@@ -439,6 +483,15 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.9.0
+      date: "2026-09-28"
+      changes:
+        - 新增 SU（System Understanding）既有系统反向理解能力：黑盒 Web 系统 Playwright 登录 + 图式 BFS 页面遍历 + DB/Redis 只读内省 + 三角关联分析 + 10 节《系统功能理解文档》
+        - 两阶段工作流：--skip-llm-phase 确定性采集 + 宿主 LLM 按 docs/spec/role-prompts/su-llm-backfill.md 回填 findings + --render-only 收口渲染
+        - 五条安全红线：凭据不落盘明文（统一 redact 管线）、DB/Redis 严格只读、浏览器网络层拦截全部非 GET 与白名单外域、危险按钮零点击、软依赖缺失诚实降级（禁 mock）
+        - 新增 scripts/system_understanding.py CLI 入口与 scripts/su/ 能力包（18 个模块文件）；14 个单测模块全通过，e2e 场景[0]-[7] PASS、[8] SKIP
+        - 能力清单同步：skill-manifest / skills-index / claude-code-skill / registry / SKILL.md / requirements 追加 SU 条目与注释化软依赖
+
     - version: 2.8.4
       date: "2026-07-23"
       changes:
@@ -499,4 +552,4 @@ metadata:
         - 简单的上下文管理
 
 created_at: "2026-03-16T00:00:00"
-updated_at: "2026-07-23T00:00:00"
+updated_at: "2026-09-28T00:00:00"

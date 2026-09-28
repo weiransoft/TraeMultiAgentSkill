@@ -9,6 +9,7 @@ This document provides practical usage examples for Trae Multi-Agent Skill.
 - [Scenario Examples](#-scenario-examples)
   - [Example 11: Karpathy Principle Checking (v2.4)](#example-11-karpathy-principle-checking-v24)
   - [Example 12: Claude Code Platform Invocation (v2.4)](#example-12-claude-code-platform-invocation-v24)
+  - [Example 13: System Understanding (SU) (v2.9)](#example-13-system-understanding-su-v29)
 - [Best Practices](#-best-practices)
 
 ## 🎯 Basic Examples
@@ -819,6 +820,78 @@ cat docs/project-understanding/architect_understanding.md
 3. Implement circuit breaker and fallback
 4. Improve monitoring and logging
 ```
+
+---
+
+### Example 13: System Understanding (SU) (v2.9)
+
+**Scenario**: You inherited a legacy ticket system — no docs, no source code, only a loginable web admin console (with a MySQL database and Redis cache). You need to understand its features, data model, and business rules without touching the system at all (fully read-only).
+
+**Step 1: Prepare config file** `config.json` (recommended `chmod 600`; keeps credentials out of shell history):
+```json
+{
+  "system": {
+    "base_url": "https://ticket.legacy.internal",
+    "login_url": "/login",
+    "username": "<system account>",
+    "password": "<system password>",
+    "success_hint": ".layout-container"
+  },
+  "database": {
+    "engine": "mysql",
+    "host": "127.0.0.1", "port": 3306, "user": "ro_user", "password": "<read-only password>",
+    "database": "ticket_db"
+  },
+  "redis": {
+    "host": "127.0.0.1", "port": 6379, "password": "<password>", "db": 0,
+    "key_allowlist": ["ticket:*", "sess:*"]
+  }
+}
+```
+
+**Step 2: Three-phase execution**:
+```bash
+# Phase A: deterministic collection (login + graph-style BFS crawl + read-only DB/Redis introspection + triangle correlation)
+# --skip-llm-phase: zero LLM calls in the script layer; sections 5/7 render "pending LLM backfill" placeholders, no fabricated conclusions
+python3 scripts/system_understanding.py --config config.json --skip-llm-phase --system-id ticket-legacy
+
+# Phase B: host LLM (TRAE roles) reads the sanitized understanding.json and writes
+#   findings JSON back into its "findings" section, per docs/spec/role-prompts/su-llm-backfill.md
+
+# Phase C: closing render (no browser, no DB connections; findings validation failure -> exit code 2 with per-item Chinese messages)
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id ticket-legacy --render-only
+```
+
+**Expected artifacts** (`docs/system-understanding/ticket-legacy/`):
+```
+📄 UNDERSTANDING.md          # 10-section system understanding document (overview / feature map /
+                             #   navigation graph / data model / UI↔data mapping / cache & middleware /
+                             #   business rules / API surface / evidence appendix / unverified inferences & gaps)
+📄 understanding.json        # Structured full results (machine-readable, sanitized)
+📄 summary.json              # Run summary (budget usage, lens completeness, confidence distribution)
+📁 state/understanding.sqlite  # Resume state store (--resume after SIGINT)
+📁 snapshots/                # Page semantic skeleton snapshots (pruned & sanitized)
+📁 diagrams/navigation.mmd   # Navigation graph + er.mmd ER diagram (implicit FKs marked "inferred")
+📁 evidence/evidence-index.json  # Evidence ID → state-store record mapping
+```
+
+**Findings backfill example** (written into the findings section of understanding.json):
+```json
+{
+  "findings": [
+    {
+      "claim": "The ticket list page (pages:8) reads the tickets table (db_tables:5) via /api/tickets (api_observations:2)",
+      "kind": "mapping",
+      "confidence": "high",
+      "evidence_refs": ["pages:8", "api_observations:2", "db_tables:5", "relations:3"],
+      "status": "proposed"
+    }
+  ]
+}
+```
+
+> Captcha/2FA on the login page? Log in manually once, export storage_state, then bypass auto-login with `--storage-state <path>`.
+> Detailed guide: [docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ---
 

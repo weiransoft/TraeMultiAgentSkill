@@ -1,6 +1,22 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略）。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解。
+
+## 🎉 2026 年 9 月最新更新 (v2.9)
+
+> 面向无文档、无源码的遗留黑盒 Web 系统（配套 MySQL/PostgreSQL + Redis），全程只读、零副作用
+
+- ✅ **既有系统理解能力 SU (v2.9)** - System Understanding，黑盒系统反向理解
+  - 🔐 **Playwright 自动登录 + 图式 BFS 页面遍历**：`url_key` 规范化去重、DOM 剪枝快照、动作三级分级（T1 放行 / T2 显式 GET 表单 / T3 危险操作只记录）、网络层拦截全部非 GET 请求与白名单外域；验证码/2FA 场景支持 `--storage-state` 人工已登录态旁路
+  - 🗄️ **DB 只读内省**：MySQL/PostgreSQL 表/列/注释/PK/显式 FK/索引/行数估算/采样（逐值脱敏）+ 隐式外键推断（三重预筛）；会话级只读 + SQL 语句白名单校验器
+  - ⚡ **Redis 只读采集**：SCAN 游标 + 命令硬编码只读白名单 + 键模式聚类（数量/TTL 分布/类型）
+  - 🔗 **UI↔API↔DB 三角关联**：页面 ↔ API ↔ 表（↔ Redis 键模式）确定性关联证据（重合度/包含度数值）
+  - 📄 **10 节《系统功能理解文档》**：系统概览/功能地图/导航图/数据模型/UI↔数据映射/缓存与中间件/业务规则汇编/API 面/证据附录/未验证推断与未覆盖清单，另有机读 `understanding.json` 与 Mermaid 图源，全程证据链
+  - 💾 **断点续跑**：SQLite（WAL）状态库，SIGINT/崩溃后 `--resume` 自动继承已完成页面/表/键
+  - 🚫 **五条安全红线（不可协商）**：凭据不落盘明文（统一 redact 管线）、DB 严格只读、Redis 只读白名单、浏览器网络层拦截全部非 GET 与白名单外域、危险按钮零点击
+  - 🧪 **测试**：14 个单测模块（`scripts/tests/test_su_*.py`）全通过；e2e 场景 [0]-[7] PASS、[8] 缺外部 DSN 时 SKIP
+  - 核心组件：`scripts/system_understanding.py`（CLI 入口）+ `scripts/su/`（能力包，18 个模块文件）
+  - 📄 详细指南：[docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ## 🎉 2026 年 7 月最新更新 (v2.8.1)
 
@@ -118,10 +134,8 @@
   - 📄 详细方案：[docs/dev/PHASE17_PLAN.md](docs/dev/PHASE17_PLAN.md)
 
 ## 🎉 2026 年 5 月最新更新 (v2.5)
-
 > 来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  
 > 理论依据：ICLR 2026 Profile-Aware Maneuvering 架构、钱学森工程控制论（系统工程、系统学）、Norbert Wiener 控制论、Ashby 必要多样性定律
-
 - ✅ ** 工程控制论增强 (v2.5)** - 基于 cybernetics-agent 项目引入反馈闭环、自适应和可观测性增强
   - 🔄 **三环控制模型**：战略层（任务规划、AI动态规划）、战术层（Guard验证、异常检测）、执行层（任务执行、反馈收集）
   - 💫 **反馈控制环**：感知-决策-执行-反馈完整闭环，基于案例的策略选择（非PID，适配认知任务）
@@ -132,40 +146,54 @@
   - 📄 详细分析：[docs/dev/CYBERNETICS_ANALYSIS.md](docs/dev/CYBERNETICS_ANALYSIS.md)
 
 ## 🎉 2026 年 4 月最新更新 (v2.4)
-
+- ✅ **Ponytail 决策梯 (v2.6)** - 6 步决策梯（YAGNI→标准库→平台原生→复用现有→一行优先→最小可行）+ 16 条不可简化红线 + 三种强度模式（lite/full/ultra）+ 债务台账 + 需求追踪
+- ✅ **Autonomous 自主迭代模式 (v2.6)** - 4 阶段循环（plan→dev→verify→fix）+ 9 个核心组件 + 17 个 CLI flag + 智能确认三态决策 + 断点续跑 + 跨平台防休眠
+- ✅ **Dynamic Workflows 6 大模式 (v2.6)** - 分类并行动 / 扇出与聚合 / 对抗性验证 / 生成与筛选 / 锦标赛 / 循环直到完成 + 12 个实现模块 + 模型路由 + worktree 隔离
+- ✅ **插件热加载 (v2.6)** - 3 种加载路径（静态注册 / 显式 API / drop-in 目录扫描）+ V3 插件实现 + 运行时轮询 + 生产安全（回滚 / 路径穿越防护）
+- ✅ **Cybernetics 工程控制论增强 (v2.5)** - 三环控制模型 + 反馈控制环 + 性能画像 + 守护协调器 + 6 个核心组件
 - ✅ **Karpathy 四大核心原则** - 融入 Andrej Karpathy 的编程智慧：Think Before Coding、Simplicity First、Surgical Changes、Goal-Driven Execution
 - ✅ **Karpathy 原则执行检查器** - 原则合规性检查、5 级严重度违规检测、验证检查点管理、执行报告生成
 - ✅ **Claude Code SubAgent 适配器** - 跨平台 Agent 适配，统一 Claude Code / Trae IDE 的 subagent 调用接口
 - ✅ **行为准则体系** - 所有角色统一的 LLM 编程行为准则，减少错误、过度复杂、无关修改
 - ✅ **验证检查点机制** - 目标驱动的验证流程，确保每个阶段都有明确的成功标准
 - ✅ **角色专属应用指南** - 每个角色都有 Karpathy 原则的具体应用场景和行为准则
+- ✅ **多角色代码走读 (v2.3)** - 架构师、产品经理、独立开发者、UI 设计师、测试专家多视角分析代码，生成对齐后的统一代码地图
+- ✅ **代码地图 Workspace 支持 (v2.3)** - 支持一个 workspace 包含多个项目的场景，明确项目标识
+- ✅ **3D 代码地图可视化 (v2.3)** - 基于 Three.js 的交互式代码结构可视化，动态流动效果，深色/浅色主题切换
+- ✅ **任务可视化页面 (v2.3)** - 实时展现各角色任务状态、进度、依赖关系、交接过程、协同关系图
+- ✅ **文档与代码一致性检查 (v2.3)** - 代码走读审查报告中新增文档与代码差异检查清单
+- ✅ **长程 Agent 支持 (v2.2)** - 基于 Anthropic《Effective Harnesses for Long-Running Agents》核心思想，支持 Checkpoint 检查点、Handoff 交接班、TaskList 任务清单
+- ✅ **AI 语义理解驱动的角色匹配 (v2.1)** - 使用大模型理解任务深层语义，提供可解释的匹配结果和置信度评分
+- ✅ **AI 助手深度集成 (v2.1)** - 集成大模型 AI 助手能力，支持代码审查，知识问答、文本分析等功能
+- ✅ **智能缓存和降级策略 (v2.1)** - 性能优化，AI 不可用时自动降级到关键词匹配
+- ✅ **UI 设计师角色** - 添加 UI 设计师角色，创建独特、生产级的 UI 界面，避免通用的 AI "slop" 美学
+- ✅ **Agent Loop 思考循环修复** - 修复 is_all_tasks_completed 方法，增加连续无进展检测保护机制
+- ✅ **规范驱动开发** - 完整的规范工具链，统一的文档管理体系，多角色共识制定规范
+- ✅ **代码地图生成** - 自动生成项目代码结构映射，支持 JSON 和 Markdown 格式，识别核心组件和模块依赖
+- ✅ **项目理解** - 快速读取项目文档和代码，为各角色生成定制化理解文档，提供项目概览和技术栈分析
+- ✅ **八阶段标准工作流程** - 需求分析→架构设计→UI 设计→测试设计→任务分解→开发实现→测试验证→发布评审
+- ✅ **跨角色设计评审机制** - PRD 评审、架构评审、UI 设计评审、测试计划评审，开发计划评审
+- ✅ **基于文档的任务分解** - 所有角色基于文档进行任务分解，确保文档驱动开发
 
 ## 🌍 多语言支持 / Multi-Language Support
-
 本技能支持中英文双语自动切换 / This skill supports automatic Chinese-English language switching:
-
 - **自动识别** / **Auto-detection**: 根据用户语言自动切换响应语言
 - **完全覆盖** / **Full Coverage**: 所有输出内容都支持多语言
 - **智能匹配** / **Smart Matching**: 代码注释自动匹配现有语言
 - **灵活切换** / **Flexible Switching**: 支持会话中切换语言
-
 📄 详细文档 / Detailed documentation:
-
 - **中文文档** / **Chinese Documentation**: [README.md](README.md)
 - **English Documentation**: [README_EN.md](README_EN.md)
-
 ### 📚 完整文档索引 / Complete Documentation Index
-
 | 文档 / Document | 中文 / Chinese | English |
 |----------------|---------------|---------|
 | 主文档 / Main | [README.md](README.md) | [README_EN.md](README_EN.md) |
 | 使用示例 / Examples | [EXAMPLES.md](EXAMPLES.md) | [EXAMPLES_EN.md](EXAMPLES_EN.md) |
 | 进度追踪 / Progress | [progress.template.md](progress.template.md) | [progress_EN.md](progress_EN.md) |
 | 依赖说明 / Dependencies | [requirements.txt](requirements.txt) | [requirements_EN.txt](requirements_EN.txt) |
-
 ## 📖 目录 / Table of Contents
-
 - [功能特性](#-功能特性)
+  - [既有系统理解能力 SU (v2.9)](#既有系统理解能力-su-v29-新增)
   - [Ponytail 决策梯 (v2.6)](#ponytail-决策梯-v26-新增)
   - [Autonomous 自主迭代模式 (v2.6)](#autonomous-自主迭代模式-v26-新增)
   - [Dynamic Workflows 6 大模式 (v2.6)](#dynamic-workflows-6-大模式-v26-新增)
@@ -186,46 +214,36 @@
 - [贡献指南](#-贡献指南)
 - [常见问题](#-常见问题)
 - [许可证](#-许可证)
-
 ## ✨ 功能特性
-
 ### AI 增强能力 (v2.1 新增)
-
 1. **AI 语义理解驱动的角色匹配** 🧠
    - 使用大模型理解任务的深层语义
    - 提供可解释的匹配结果和置信度评分
    - 支持多种匹配策略（AI 增强、语义、关键词、混合）
    - 智能缓存和降级策略
-
 2. **AI 助手深度集成** 🤖
    - 代码审查和建议（ai_assistant.py）
    - 知识问答和技术咨询
    - 文本分析和摘要
    - 自然语言交互界面
-
 3. **性能优化** ⚡
    - 智能缓存机制（减少 40-60% API 调用）
    - 自动降级策略（AI 不可用时使用关键词匹配）
    - 批量处理和异步请求支持
-
 ### 长程 Agent 支持 (v2.2 新增)
-
 基于 Anthropic 文章《Effective Harnesses for Long-Running Agents》的核心思想，解决长程任务中的"断片"问题：
-
 1. **Checkpoint 检查点机制** 💾
    - 定期保存任务状态（像人类工程师 git commit）
    - 支持从任意断点恢复
    - 数据完整性校验（SHA256 哈希）
    - 自动过期清理
    - 核心文件：`scripts/checkpoint_manager.py`
-
 2. **Handoff 交接班协议** 🔄
    - 标准化交接文档（JSON + Markdown）
    - 交接原因记录
    - 信心度评估
    - 重要注意事项传递
    - 支持双智能体架构（Planner + Executor）
-
 3. **TaskList 任务清单** 📋
    - 像人类工程师维护 TODO.md 一样管理任务
    - 任务拆解和优先级排序
@@ -233,7 +251,6 @@
    - 进度跟踪
    - Markdown 导出
    - 核心文件：`scripts/task_list_manager.py`
-
 4. **WorkflowEngineV2 增强版工作流** ⚙️
    - 集成 Checkpoint + TaskList + Handoff
    - 智能任务拆分
@@ -241,50 +258,60 @@
    - 支持 Agent 交接班
    - 断点恢复机制
    - 核心文件：`scripts/workflow_engine_v2.py`
-
 **使用示例**:
 ```bash
 # 创建带长程支持的工作流
 python3 scripts/workflow_engine_v2_demo.py \
     --task "实现完整电商系统"
-
 # 运行测试
 python3 scripts/tests/run_tests.py
 ```
-
 **测试结果**: 24 个测试全部通过 ✅
-
 ### Karpathy 四大核心原则 (v2.4 新增)
-
 基于 Andrej Karpathy 对 LLM 编程常见陷阱的观察，强制执行四大核心原则：
-
 1. **Think Before Coding（三思而后行）** 🧠
    - 明确假设、呈现权衡、遇到不清就问
    - 核心文件：`scripts/karpathy_principle_enforcer.py`
-
 2. **Simplicity First（简单优先）** 🎯
    - 最小代码、无 speculative features、无过度抽象
-
 3. **Surgical Changes（精准修改）** 🔬
    - 只改需要的、不改无关的、保持风格一致
-
 4. **Goal-Driven Execution（目标驱动）** ✅
    - 定义成功标准、验证检查点、迭代直到完成
-
 **Karpathy 原则执行检查器**:
 - 原则合规性检查
 - 违规检测与提醒（5 级严重度：CRITICAL/HIGH/MEDIUM/LOW/INFO）
 - 验证检查点管理
 - 执行报告生成（JSON 导出）
-
 ### Claude Code SubAgent 适配器 (v2.4 新增)
-
 跨平台 Agent 适配，统一 Claude Code / Trae IDE 的 subagent 调用接口：
-
 - `ClaudeCodeSubAgentAdapter` 类（`scripts/claude_code_subagent_adapter.py`）
 - 自动平台检测：`claude_code` / `trae` / `unknown`
 - 统一 `invoke_agent()` 接口
 - 环境变量检测：`CLAUDE_CODE_ENV` / `TRAE_ENV`
+### 既有系统理解能力 SU (v2.9 新增)
+面向**无文档、无源码**的遗留黑盒 Web 系统（配套 MySQL/PostgreSQL 数据库与 Redis 缓存），在**全程只读、零副作用**的前提下自动完成反向理解：
+1. **Playwright 自动登录 + 图式 BFS 遍历** 🕷️
+   - 显式选择器或启发式识别登录表单，会话维持与自动重登（≤3 次）
+   - `url_key` 规范化去重、DOM 剪枝快照、动作三级分级（T1 放行 / T2 显式 GET 表单 / T3 危险操作只记录）
+   - `page.route` 网络层拦截全部非 GET 请求与白名单外域
+   - 核心文件：`scripts/su/browser_login.py`、`scripts/su/site_crawler.py`、`scripts/su/action_tier.py`
+2. **DB/Redis 只读内省** 🗄️
+   - MySQL/PostgreSQL：表/列/注释/PK/显式 FK/索引/行数估算/采样（逐值脱敏）+ 隐式外键推断（三重预筛）
+   - Redis：SCAN 游标 + 命令硬编码只读白名单 + 键模式聚类（数量/TTL 分布/类型）
+   - 核心文件：`scripts/su/db_inspector.py`、`scripts/su/db_guard.py`、`scripts/su/redis_inspector.py`、`scripts/su/redis_guard.py`
+3. **UI↔API↔DB 三角关联** 🔗
+   - 页面 ↔ API ↔ 表（↔ Redis 键模式）的确定性关联证据（重合度/包含度数值），供 LLM 与文档引用
+   - 核心文件：`scripts/su/relation_analyzer.py`、`scripts/su/api_observer.py`
+4. **10 节《系统功能理解文档》** 📄
+   - 系统概览 / 功能地图 / 导航图 / 数据模型 / UI↔数据映射 / 缓存与中间件 / 业务规则汇编 / API 面 / 证据附录 / 未验证推断与未覆盖清单
+   - 另有机读 `understanding.json`（全脱敏，供宿主 LLM 消费）与 Mermaid 图源
+   - 核心文件：`scripts/su/document_renderer.py`
+5. **断点续跑** 💾
+   - SQLite（WAL）状态库；SIGINT（退出码 130）或崩溃后 `--resume` 自动继承已完成页面/表/键，`--fresh` 归档重跑
+   - 核心文件：`scripts/su/state_store.py`
+6. **两阶段工作流（证据与结论严格分离）** 🤖
+   - 脚本层零 LLM 调用、不出语义结论；语义结论由宿主 LLM 按 `docs/spec/role-prompts/su-llm-backfill.md` 契约回填、CLI 校验收口
 
 ### Ponytail 决策梯 (v2.6 新增)
 
@@ -595,185 +622,67 @@ V3 插件架构之上的动态能力，保留 Phase 16 静态注册路径基础�
 
 使用调度脚本进行更精细的控制：
 
+**快速开始（三阶段 CLI）**:
 ```bash
-# 自动识别角色
-python3 scripts/trae_agent_dispatch.py \
-    --task "设计系统架构"
+# 阶段 A：确定性采集（登录 + BFS 遍历 + DB/Redis 内省 + 三角关联，产出骨架文档）
+# 凭据推荐 JSON 配置文件（chmod 600），--skip-llm-phase 跳过语义结论、不虚构
+python3 scripts/system_understanding.py --config config.json --skip-llm-phase
 
-# 指定角色
-python3 scripts/trae_agent_dispatch.py \
-    --task "实现功能" \
-    --agent solo_coder
+# 阶段 B：宿主 LLM 读取脱敏产物 understanding.json，按
+#   docs/spec/role-prompts/su-llm-backfill.md 契约产出 findings JSON 写回该文件 findings 段
 
-# 多角色共识
-python3 scripts/trae_agent_dispatch.py \
-    --task "启动新项目：安全浏览器" \
-    --consensus true
-
-# 完整项目流程
-python3 scripts/trae_agent_dispatch.py \
-    --task "安全浏览器广告拦截功能" \
-    --project-full-lifecycle
-
-# 项目全生命周期模式（8 阶段标准工作流程）
-python3 scripts/trae_agent_dispatch.py \
-    --task "实现电商系统用户登录功能" \
-    --project-full-lifecycle
-# 自动执行：需求分析→架构设计→UI 设计→测试设计→任务分解→开发实现→测试验证→发布评审
-
-# 规范驱动开发
-python3 scripts/spec_tools.py init
-python3 scripts/spec_tools.py analyze
-python3 scripts/spec_tools.py update --spec-file SPEC.md
-
-# 代码地图生成
-python3 scripts/code_map_generator_v2.py /path/to/project --workspace /workspace
-
-# 多角色代码走读
-python3 scripts/multi_role_code_walkthrough.py /path/to/project --workspace /workspace
-
-# 项目理解
-python3 scripts/project_understanding.py /path/to/project
+# 阶段 C：收口渲染（不启动浏览器、不连库；校验 findings 后重渲染全部产物）
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --render-only
 ```
 
-## 🎭 角色介绍
-
-### 1. 架构师 (Architect)
-
-**职责**: 设计系统性、前瞻性、可落地、可验证的架构
-
-**核心原则**:
-- ✅ 系统性思维 - 设计前回答 4 个关键问题
-- ✅ 5-Why 分析法 - 连续追问找到根因
-- ✅ 零容忍清单 - 禁止 mock、硬编码、简化
-- ✅ 验证驱动设计 - 完整验收标准
-
-**典型输出**:
-- 系统架构图（Mermaid）
-- 模块职责清单
-- 接口定义（输入/输出/异常）
-- 数据模型设计
-- 部署架构说明
-
-**触发关键词**: 架构、设计、选型、审查、性能、瓶颈、模块、接口、部署
-
-### 2. 产品经理 (Product Manager)
-
-**职责**: 定义用户价值清晰、需求明确、可落地、可验收的产品
-
-**核心原则**:
-- ✅ 需求三层挖掘 - 表面→真实→本质
-- ✅ SMART 验收标准 - 具体、可衡量、可实现
-- ✅ 竞品分析规则 - 至少 5 个竞品对比
-
-**典型输出**:
-- 产品需求文档（PRD）
-- 用户故事地图
-- 验收标准（SMART）
-- 竞品分析报告
-
-**触发关键词**: 需求、PRD、用户故事、竞品、市场、调研、验收、UAT、体验
-
-### 3. 测试专家 (Test Expert)
-
-**职责**: 确保全面、深入、自动化、可量化的质量保障
-
-**核心原则**:
-- ✅ 测试金字塔 - 70% 单元 +20% 集成 +10%E2E
-- ✅ 正交分析法 - 5 类场景全覆盖
-- ✅ 真机测试规则 - 真实环境验证
-
-**典型输出**:
-- 测试策略文档
-- 测试用例（正常/异常/边界/性能/安全）
-- 自动化测试脚本
-- 质量评估报告
-
-**触发关键词**: 测试、质量、验收、自动化、性能测试、缺陷、评审、门禁
-
-### 5. UI 设计师 (UI Designer)
-
-**职责**: 创建独特、生产级的 UI 界面，具有高设计质量，避免通用的 AI "slop" 美学
-
-**核心原则**:
-- ✅ 设计思维规则 - 设计前回答 4 个关键问题
-- ✅ UI 设计美学指南 - 字体、色彩、动画、布局
-- ✅ 零容忍清单 - 禁止通用字体、陈旧配色、AI slop
-- ✅ 验证驱动设计 - 完整验收标准
-- ✅ 完整性检查 - 多维度检查清单
-
-**典型输出**:
-- 设计哲学文档
-- 风格指南
-- 高保真原型
-- UI 设计文档
-
-**触发关键词**: UI设计、界面设计、前端设计、视觉设计、UI/UX、UI原型、界面美化、UI优化、UI重构
-
-### 4. 独立开发者 (Solo Coder)
-
-**职责**: 编写完整、高质量、可维护、可测试的代码
-
-**核心原则**:
-- ✅ 零容忍清单 - 10 项绝对禁止
-- ✅ 完整性检查 - 4 维度检查清单
-- ✅ 自测规则 - 3 层测试验证
-
-**典型输出**:
-- 完整功能代码
-- 单元测试（覆盖率>80%）
-- 集成测试
-- 技术文档
-
-**触发关键词**: 实现、开发、代码、修复、优化、重构、单元测试、文档
-
-## 💡 使用方法
-
-### 场景 1: 项目启动
-
+**测试**: 14 个单测模块全通过；e2e 场景 [0]-[7] PASS（场景 [8] 需外部注入 DSN，缺省 SKIP）✅
 ```bash
-# 完整项目启动（多角色共识）
-python3 scripts/trae_agent_dispatch.py \
-    --task "启动新项目：安全浏览器广告拦截功能" \
-    --consensus true \
-    --priority high
-
-# 自动组织：
-#   1. 产品经理 - 需求定义
-#   2. 架构师 - 架构设计
-#   3. 测试专家 - 测试策略
-#   4. 独立开发者 - 开发计划
+bash scripts/tests/scripts/run_system_understanding.sh      # 单测
+bash scripts/tests/scripts/run_system_understanding_e2e.sh  # e2e
+```
+📄 详细指南：[docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
+### Ponytail 决策梯 (v2.6 新增)
+在 Karpathy Simplicity First 原则之上，提供可执行的"写代码前先停一停"决策梯，强制开发者每写一行代码前先问 6 个问题：
+1. **6 步决策梯** 🪜
+   - 台阶 1 - YAGNI：这东西真的需要存在吗？推测性需求直接跳过
+   - 台阶 2 - 标准库优先：语言标准库能搞定？直接用标准库
+   - 台阶 3 - 平台原生：运行时平台自带功能能覆盖？用平台原生特性
+   - 台阶 4 - 复用现有：已安装的依赖能解决？复用现有依赖，不新增
+   - 台阶 5 - 一行优先：能写成一行？写成一行，不牺牲可读性
+   - 台阶 6 - 最小可行：以上都不行，写最少能做工作的代码
+   - 核心文件：`scripts/ponytail/ruleset.py`
+2. **16 条不可简化红线** 🚫
+   - 原始 Ponytail 红线（6 条）：信任边界输入校验、防数据丢失错误处理、安全措施、无障碍基础、用户明确要求保留功能、真实硬件校准旋钮
+   - 项目规则红线（10 条）：真实业务逻辑禁 mock、需求文档功能禁跳过、非平凡逻辑留可运行检查、并发安全不可简化、真实错误处理禁吞异常、关键路径日志禁删除、密钥配置校验禁简化、数据库事务边界禁简化、API 契约禁单方面简化、隐私数据处理禁简化
+   - 核心文件：`scripts/ponytail/ruleset.py`
+3. **三种强度模式** 🎚️
+   - `lite`：精简版，注入 6 步决策梯（无红线详情），适用 test_expert / ui_designer
+   - `full`（默认）：完整版，注入 6 步 + 16 条红线 + 输出规范，适用 solo_coder / architect
+   - `ultra`：YAGNI 极端主义，full + 额外约束，autonomous 模式自动降级为 full
+   - 核心文件：`scripts/ponytail/mode_tracker.py`
+4. **债务台账 + 需求追踪** 📒
+   - `DebtCollector`：verify 阶段自动扫描 `# ponytail:` 注释，区分"有升级路径"与"腐烂风险"债务，超过 3 条 no_trigger 债务则告警
+   - `RequirementTracer`：解析需求文档 `[REQ-XXX]` 标记，中文关键词提取 + 代码实现检测（≥50% 关键词匹配视为已实现）
+   - 核心文件：`scripts/ponytail/debt_collector.py`、`scripts/ponytail/requirement_tracer.py`
+**使用方式**:
+```bash
+# 在对话中切换模式
+/ponytail ultra    # 切换到 ULTRA 模式（YAGNI 极端主义）
+/ponytail full     # 切换到 FULL 模式（默认）
+/ponytail lite     # 切换到 LITE 模式（精简）
+/ponytail off      # 关闭决策梯注入
+/ponytail          # 查看当前模式
+# 环境变量（优先级最高）
+export PONYTAIL_MODE=ultra
+# 配置文件
+echo "full" > .ponytail_mode
+```
+**测试**: 10 个测试文件，98 个测试用例全部通过 ✅
+```bash
+bash scripts/tests/scripts/run_ponytail_tests.sh
 ```
 
-### 场景 2: 功能开发
-
-```bash
-# 单角色调度（快速开发）
-python3 scripts/trae_agent_dispatch.py \
-    --task "实现广告拦截核心模块" \
-    --agent solo_coder \
-    --context "基于架构设计文档 v2.0"
-
-# 自动包含：
-#   - 架构设计文档作为上下文
-#   - 完整性检查清单
-#   - 自测要求
-```
-
-### 场景 3: 代码审查
-
-```bash
-# 多角色代码审查
-python3 scripts/trae_agent_dispatch.py \
-    --task "审查广告拦截核心模块" \
-    --code-review \
-    --files src/adblock/ tests/
-
-# 参与角色：
-#   - 架构师（架构合规性）
-#   - 测试专家（测试覆盖率）
-#   - 独立开发者（代码质量）
-```
+📄 详细指南：[docs/guides/PONYTAIL_GUIDE.md](docs/guides/PONYTAIL_GUIDE.md)
 
 ### 场景 4: 紧急 Bug 修复
 
@@ -1673,6 +1582,7 @@ SOFTWARE.
 - [Dynamic Workflows 融合方案](docs/dev/DYNAMIC_WORKFLOWS_INTEGRATION.md) - 6 大模式、12 个实现模块
 - [Cybernetics 增强分析](docs/dev/CYBERNETICS_ANALYSIS.md) - 6 个核心组件、三环控制模型
 - [Phase 17 插件热加载方案](docs/dev/PHASE17_PLAN.md) - 3 种加载路径、V3 插件实现
+- [既有系统理解能力指南](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md) - SU 三阶段 CLI 工作流、五条安全红线、诚实降级
 
 ---
 
