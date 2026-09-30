@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -106,19 +107,24 @@ class TestPonytailRegressionPhase18(unittest.TestCase):
         from autonomous.handlers.verify_handler import VerifyHandler
 
         iter_ctx = MagicMock()
-        iter_ctx.worktree_path = Path("/tmp")
-        iter_ctx.agent_output = "some output"
+        # 用隔离临时目录作 worktree（原为 /tmp：VerifyHandler 的 builtin 安全
+        # 扫描会 rglob 递归整个系统临时目录，任何外部历史文件含
+        # password='…'/sk-… 都会让这个"无 ponytail 应 success"的用例误报 fatal
+        # ——测试必须自包含，2026-09-30）
+        with tempfile.TemporaryDirectory() as wt_tmp:
+            iter_ctx.worktree_path = Path(wt_tmp)
+            iter_ctx.agent_output = "some output"
 
-        # 无 ponytail_engine 和 debt_collector（向后兼容）
-        vh = VerifyHandler(
-            git_driver=None,
-            test_command="",  # 不执行测试
-            security_analyzer="builtin",
-            ponytail_engine=None,
-            debt_collector=None,
-            project_root="/tmp",
-        )
-        result = vh.do_handle(iter_ctx)
+            # 无 ponytail_engine 和 debt_collector（向后兼容）
+            vh = VerifyHandler(
+                git_driver=None,
+                test_command="",  # 不执行测试
+                security_analyzer="builtin",
+                ponytail_engine=None,
+                debt_collector=None,
+                project_root=wt_tmp,
+            )
+            result = vh.do_handle(iter_ctx)
         # 无测试命令时应返回 success（0 passed/0 failed/0 skipped）
         self.assertEqual(result.kind, "success")
 

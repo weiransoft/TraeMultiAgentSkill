@@ -11,9 +11,11 @@
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -227,6 +229,21 @@ class VerifyHandler(StageHandler):
             list: 安全问题列表
         """
         if not worktree.exists():
+            return []
+        # 系统临时目录不作扫描根：rglob 会把整机 /tmp 卷入（外部用户/历史文件
+        # 与本次变更无关，且测试场景误伤——2026-09-30 phase18 回归教训）。
+        # worktree 显式指向 /tmp 系调用方违例，保守跳过并留痕。
+        _tmp_resolved = Path(tempfile.gettempdir()).resolve()
+        try:
+            _wt_resolved = Path(worktree).resolve()
+        except OSError:
+            return []
+        if _wt_resolved == _tmp_resolved:
+            # 违例留痕：worktree 直指系统临时目录会整机扫描，保守跳过
+            # （stdlib logging 已顶层导入）
+            logging.getLogger(__name__).warning(
+                "安全检查跳过：worktree 即系统临时目录 %s（防整机扫描误伤）",
+                _tmp_resolved)
             return []
         issues = []
         # 限制扫描范围：仅 .py / .yaml / .yml / .json / .env / .sh / .ts / .js
