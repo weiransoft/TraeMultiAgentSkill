@@ -536,7 +536,7 @@ class DocumentRenderer:
     # 主入口
     # ------------------------------------------------------------------
 
-    def render(self) -> RenderOutcome:
+    def render(self, run_status_override: Optional[str] = None) -> RenderOutcome:
         """渲染全部产物（幂等：同一状态库二次渲染除头部时间行外逐字节稳定）。
 
         流程：一次性导出 understanding 数据 → 渲染 10 节 Markdown →
@@ -545,14 +545,23 @@ class DocumentRenderer:
         全部 JSON 落盘统一 ``sort_keys=True``（字典序稳定）+ 时间戳取
         run 级常量（§7.3 幂等策略）。
 
+        Args:
+            run_status_override: 透传给 ``StateStore.export_understanding`` 的
+                run 终态覆盖值（仅限 completed/interrupted，2026-09-30 D1 修复）。
+                编排层在"渲染后即 mark(completed) 收口"的链路（--render-only、
+                完整流水线正常收口）传入终态，避免磁盘 understanding.json 的
+                meta.run_status 冻结在导出瞬间的 running、与后续 DB 收口永久脱节。
+
         Returns:
             RenderOutcome: 产物清单 + 统计快照。
 
         Raises:
             RuntimeError: Mermaid 自检未通过（语法错误必须显式失败，不产出坏图）。
+            ValueError: run_status_override 非终态口径（由 StateStore 校验抛出）。
         """
         self._root.mkdir(parents=True, exist_ok=True)
-        self._understanding = self._store.export_understanding()
+        self._understanding = self._store.export_understanding(
+            run_status_override=run_status_override)
         started_at = self._run_started_at()
         outcome = RenderOutcome(stats=self._store.stats())
 

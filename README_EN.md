@@ -2,7 +2,7 @@
 
 🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup. v2.9 adds System Understanding (SU) — fully read-only reverse engineering of black-box web systems. v2.9.1 adds the SU third phase "Expert Detailed Doc" (SFD) — five experts author sections that are assembled into SYSTEM_FUNCTION_DOC.md.
 
-## 🎉 September 2026 Latest Updates (v2.9.1)
+## 🎉 September 2026 Latest Updates (v2.9.2)
 
 > Third phase after SU collection + backfill: zero network, zero credentials, zero new dependencies; no browser, no DB connection
 

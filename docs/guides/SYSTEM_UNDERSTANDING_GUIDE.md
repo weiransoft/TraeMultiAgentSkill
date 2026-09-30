@@ -1,6 +1,6 @@
 # 既有系统理解能力（SU）使用指南
 
-- **能力版本**：v2.9.1（2026-09-30）
+- **能力版本**：v2.9.2（2026-09-30）
 - **上游文档**：`docs/dev/SYSTEM_UNDERSTANDING_PRD.md`（REQ-SU-001~021）、`docs/dev/SYSTEM_UNDERSTANDING_ARCHITECTURE.md`（ARCH-SU-001）；SFD 阶段：`docs/dev/SYSTEM_FUNCTION_DOC_PRD.md`（PRD-SFD-001）、`docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md`（ARCH-SFD-001）
 - **LLM 契约**：`docs/spec/role-prompts/su-llm-backfill.md`（PROMPT-SU-001）；SFD 五专家提示词：`docs/spec/role-prompts/su-detailed-*.md`（PROMPT-SFD 系列）
 - **CLI 入口**：`scripts/system_understanding.py`（能力包 `scripts/su/`，19 个模块文件）
@@ -37,6 +37,9 @@ SU（System Understanding，既有系统反向理解）面向**无文档、无�
   python3 scripts/system_understanding.py --out <同目录> --system-id <id> --render-only
   → 不启动浏览器、不连 DB/Redis；校验 findings → 入库（status=proposed）→ 重渲染全部产物
   → 校验失败退出码 2 并中文逐条列出违约项；成功退出码 0（渲染幂等）
+  → 成功收口后 understanding.json 的 meta.run_status 即为 completed（v2.9.2 D1 修复：
+    渲染按"成功即 mark(completed)"注入终态投影，磁盘与 run_meta 一致；
+    中断链路维持先 mark 后导出的原语义）
 ```
 
 ### findings 回填示例（写入 `understanding.json` 的 `findings` 段，整体替换语义）
@@ -277,6 +280,8 @@ SU 采集 + findings 回填 + `--render-only` 渲染收口完成之后，可追�
 - **凭据扫描收口（退出码 2）**：装配落盘前对终稿 + 五包执行四判据扫描（C1 scrub 差集 / C2 URL userinfo（脱敏形态豁免）/ C3 键值对 / C4 扩展敏感键名 × 高熵值），命中则终稿与报告**均不落盘**、上一版完好，stdout 只报位置类别不含原文。
 - **原子写与幂等**：全部产物临时文件 + rename 落盘，SIGINT（退出码 130）不覆写上一版；时间戳统一取 `meta.started_at`（run 级常量），同输入重跑终稿逐字节一致。
 - **诚实红线**：专家只读素材包与 UNDERSTANDING.md，禁止索取/猜测凭据、禁止虚构；发现素材疑似凭据残留立即停止报告，绝不转录（脚本扫描器为同一红线的机器镜像）。
+- **前置校验口径（v2.9.2 D1 修复）**：SFD 前置校验直接读 understanding.json 的 `meta.run_status` 即可——v2.9.2 起，`--render-only` 成功收口后该字段即为 `completed`（渲染按"成功即 mark(completed)"注入终态投影，与 run_meta 收口一致）；v2.9.1 及更早版本该字段冻结在 `running`，需回读 run_meta 佐证。StateStore 仅接受 `completed` / `interrupted` 终态覆盖，`running` 等非法值 ValueError 拒绝，杜绝伪造终态。
+
 
 ### 7.6 退出码（详说模式，继承 SU 约定之子集）
 

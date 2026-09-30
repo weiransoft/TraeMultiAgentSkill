@@ -1,7 +1,7 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md）。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md），v2.9.2 修复 D1（understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致）。
 ---
 # Multi-Agent Team Dispatcher (AI-Enhanced)
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。

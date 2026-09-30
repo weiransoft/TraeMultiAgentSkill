@@ -339,12 +339,16 @@ class SystemUnderstanding:
         self._phase_relations(self._store)
         return dict(self._store.export_understanding())
 
-    def save(self, output_dir: str) -> None:
+    def save(self, output_dir: str, run_status_override: Optional[str] = None) -> None:
         """执行阶段 5：从状态库渲染全部产物（UNDERSTANDING.md/json/图）。
 
         Args:
             output_dir: 输出根目录（覆盖配置的 out_dir——main 恒传 CLI --out 值，
                 保证两阶段工作流（§6.3）阶段 C 可指回同一目录）。
+            run_status_override: 透传给渲染器的 run 终态覆盖值（completed/
+                interrupted，2026-09-30 D1 修复）——调用方保证"渲染成功后即
+                mark 同值收口"时传入，使磁盘 understanding.json 的 meta 段
+                与 DB 收口一致，不再冻结在导出瞬间的 running。
         """
         assert self._store is not None
         cfg = self._cfg
@@ -355,7 +359,7 @@ class SystemUnderstanding:
             self._cfg = _cfg_with_out(cfg, out_path)
         renderer = DocumentRenderer(self._store, self._cfg)
         self._lens_report.apply_to(renderer)
-        renderer.render()
+        renderer.render(run_status_override=run_status_override)
         self._renderer = renderer
 
     # ------------------------------------------------------------------
@@ -470,8 +474,16 @@ class SystemUnderstanding:
             # --skip-llm-phase 时 findings 段保持空 → 骨架渲染，AC3）
             self._phase_llm_bridge(store)
 
-            # 渲染收口（阶段 5）+ run 状态收口
-            self.save(str(self._cfg.out_dir))
+            # 渲染收口（阶段 5）+ run 状态收口。D1 修复（2026-09-30）：
+            # 未中断链路传 completed 覆盖——渲染成功后紧接 mark("completed")
+            # 收口，磁盘 understanding.json 的 meta.run_status 自此与 DB 终态
+            # 一致（此前冻结在导出瞬间的 running，宿主/SFD 前置校验读磁盘
+            # 投影时永远违例）。中断链路**不传**覆盖：中断处理器已先
+            # mark("interrupted")，导出值天然就是 interrupted，渲染与 DB 无
+            # 时序差，无需投影修正（保持既有 e2e 场景[4]语义零变化）。
+            self.save(str(self._cfg.out_dir),
+                      run_status_override=(None if interrupted_during_run
+                                           else "completed"))
             if interrupted_during_run:
                 # 中断后产物照常渲染落盘（已采进度不浪费——interrupted
                 # 库可 --resume），但 run 状态保持 interrupted、退出码 130
@@ -590,7 +602,11 @@ class SystemUnderstanding:
                 # "未采集"——--render-only 语义是"重渲染既有事实"，四透镜据库内
                 # 数据有无登记：有数据=collected，无数据=skipped（诚实口径）
                 self._infer_lens_status(store)
-                self.save(str(out_root))
+                # D1 修复（2026-09-30）：acquire_lock 后本次 render run 处于
+                # running，渲染成功后紧接 mark("completed") 收口——传终态覆盖
+                # 使 understanding.json 的 meta.run_status 与 DB 收口一致
+                # （此前冻结为 running，SFD 前置校验读磁盘投影时永远违例）。
+                self.save(str(out_root), run_status_override="completed")
             except BaseException:
                 # 取锁后任何失败（findings 校验 exit 2 / 其它异常）都必须清算
                 # 本次自建 run——否则 running 残行 + 指向已退出进程的 locked_by

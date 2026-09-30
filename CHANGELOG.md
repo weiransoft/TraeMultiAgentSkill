@@ -3,6 +3,12 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.9.2] - 2026-09-30
+
+### Fixed
+- ✅ **D1 遗留修复：understanding.json 的 meta.run_status 不再冻结 running**——`--render-only` 与完整流水线正常收口时，渲染环节按"成功即 mark(completed)"的事实向磁盘投影注入终态（StateStore 新增 `run_status_override` 参数 + `validate_run_status_override` 终态校验，仅放行 completed/interrupted，running 等非法值 ValueError 拒绝）；中断链路维持先 mark 后导出的原语义（e2e 场景[4]零回归）
+- ✅ 新增 3 个 D1 回归用例（completed 投影 / 默认 None 维持库值 / interrupted 投影 + 校验非法域），SU 单测聚合 20 模块全绿；e2e [0]-[7]、[9]-[13] 全 PASS、[8] SKIP
+
 ## [2.9.1] - 2026-09-30
 
 ### Added

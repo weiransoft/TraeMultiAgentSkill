@@ -1,5 +1,5 @@
 name: multi-agent-team
-version: 2.9.1
+version: 2.9.2
 description: |
   Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说）
   
@@ -492,6 +492,11 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.9.2
+      date: "2026-09-30"
+      changes:
+        - D1 遗留修复：--render-only 与完整流水线正常收口时，渲染环节按"成功即 mark(completed)"事实向 understanding.json 的 meta.run_status 注入终态投影（StateStore.export_understanding 新增 run_status_override 参数 + validate_run_status_override 终态校验，仅放行 completed/interrupted，running 等非法值 ValueError 拒绝）；中断链路维持先 mark 后导出的原语义（e2e 场景[4]零回归）
+        - 新增 3 个 D1 回归用例（test_su_doc_render：completed 投影 / 默认 None 维持库值 / interrupted 投影 + 校验非法域）；SU 单测聚合 20 模块全绿、e2e [0]-[7] 与 [9]-[13] 全 PASS
     - version: 2.9.1
       date: "2026-09-30"
       changes:

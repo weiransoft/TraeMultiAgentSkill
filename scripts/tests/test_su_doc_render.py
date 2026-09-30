@@ -174,6 +174,51 @@ class TestRenderProducts(unittest.TestCase):
             self.assertEqual(len(data["relations"]), 1)
             store.close()
 
+    def test_run_status_override_completed_in_disk_meta(self):
+        """D1 回归（2026-09-30）：render(run_status_override='completed') 时，
+        磁盘 understanding.json 的 meta.run_status 必须是 completed（编排层在
+        渲染成功后才 mark('completed')，不传覆盖则磁盘永远冻结为 running）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            store = _make_store(tmp)  # acquire_lock 后 run 处于 running
+            _seed(store)
+            DocumentRenderer(store, _make_cfg(tmp)).render(
+                run_status_override="completed")
+            data = json.loads((Path(tmp) / "legacy-test" / "understanding.json").read_text("utf-8"))
+            self.assertEqual(data["meta"]["run_status"], "completed")
+            # 事实字段不受覆盖影响：run_id 仍是本次真实 run
+            self.assertIsNotNone(data["meta"]["run_id"])
+            store.close()
+
+    def test_run_status_override_none_keeps_db_value(self):
+        """不传覆盖（默认 None）时 meta.run_status 维持库内现值（running）——
+        中断链路语义：中断处理器先 mark，导出值天然是 interrupted，无需投影。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            store = _make_store(tmp)
+            _seed(store)
+            DocumentRenderer(store, _make_cfg(tmp)).render()
+            data = json.loads((Path(tmp) / "legacy-test" / "understanding.json").read_text("utf-8"))
+            self.assertEqual(data["meta"]["run_status"], "running")
+            store.close()
+
+    def test_run_status_override_interrupted_before_mark(self):
+        """覆盖为 interrupted 时磁盘投影即为 interrupted（即使库内仍 running）；
+        同时验证 StateStore 层校验：running 等非法值必须 ValueError 拒绝。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            store = _make_store(tmp)
+            _seed(store)
+            DocumentRenderer(store, _make_cfg(tmp)).render(
+                run_status_override="interrupted")
+            data = json.loads((Path(tmp) / "legacy-test" / "understanding.json").read_text("utf-8"))
+            self.assertEqual(data["meta"]["run_status"], "interrupted")
+            store.close()
+        # 非法覆盖值（过程态 running / 任意串）必须被校验拒绝
+        for bad in ("running", "failed", "bogus"):
+            with self.assertRaises(ValueError):
+                StateStore.validate_run_status_override(bad)
+        # 合法域：None / completed / interrupted
+        for ok in (None, "completed", "interrupted"):
+            self.assertEqual(StateStore.validate_run_status_override(ok), ok)
+
     def test_summary_json_fields(self):
         """summary.json：stats + confidence 分布 + 预算快照。"""
         with tempfile.TemporaryDirectory() as tmp:

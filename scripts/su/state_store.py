@@ -1201,7 +1201,7 @@ class StateStore:
     # 读取（供渲染，§6.1 / §7.3：全部 ORDER BY 主键、字典 sorted → 幂等）
     # ------------------------------------------------------------------
 
-    def export_understanding(self) -> RedactedDict:
+    def export_understanding(self, run_status_override: Optional[str] = None) -> RedactedDict:
         """导出 understanding.json 数据源（§6.1 schema 结构，已全脱敏）。
 
         组合：run_meta（status/budget 占位由编排层注入）、pages+page_actions、
@@ -1209,11 +1209,55 @@ class StateStore:
         relations。透镜缺失的 status/skip_reason 字段由编排层按 preflight 结果
         后处理填入（脚本层各采集单元只写事实，不做缺省语义）。
 
+        Args:
+            run_status_override: 可选的 run 状态覆盖值（仅限 completed/
+                interrupted 终态口径，2026-09-30 D1 修复）。渲染落盘可能发生在
+                本次 run mark("completed") 之前（编排层先 save 后收口），若不加
+                覆盖，understanding.json 的 meta.run_status 会冻结导出瞬间的
+                "running"，与后续 run_meta 收口永久脱节——宿主/SFD 前置校验
+                读该字段时将永远看到 running。编排层在"渲染后即收口 completed"
+                的链路（--render-only、完整流水线）传入终态值，使磁盘 meta 段
+                与 DB 收口一致。校验（validate_run_status_override）失败抛
+                ValueError，防止用伪造状态污染真相源。
+
         Returns:
             RedactedDict: 顶层已脱敏 dict（落盘/入 LLM 上下文唯一合法形态）。
         """
+        validated_override = self.validate_run_status_override(run_status_override)
         with self._gate:
-            return self._export_understanding_locked()
+            out = self._export_understanding_locked()
+        if validated_override is not None:
+            # 覆写发生在加锁导出之后、返回之前：仅 meta.run_status 单键，
+            # 不触碰其余事实字段；RedactedDict 保持类型标记不丢失
+            meta = out.get("meta")
+            if isinstance(meta, dict):
+                meta["run_status"] = validated_override
+        return out
+
+    @staticmethod
+    def validate_run_status_override(value: Optional[str]) -> Optional[str]:
+        """校验 meta.run_status 覆盖值：仅允许 None 或终态（completed/interrupted）。
+
+        running 不是合法覆盖值——running 是"进行中"的过程态，若允许覆盖进磁盘
+        投影，等于把 D1 问题从"冻结"升级为"伪造"。interrupted 允许是配合
+        SIGINT 链路"产物照常落盘但 run 保持 interrupted"（系统 130 退出）的
+        时序：中断处理先 mark('interrupted') 再渲染时，传与不传结果一致；
+        先渲染后 mark 的链路则必须传入以保持一致。
+
+        Args:
+            value: 待校验的覆盖值。
+
+        Returns:
+            Optional[str]: 校验通过后原样返回。
+
+        Raises:
+            ValueError: 值不在 {None, 'completed', 'interrupted'} 内。
+        """
+        if value is not None and value not in ("completed", "interrupted"):
+            raise ValueError(
+                "run_status_override 只允许终态 completed/interrupted，实际={0!r}"
+                .format(value))
+        return value
 
     def _export_understanding_locked(self) -> RedactedDict:
         """export_understanding 的加锁内层（调用方持 _gate，全表读取一致快照）。"""
