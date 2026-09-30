@@ -1,6 +1,6 @@
 {
-  "version": "2.9.0",
-  "updated_at": "2026-09-28T00:00:00.000000",
+  "version": "2.9.1",
+  "updated_at": "2026-09-30T00:00:00.000000",
   "skills": {
     "test-skill": {
       "name": "test-skill",
@@ -27,8 +27,8 @@
     },
     "system-understanding": {
       "name": "system-understanding",
-      "version": "2.9.0",
-      "description": "既有系统反向理解（SU）：黑盒 Web 系统 Playwright 登录 + 图式 BFS 页面遍历 + DB/Redis 只读内省 + 三角关联分析 + 10 节《系统功能理解文档》。两阶段工作流：--skip-llm-phase 确定性采集 + 宿主 LLM 回填 findings + --render-only 收口渲染。软依赖（playwright/pymysql/psycopg2/redis）缺失时诚实降级，禁 mock。",
+      "version": "2.9.1",
+      "description": "既有系统反向理解（SU）：黑盒 Web 系统 Playwright 登录 + 图式 BFS 页面遍历 + DB/Redis 只读内省 + 三角关联分析 + 10 节《系统功能理解文档》。两阶段工作流：--skip-llm-phase 确定性采集 + 宿主 LLM 回填 findings + --render-only 收口渲染。软依赖（playwright/pymysql/psycopg2/redis）缺失时诚实降级，禁 mock。v2.9.1 专家详说（SFD）：--detailed-doc 五视角素材包 + 五专家派发 + --assemble 装配 SYSTEM_FUNCTION_DOC.md（零网络零凭据零新依赖）。",
       "author": "Trae Team",
       "status": "active",
       "capabilities": [
@@ -93,10 +93,14 @@
         "llm_contract": "docs/spec/role-prompts/su-llm-backfill.md",
         "guide": "docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md",
         "unit_tests": "scripts/tests/scripts/run_system_understanding.sh",
-        "e2e_tests": "scripts/tests/scripts/run_system_understanding_e2e.sh"
+        "e2e_tests": "scripts/tests/scripts/run_system_understanding_e2e.sh",
+        "sfd_module": "scripts/su/detailed_doc.py",
+        "sfd_prd": "docs/dev/SYSTEM_FUNCTION_DOC_PRD.md",
+        "sfd_architecture": "docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md",
+        "sfd_expert_prompts": "docs/spec/role-prompts/su-detailed-{architect,product,walkthrough,ui,qa}.md"
       },
       "created_at": "2026-09-28T00:00:00.000000",
-      "updated_at": "2026-09-28T00:00:00.000000"
+      "updated_at": "2026-09-30T00:00:00.000000"
     }
   }
 }

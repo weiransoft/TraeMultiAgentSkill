@@ -19,7 +19,9 @@ cd "$PROJECT_ROOT" || exit 1
 
 PYTHON="${PYTHON:-python3}"
 
-# 14 个 SU 测试模块（unittest 模块路径，tests/ 无 __init__.py 依赖 discovery）
+# 20 个 SU 测试模块（unittest 模块路径，tests/ 无 __init__.py 依赖 discovery）
+# 后 6 项为 SFD（专家详说）切分（ARCH-SFD-001 §10.1：precheck/packages/
+# outline/scan/assemble/cli，命名契约 test_su_detailed_*）
 SU_MODULES=(
   "tests.test_su_config"          # REQ-SU-001/002 配置与脱敏管线
   "tests.test_su_url_key"         # REQ-SU-005 URL 归一化
@@ -35,6 +37,12 @@ SU_MODULES=(
   "tests.test_su_site_crawler"    # crawler 层协议（form 去重/预算顺序/settled）
   "tests.test_su_degrade"         # REQ-SU-021 软依赖降级
   "tests.test_su_e2e_site"        # fixture 测试站/状态库 builder 自测（防腐烂）
+  "tests.test_su_detailed_precheck"   # REQ-SFD-001 详说前置校验（锚定 run 口径）
+  "tests.test_su_detailed_packages"   # REQ-SFD-002 五包白名单/scrub 复核/原子写
+  "tests.test_su_detailed_outline"    # REQ-SFD-003 8 节大纲骨架与幂等
+  "tests.test_su_detailed_scan"       # REQ-SFD-013 四判据凭据扫描收口
+  "tests.test_su_detailed_assemble"   # REQ-SFD-004/006 装配/降级/漂移/报告
+  "tests.test_su_detailed_cli"        # REQ-SFD-005 CLI 互斥与组合拒绝
 )
 
 failed=0

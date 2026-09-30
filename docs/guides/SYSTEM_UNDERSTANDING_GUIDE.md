@@ -1,9 +1,9 @@
 # 既有系统理解能力（SU）使用指南
 
-- **能力版本**：v2.9.0（2026-09-28）
-- **上游文档**：`docs/dev/SYSTEM_UNDERSTANDING_PRD.md`（REQ-SU-001~021）、`docs/dev/SYSTEM_UNDERSTANDING_ARCHITECTURE.md`（ARCH-SU-001）
-- **LLM 契约**：`docs/spec/role-prompts/su-llm-backfill.md`（PROMPT-SU-001）
-- **CLI 入口**：`scripts/system_understanding.py`（能力包 `scripts/su/`，18 个模块文件）
+- **能力版本**：v2.9.1（2026-09-30）
+- **上游文档**：`docs/dev/SYSTEM_UNDERSTANDING_PRD.md`（REQ-SU-001~021）、`docs/dev/SYSTEM_UNDERSTANDING_ARCHITECTURE.md`（ARCH-SU-001）；SFD 阶段：`docs/dev/SYSTEM_FUNCTION_DOC_PRD.md`（PRD-SFD-001）、`docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md`（ARCH-SFD-001）
+- **LLM 契约**：`docs/spec/role-prompts/su-llm-backfill.md`（PROMPT-SU-001）；SFD 五专家提示词：`docs/spec/role-prompts/su-detailed-*.md`（PROMPT-SFD 系列）
+- **CLI 入口**：`scripts/system_understanding.py`（能力包 `scripts/su/`，19 个模块文件）
 
 ---
 
@@ -128,6 +128,9 @@ SU（System Understanding，既有系统反向理解）面向**无文档、无�
 | `--resume` / `--fresh` | resume | 断点续跑：复用 interrupted 进度（默认）/ 归档旧状态后全新重跑 |
 | `--skip-llm-phase` | false | 只跑确定性采集，产出"待 LLM 语义回填"骨架文档 |
 | `--render-only` | false | 仅渲染：校验入库 findings 并重渲染全部产物（findings 校验失败退出码 2） |
+| `--detailed-doc` | false | 专家详说（第三阶段，v2.9.1）：前置校验 SU 产物 → 生成五专家素材包与 8 节大纲骨架 → 打印派发指引（要求 findings 已回填且锚定 run ∈ {completed, interrupted}；与 `--render-only`/`--assemble` 互斥） |
+| `--assemble` | false | 装配详说终稿（v2.9.1）：读取 `detailed/sections/` 专家草稿 → E-n 引用校验 → 凭据扫描 → 原子写 `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json`（可独立于 `--detailed-doc` 反复执行） |
+| `--force` | false | 仅与 `--detailed-doc`/`--assemble` 配合：覆盖既有终稿（头部 `status: final`）时跳过 exit 2 保护 |
 | `--verbose` | false | 调试日志（DEBUG 级；全程仍脱敏） |
 
 **退出码**：0 成功（含预算耗尽收尾、透镜降级完成）；2 参数/配置错误（含 `--render-only` findings 校验失败）；3 目标系统不可达；4 登录失败/会话反复失效；5 playwright 缺失（UI 透镜致命降级）；130 收到 SIGINT（状态库已存 `interrupted`，可 `--resume` 续跑）。
@@ -198,4 +201,89 @@ docs/system-understanding/<system_id>/
 集成测试口径即"输出目录全文件 + SQLite 文件 grep 凭据/PII 明文 0 命中"（REQ-SU-002 AC2）。可自查：`grep -rEi 'password|token' docs/system-understanding/<id>/ --include='*'` 并人工复核命中上下文是否为脱敏占位。
 
 **Q7：如何跑本能力测试？**
-单测：`bash scripts/tests/scripts/run_system_understanding.sh`（14 模块）；e2e：`bash scripts/tests/scripts/run_system_understanding_e2e.sh`（场景[0]-[7]，playwright 缺失时浏览器场景显式 SKIP；场景[8] 需外部注入 `SU_TEST_MYSQL_DSN`/`SU_TEST_REDIS_URL`，缺省 SKIP）。两者均已接入 `run_all.sh` 聚合。
+单测：`bash scripts/tests/scripts/run_system_understanding.sh`（20 模块，含 SFD 6 模块）；e2e：`bash scripts/tests/scripts/run_system_understanding_e2e.sh`（场景[0]-[7] 为 SU 场景，[8] 需外部注入 `SU_TEST_MYSQL_DSN`/`SU_TEST_REDIS_URL` 缺省 SKIP，[9]-[13] 为 SFD 场景；playwright 缺失时浏览器场景显式 SKIP，[10]-[13] 零浏览器依赖恒执行）。两者均已接入 `run_all.sh` 聚合。
+
+## 7. 专家详说阶段（SFD，第三阶段，v2.9.1）
+
+SU 采集 + findings 回填 + `--render-only` 渲染收口完成之后，可追加**第三阶段"专家详说"（SFD，System Function Doc）**：以已脱敏落盘的 SU 产物为唯一事实源，由五位专家分节撰写叙述性《系统功能详说文档》（`SYSTEM_FUNCTION_DOC.md`，8 节），与证据汇编 `UNDERSTANDING.md` 并存互链。实现模块 `scripts/su/detailed_doc.py`，**零网络、零凭据、零新依赖**——不启动浏览器、不连 DB/Redis。
+
+### 7.1 触发前提
+
+- `UNDERSTANDING.md`、`understanding.json`、`evidence/evidence-index.json` 三件套存在（即 `--render-only` 已至少成功收口一次）；
+- `understanding.json` 的 `findings` 段非空（宿主 LLM 已回填，PROMPT-SU-001），且与状态库计数双源一致；
+- 锚定 run（`understanding.json` 的 `meta.run_id` 对应行，**非最新行**）状态 ∈ {completed, interrupted}；
+- 详说模式拒绝与 `--fresh` / `--resume` / `--skip-llm-phase` 组合（显式报错，退出码 2）；与 `--render-only` / `--assemble` 互斥（argparse 互斥组，同时给出退出码 2）。
+
+### 7.2 三命令工作流
+
+```
+第 1 步（脚本层，确定性）
+  python3 scripts/system_understanding.py --out <out> --system-id <id> --detailed-doc
+  → 前置校验（findings 非空 + 双源一致 + 锚定 run 状态，全程只读）
+  → 五视角素材包 detailed/inputs/*.json（字段白名单 + scrub 复核 + 锚点 manifest）
+  → 8 节大纲骨架 SYSTEM_FUNCTION_DOC.md（status: outline）+ 创建空 detailed/sections/
+  → stdout 打印五专家派发指引（prompt/素材包/输出文件绝对路径）与装配命令
+
+第 2 步（宿主 LLM，脚本外）
+  按派发指引将五条任务并行交给专家子代理（Task 机制）：
+  各自读素材包 + UNDERSTANDING.md，按 PROMPT-SFD 契约产出分段草稿
+  detailed/sections/0N-xxx.doc.md（首行节头必须与大纲一致；E-n 引用推荐
+  E0012(pages:3) 锚注形态；无证据推断显式标 [推断]）
+
+第 3 步（脚本层，确定性）
+  python3 scripts/system_understanding.py --out <out> --system-id <id> --assemble
+  → 逐节归属校验 + E-n 引用 (seq,ref) 双键校验（锚点失配时漂移检测）
+  → 降级声明与 low findings 汇总（第 7 节自动生成）+ 证据索引附录（第 8 节）
+  → 四判据凭据扫描（命中 → 终稿与报告均不落盘，退出码 2）
+  → 原子写终稿 SYSTEM_FUNCTION_DOC.md（status: final）+ detailed/assembly-report.json
+```
+
+`--assemble` 独立于 `--detailed-doc`：草稿返工、findings 修订后可反复重跑；既有终稿（头部 `status: final`）默认拒绝覆盖，需显式加 `--force`。
+
+### 7.3 产物布局
+
+```
+<out>/<system_id>/
+├── UNDERSTANDING.md                  # SU 既有——详说阶段字节级不变
+├── understanding.json                # SU 既有——详说阶段只读
+├── evidence/evidence-index.json      # SU 既有——E-n 引用合法集合源
+├── SYSTEM_FUNCTION_DOC.md            # 终稿（--detailed-doc 产骨架 → --assemble 覆盖终稿）
+└── detailed/
+    ├── inputs/                       # 五视角素材包（--detailed-doc 原子写）
+    │   ├── architect.json  ├── product.json  ├── dev.json
+    │   ├── ui.json         └── qa.json
+    ├── sections/                     # 专家草稿（宿主 LLM 写入；装配时读取）
+    │   ├── 01-architecture.doc.md    ├── 02-product.doc.md
+    │   ├── 03-pages.doc.md           ├── 04-data-semantics.doc.md
+    │   └── 05-quality.doc.md
+    └── assembly-report.json          # 装配报告（与终稿同批落盘）
+```
+
+终稿固定 8 节：1 系统定位与技术架构 / 2 功能全景与业务流程（含 2.4 业务规则与状态机）/ 3 页面功能详说 / 4 数据模型业务语义 / 5 接口契约说明 / 6 质量盲区与风险建议 / 7 未验证推断与附录（装配层自动）/ 8 附录：证据索引与运行说明（装配层自动）。
+
+### 7.4 五角色分工
+
+| 角色 | 派发提示词（`docs/spec/role-prompts/`） | 素材包 | 输出草稿 | 承担终稿节 |
+|---|---|---|---|---|
+| 架构师 | `su-detailed-architect.md` | `inputs/architect.json` | `sections/01-architecture.doc.md` | 第 1 节 |
+| 产品经理 | `su-detailed-product.md` | `inputs/product.json` | `sections/02-product.doc.md` | 第 2 节（含 2.4） |
+| UI 设计师 | `su-detailed-ui.md` | `inputs/ui.json` | `sections/03-pages.doc.md` | 第 3 节 |
+| 独立开发者·走读 | `su-detailed-walkthrough.md` | `inputs/dev.json` | `sections/04-data-semantics.doc.md` | 第 4、5 节（第 5 节以 `<!-- SFD-SECTION: 5 -->` 标记切分） |
+| 测试专家 | `su-detailed-qa.md` | `inputs/qa.json` | `sections/05-quality.doc.md` | 第 6 节 |
+
+### 7.5 降级与安全语义
+
+- **降级不崩（退出码 0）**：缺草稿 / 首行节头不符 / 第 5 节标记缺失或多写 → 对应节替换为降级声明并在 `assembly-report.json` 登记 `degraded_sections`；非法 E-n 引用原文保留并改写为 `E0012 [未验证引用]`、锚点失配场景的同 seq 异 ref 引用改写为 `[漂移引用]`，均计入报告（合法率仅度量不拦截，达标线 ≥95%）。
+- **凭据扫描收口（退出码 2）**：装配落盘前对终稿 + 五包执行四判据扫描（C1 scrub 差集 / C2 URL userinfo（脱敏形态豁免）/ C3 键值对 / C4 扩展敏感键名 × 高熵值），命中则终稿与报告**均不落盘**、上一版完好，stdout 只报位置类别不含原文。
+- **原子写与幂等**：全部产物临时文件 + rename 落盘，SIGINT（退出码 130）不覆写上一版；时间戳统一取 `meta.started_at`（run 级常量），同输入重跑终稿逐字节一致。
+- **诚实红线**：专家只读素材包与 UNDERSTANDING.md，禁止索取/猜测凭据、禁止虚构；发现素材疑似凭据残留立即停止报告，绝不转录（脚本扫描器为同一红线的机器镜像）。
+
+### 7.6 退出码（详说模式，继承 SU 约定之子集）
+
+| 退出码 | 场景 |
+|---|---|
+| 0 | 成功（含降级出稿） |
+| 2 | 前置校验违例（缺文件/findings 空/双源不一致/run 状态违例）、互斥与生命周期参数组合违例、既有终稿未加 `--force`、凭据扫描命中 |
+| 130 | SIGINT（临时文件 + rename 原子写保证上一版完好） |
+
+> 完整设计口径见 `docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md`（ARCH-SFD-001 §3 CLI / §5 产物 / §8 安全）与 `docs/dev/SYSTEM_FUNCTION_DOC_PRD.md`（PRD-SFD-001）。

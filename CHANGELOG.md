@@ -3,6 +3,35 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.9.1] - 2026-09-30
+
+### Added
+
+#### v2.9.1 — 专家详说阶段（SFD，System Function Doc）
+
+在 SU 两阶段（采集 + 回填）之后新增第三阶段"专家详说"：以回填收口后的
+`understanding.json` 为唯一事实源，前置校验通过后生成五视角素材包与 8 节大纲骨架，
+由宿主 LLM 派发五位专家子代理分节撰写，最终 `--assemble` 装配为
+《系统功能详说文档》（SYSTEM_FUNCTION_DOC.md）+ 装配报告（assembly-report.json）。
+零网络、零凭据、零新依赖；不启动浏览器、不连库。
+
+##### SFD 核心能力
+
+- ✅ 新增 `scripts/su/detailed_doc.py`（`scripts/su/` 能力包 18 → 19 个模块文件）
+  - `--detailed-doc`：前置校验（锚定 `understanding.json` 的 `meta.run_id`、findings 双源一致性）→ 生成五视角素材包（`detailed/inputs/`，白名单提取 + scrub 复核 + 锚点 manifest）→ 输出 8 节大纲骨架
+  - `--assemble`：装配五专家分节稿（`detailed/sections/0N-xxx.doc.md`）为终稿 `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json`（终稿原子写；已存在终稿时需 `--force`）
+  - 详说模式拒绝与 `--fresh` / `--resume` / `--skip-llm-phase` 组合（CLI 显式报错）
+- ✅ 契约要点：E-n 引用采用 (seq, ref) 双键并做锚点漂移检测；四判据凭据扫描（C1 scrub 差集 / C2 URL userinfo 带脱敏豁免 / C3 键值对 / C4 扩展敏感键名 × 高熵值）
+- ✅ 新增 5 个专家派发提示词：`docs/spec/role-prompts/su-detailed-{architect,product,walkthrough,ui,qa}.md`（架构师 / 产品经理 / 走读开发 / UI / 测试）
+- ✅ 新增手工冒烟脚本 `scripts/tests/scripts/sfd_smoke.sh`（S-1/S-5 最小链路：造库 → render-only → detailed-doc → 五草稿 → assemble → 幂等/保护/CLI 违例速查）
+- ✅ 设计文档：`docs/dev/SYSTEM_FUNCTION_DOC_PRD.md`（PRD-SFD-001）/ `docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md`（ARCH-SFD-001）
+
+##### SFD 测试
+
+- ✅ 新增 6 个单测模块（`scripts/tests/test_su_detailed_{precheck,packages,outline,scan,assemble,cli}.py`，112 个测试用例），全部通过
+- ✅ SU 单测聚合 14 → 20 个模块（`scripts/tests/test_su_*.py` 实测 520 个用例，500+ 表述）
+- ✅ 新增 e2e 场景 [9]-[13]（对应 S-1~S-5；其中 [10]-[13] 零浏览器依赖恒执行）
+
 ## [2.9.0] - 2026-09-28
 
 ### Added

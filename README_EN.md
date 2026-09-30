@@ -1,6 +1,18 @@
 # Trae Multi-Agent Skill
 
-🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup. v2.9 adds System Understanding (SU) — fully read-only reverse engineering of black-box web systems.
+🎭 Dynamically dispatches to appropriate agent roles (Architect, Product Manager, Test Expert, Solo Coder, UI Designer) based on task type. Supports multi-agent collaboration, consensus mechanism, complete project lifecycle management, specification-driven development, code map generation, project understanding, and Karpathy's Four Core Principles enforcement. Supports Chinese-English bilingual. v2.5 adds Cybernetics engineering cybernetics, v2.6 adds Ponytail Decision Ladder (less redundant code), Autonomous iteration mode, Dynamic Workflows 6 modes, Plugin hot-reload, v2.7 adds UI/UX audit analysis and visual regression testing scripts. v2.7.1 revises AI honest degradation, real semantic matching, dual-host manifest sync, and v1 dead code cleanup. v2.9 adds System Understanding (SU) — fully read-only reverse engineering of black-box web systems. v2.9.1 adds the SU third phase "Expert Detailed Doc" (SFD) — five experts author sections that are assembled into SYSTEM_FUNCTION_DOC.md.
+
+## 🎉 September 2026 Latest Updates (v2.9.1)
+
+> Third phase after SU collection + backfill: zero network, zero credentials, zero new dependencies; no browser, no DB connection
+
+- ✅ **System Function Doc (SFD) (v2.9.1)** — Expert detailed doc on top of SU artifacts
+  - 🧾 `--detailed-doc`: pre-check (anchors `meta.run_id` of `understanding.json`, findings dual-source consistency) → five-perspective input packages (allowlist + scrub re-check + anchor manifest) → 8-section outline skeleton
+  - 🤝 Host LLM dispatches five experts (Architect / Product Manager / Walkthrough Developer / UI / QA); prompts at `docs/spec/role-prompts/su-detailed-*.md`
+  - 📦 `--assemble`: assembles final `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json` (atomic write, `--force` final-doc protection)
+  - 🔒 Contracts: E-n references use (seq, ref) dual keys with anchor-drift detection; four-criteria credential scan (C1 scrub diff-set / C2 URL userinfo / C3 key-value pairs / C4 sensitive key names × high-entropy values)
+  - 🧪 Tests: SU unit tests now 20 modules (500+ cases) all passing; e2e scenarios [9]-[13] (S-1~S-5; [10]-[13] browser-free, always executed)
+  - Core component: `scripts/su/detailed_doc.py` (`scripts/su/` grows from 18 to 19 module files)
 
 ## 🎉 September 2026 Latest Updates (v2.9)
 
@@ -228,6 +240,7 @@
    - Five non-negotiable safety redlines: credential redaction, DB/Redis read-only, non-GET network interception, zero dangerous clicks
    - Core files: `scripts/system_understanding.py`, `scripts/su/` (18 module files)
    - Detailed guide: `docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md`
+   - **Expert Detailed Doc (SFD, v2.9.1)**: third phase after collection + backfill — `--detailed-doc` (pre-check → five-perspective input packages → 8-section outline), host LLM dispatches five experts (Architect / Product / Walkthrough / UI / QA per `docs/spec/role-prompts/su-detailed-*.md`), then `--assemble` produces `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json`; E-n (seq, ref) dual-key references with anchor-drift detection and four-criteria credential scan; `scripts/su/detailed_doc.py` (19th module)
 
 9. **8-Stage Standard Workflow** 📊
    - Stage 1: Requirements Analysis (Product Manager)
@@ -1131,6 +1144,7 @@ Thanks to all contributors and users for their support!
 
 | Version | Date | Core Features |
 |---------|------|---------------|
+| v2.9.1 | September 2026 | SU Expert Detailed Doc phase (SFD): `--detailed-doc` / `--assemble`, five-expert dispatch, `detailed_doc.py` (SU unit tests now 20 modules) |
 | v2.7 | June 2026 | UI/UX Audit Analysis (`uiux_analyzer.py`, 4 detection dimensions), Visual Regression & Display Integrity (`visual_regression.py`, 3 detection dimensions) |
 | v2.6 | June 2026 | Ponytail Decision Ladder (less redundant code), Autonomous Iteration Mode, Dynamic Workflows 6 Modes, Plugin Hot-Reload |
 | v2.5 | May 2026 | Engineering Cybernetics Enhancement (three-ring control model, feedback control loop, performance fingerprint, guard coordinator) |

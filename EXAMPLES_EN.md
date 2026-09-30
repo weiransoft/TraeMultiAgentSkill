@@ -10,6 +10,7 @@ This document provides practical usage examples for Trae Multi-Agent Skill.
   - [Example 11: Karpathy Principle Checking (v2.4)](#example-11-karpathy-principle-checking-v24)
   - [Example 12: Claude Code Platform Invocation (v2.4)](#example-12-claude-code-platform-invocation-v24)
   - [Example 13: System Understanding (SU) (v2.9)](#example-13-system-understanding-su-v29)
+  - [Example 14: Legacy System Expert Detailed Doc (SFD) (v2.9.1)](#example-14-legacy-system-expert-detailed-doc-sfd-v291)
 - [Best Practices](#-best-practices)
 
 ## 🎯 Basic Examples
@@ -891,6 +892,49 @@ python3 scripts/system_understanding.py --out docs/system-understanding --system
 ```
 
 > Captcha/2FA on the login page? Log in manually once, export storage_state, then bypass auto-login with `--storage-state <path>`.
+> Detailed guide: [docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
+
+---
+
+### Example 14: Legacy System Expert Detailed Doc (SFD) (v2.9.1)
+
+**Scenario**: The legacy ticket system from Example 13 has completed SU collection + backfill (`UNDERSTANDING.md` and `understanding.json` are closed out). The team now needs a **deep per-feature detailed doc** (SYSTEM_FUNCTION_DOC.md) — not just "what the system has", but "why each feature is designed this way, how data flows, where the boundaries are, and what the risks are". Five experts (Architect / Product Manager / Walkthrough Developer / UI / QA) author sections; the script handles pre-checks and final assembly. Zero network, zero credentials, zero new dependencies.
+
+**Step 1: Detailed-doc preparation** (pre-check + five-perspective input packages + 8-section outline skeleton):
+```bash
+# Pre-check: anchors meta.run_id of understanding.json, findings dual-source consistency;
+# then generates detailed/inputs/ packages (allowlist extraction + scrub re-check + anchor
+# manifest) and the 8-section outline skeleton. No browser, no DB connections.
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id erp-legacy --detailed-doc
+```
+
+**Step 2: Host LLM dispatches five experts** (per the dispatch guidance printed by `--detailed-doc`):
+```
+Architect          → docs/spec/role-prompts/su-detailed-architect.md   + inputs/architect.*
+Product Manager    → docs/spec/role-prompts/su-detailed-product.md     + inputs/product.*
+Walkthrough Dev    → docs/spec/role-prompts/su-detailed-walkthrough.md + inputs/walkthrough.*
+UI                 → docs/spec/role-prompts/su-detailed-ui.md          + inputs/ui.*
+QA                 → docs/spec/role-prompts/su-detailed-qa.md          + inputs/qa.*
+Each expert writes detailed/sections/0N-xxx.doc.md (E-n references must use (seq, ref) dual keys)
+```
+
+**Step 3: Assemble the final document**:
+```bash
+# Validates per-section E-n references (anchor-drift detection) + four-criteria
+# credential scan, then atomically writes the final document
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id erp-legacy --assemble
+```
+
+**Expected artifacts** (`docs/system-understanding/erp-legacy/`):
+```
+📁 detailed/inputs/                 # Five-perspective input packages (allowlist + scrub re-check + anchor manifest)
+📁 detailed/sections/0N-xxx.doc.md  # Expert-authored sections
+📄 SYSTEM_FUNCTION_DOC.md           # Final detailed doc (8 sections)
+📄 assembly-report.json             # Assembly report (reference validation, drift detection, credential scan)
+```
+
+> If the final doc already exists, `--assemble` refuses to overwrite unless you pass `--force`.
+> Detailed-doc mode rejects combinations with `--fresh` / `--resume` / `--skip-llm-phase` (exit code 2).
 > Detailed guide: [docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ---

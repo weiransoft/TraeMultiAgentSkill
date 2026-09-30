@@ -1,7 +1,7 @@
 name: multi-agent-team
-version: 2.9.0
+version: 2.9.1
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
@@ -307,6 +307,9 @@ capabilities:
       - DB/Redis 只读内省（MySQL/PostgreSQL SELECT-only 白名单、Redis 只读命令白名单）
       - UI↔API↔表↔Redis 三角关联分析（确定性证据 + 隐式外键推断）
       - 10 节《系统功能理解文档》渲染 + 宿主 LLM 两阶段语义回填工作流
+      - 专家详说（SFD，v2.9.1）：--detailed-doc 前置校验（锚定 run_id、findings 双源一致）→
+        五视角素材包 + 8 节大纲骨架 → 宿主 LLM 派发五专家（su-detailed-*.md）→
+        --assemble 装配 SYSTEM_FUNCTION_DOC.md + assembly-report.json（零网络零凭据零新依赖）
 
       安全红线：凭据不落盘明文（统一 redact 管线）；DB/Redis 严格只读；
       浏览器网络层拦截全部非 GET 与白名单外域；危险按钮零点击。
@@ -339,6 +342,12 @@ capabilities:
           items:
             type: string
           description: diagrams/ 目录 Mermaid 图源（navigation.mmd 导航图、er.mmd ER 图）
+        system_function_doc_md:
+          type: string
+          description: SYSTEM_FUNCTION_DOC.md《系统功能详说文档》终稿（SFD --assemble 产物，v2.9.1）
+        assembly_report_json:
+          type: string
+          description: assembly-report.json 装配报告（引用校验、锚点漂移检测、凭据扫描结果，v2.9.1）
 
 dependencies: []
 
@@ -483,6 +492,14 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.9.1
+      date: "2026-09-30"
+      changes:
+        - 新增 SU 第三阶段"专家详说"（SFD）：--detailed-doc 前置校验（锚定 understanding.json meta.run_id、findings 双源一致）→ 五视角素材包（白名单 + scrub 复核 + 锚点 manifest）+ 8 节大纲骨架 → 宿主 LLM 派发五专家（docs/spec/role-prompts/su-detailed-{architect,product,walkthrough,ui,qa}.md）→ --assemble 装配 SYSTEM_FUNCTION_DOC.md + assembly-report.json
+        - 契约：E-n 引用 (seq, ref) 双键 + 锚点漂移检测；四判据凭据扫描（C1 scrub 差集 / C2 URL userinfo 带脱敏豁免 / C3 键值对 / C4 扩展敏感键名×高熵值）；终稿原子写、--force 终稿保护；详说模式拒绝 --fresh/--resume/--skip-llm-phase 组合；零网络零凭据零新依赖
+        - 新增 scripts/su/detailed_doc.py（scripts/su/ 模块数 18→19）；新增 6 个单测模块 test_su_detailed_*.py（112 用例），SU 单测聚合 20 个模块、全仓 500+ 用例；e2e 场景 [9]-[13]（S-1~S-5，[10]-[13] 零浏览器恒执行）
+        - 设计文档：docs/dev/SYSTEM_FUNCTION_DOC_PRD.md（PRD-SFD-001）/ docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md（ARCH-SFD-001）
+
     - version: 2.9.0
       date: "2026-09-28"
       changes:
@@ -552,4 +569,4 @@ metadata:
         - 简单的上下文管理
 
 created_at: "2026-03-16T00:00:00"
-updated_at: "2026-09-28T00:00:00"
+updated_at: "2026-09-30T00:00:00"

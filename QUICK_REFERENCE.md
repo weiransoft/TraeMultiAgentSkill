@@ -50,6 +50,18 @@
 
 **退出码**：0 成功；2 配置/findings 校验错误；3 系统不可达；4 登录失败；5 playwright 缺失；130 SIGINT（可 `--resume`）
 
+### 专家详说 SFD 速查 (v2.9.1)
+
+| 阶段 | 命令 | 说明 |
+|------|------|------|
+| 详说准备 | `python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --detailed-doc` | 前置校验（锚定 run_id、findings 双源一致）→ 五视角素材包 + 8 节大纲骨架，零浏览器/零连库 |
+| 专家撰写 | 宿主 LLM 派发五专家（`docs/spec/role-prompts/su-detailed-*.md`），产出 `detailed/sections/0N-xxx.doc.md` | 架构师/产品经理/走读开发/UI/测试 |
+| 装配终稿 | `python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --assemble` | 产出 `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json`（终稿保护需 `--force`） |
+
+**产物路径**：`<out>/<system_id>/detailed/inputs/`（素材包）、`detailed/sections/`（分节稿）、`SYSTEM_FUNCTION_DOC.md`（终稿）、`assembly-report.json`（装配报告）
+
+**约束**：详说模式拒绝与 `--fresh` / `--resume` / `--skip-llm-phase` 组合（退出码 2）
+
 📄 详细指南：[docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ## 示例

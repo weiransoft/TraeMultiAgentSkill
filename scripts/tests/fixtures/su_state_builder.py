@@ -33,6 +33,10 @@ SEED_PAGES = [
     ("/orders", "http://127.0.0.1:9/orders", "订单列表", 1, "done"),
     ("/products", "http://127.0.0.1:9/products", "商品总览", 1, "done"),
     ("/orders#/orders/1", "http://127.0.0.1:9/orders#/orders/1", "订单明细 1", 2, "done"),
+    # timeout 页：SFD 测试视角盲区素材（REQ-SFD-010 要求覆盖 timeout/error 页
+    # 场景）——status='timeout' 不参与 done 页渲染口径，既有断言按 status 过滤
+    # 的语义不受影响。
+    ("/reports", "http://127.0.0.1:9/reports", "报表中心", 1, "timeout"),
 ]
 
 # 种子 API 端点（/api/orders 键名与 orders 表列名高合合作关联证据素材）

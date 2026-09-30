@@ -1,6 +1,18 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》。
+
+## 🎉 2026 年 9 月最新更新 (v2.9.1)
+
+> 在 SU 采集+回填之后追加第三阶段"专家详说"：零网络、零凭据、零新依赖，不启动浏览器、不连库
+
+- ✅ **专家详说 SFD (v2.9.1)** - System Function Doc，SU 产物之上的五专家分节详说
+  - 🧾 `--detailed-doc`：前置校验（锚定 `understanding.json` 的 `meta.run_id`、findings 双源一致）→ 五视角素材包（白名单 + scrub 复核 + 锚点 manifest）→ 8 节大纲骨架
+  - 🤝 宿主 LLM 派发五专家（架构师 / 产品经理 / 走读开发 / UI / 测试），prompt 见 `docs/spec/role-prompts/su-detailed-*.md`
+  - 📦 `--assemble`：装配终稿 `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json`（原子写、`--force` 终稿保护）
+  - 🔒 契约：E-n 引用 (seq,ref) 双键 + 锚点漂移检测；四判据凭据扫描（C1 scrub 差集 / C2 URL userinfo / C3 键值对 / C4 敏感键名×高熵值）
+  - 🧪 测试：SU 单测 20 个模块（500+ 用例）全通过；e2e 场景 [9]-[13]（S-1~S-5，[10]-[13] 零浏览器恒执行）
+  - 核心组件：`scripts/su/detailed_doc.py`（`scripts/su/` 能力包 18 → 19 个模块文件）
 
 ## 🎉 2026 年 9 月最新更新 (v2.9)
 
@@ -312,6 +324,26 @@ python3 scripts/tests/run_tests.py
    - 核心文件：`scripts/su/state_store.py`
 6. **两阶段工作流（证据与结论严格分离）** 🤖
    - 脚本层零 LLM 调用、不出语义结论；语义结论由宿主 LLM 按 `docs/spec/role-prompts/su-llm-backfill.md` 契约回填、CLI 校验收口
+
+### 专家详说（v2.9.1）
+
+SU 采集 + 回填完成后的第三阶段：把 `understanding.json` 交给五位专家分节详说，再装配成《系统功能详说文档》。三命令工作流：
+
+```bash
+# 1) 前置校验 + 五视角素材包 + 8 节大纲骨架（不启动浏览器、不连库）
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id erp-legacy --detailed-doc
+
+# 2) 宿主 LLM 按派发指引把五个 prompt + 对应素材包分别交专家子代理，
+#    产出 detailed/sections/0N-xxx.doc.md
+#    （架构师/产品经理/走读开发/UI/测试，prompt：docs/spec/role-prompts/su-detailed-*.md）
+
+# 3) 装配终稿 SYSTEM_FUNCTION_DOC.md + assembly-report.json
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id erp-legacy --assemble
+```
+
+五专家分工：架构师负责系统结构与技术决策、产品经理负责功能语义与用户价值、走读开发负责页面行为到数据流的逐页解释、UI 负责交互模式与信息架构、测试负责质量风险与验证建议。
+
+📄 详见 [docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ### Ponytail 决策梯 (v2.6 新增)
 
@@ -1562,6 +1594,7 @@ SOFTWARE.
 
 | 版本 | 日期 | 核心特性 |
 |------|------|---------|
+| v2.9.1 | 2026 年 9 月 | SU 专家详说阶段（SFD）：`--detailed-doc` / `--assemble`、五专家派发、`detailed_doc.py`（SU 单测 20 模块） |
 | v2.7 | 2026 年 6 月 | UI/UX 巡检分析（`uiux_analyzer.py`，4 大检测维度）、视觉回归与显示完整性（`visual_regression.py`，3 大检测维度） |
 | v2.6 | 2026 年 6 月 | Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载 |
 | v2.5 | 2026 年 5 月 | Cybernetics 工程控制论增强（三环控制模型、反馈控制环、性能画像、守护协调器） |

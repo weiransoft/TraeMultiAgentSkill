@@ -1,7 +1,7 @@
 # Trae Multi-Agent Skill 实现状态
 ## 版本信息
-- **当前版本**: 2.9.0
-- **发布日期**: 2026-09-28
+- **当前版本**: 2.9.1
+- **发布日期**: 2026-09-30
 - **状态**: ✅ 已完成（所有计划功能 100% 实现）
 
 ## v2.7.1 修订（AI 诚实化 + 真实语义匹配 + 双宿主同步 + v1 死代码清算）
@@ -70,6 +70,21 @@
   - 单测脚本: `scripts/tests/scripts/run_system_understanding.sh`
   - e2e 脚本: `scripts/tests/scripts/run_system_understanding_e2e.sh`（场景 [0]-[7] PASS；场景 [8] 需外部注入 DSN，缺省 SKIP）；两者均已接入 `run_all.sh`
 - **文档**: `docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md` / `docs/spec/role-prompts/su-llm-backfill.md`（PROMPT-SU-001 契约）/ `docs/dev/SYSTEM_UNDERSTANDING_PRD.md` / `docs/dev/SYSTEM_UNDERSTANDING_ARCHITECTURE.md`
+
+## v2.9.1 新增功能（SU 专家详说阶段 SFD）
+
+- **状态**: ✅ 完整实现（设计 / 实现 / 单测 / e2e 全通过；架构审查 D1-D6 通过）
+- **定位**: SU 采集 + 回填之后的第三阶段"专家详说"，零网络、零凭据、零新依赖，不启动浏览器、不连库
+- **核心实现**: `scripts/su/detailed_doc.py`（新增，`scripts/su/` 模块数 18 → 19）
+  - `--detailed-doc`：前置校验（锚定 `understanding.json` 的 `meta.run_id`、findings 双源一致）→ 五视角素材包（白名单 + scrub 复核 + 锚点 manifest）→ 8 节大纲骨架
+  - `--assemble`：装配五专家分节稿为终稿 `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json`（终稿原子写；`--force` 终稿保护）
+  - 详说模式拒绝与 `--fresh` / `--resume` / `--skip-llm-phase` 组合
+- **契约**: E-n 引用 (seq, ref) 双键 + 锚点漂移检测；四判据凭据扫描（C1 scrub 差集 / C2 URL userinfo 带脱敏豁免 / C3 键值对 / C4 扩展敏感键名 × 高熵值）
+- **专家派发提示词**: `docs/spec/role-prompts/su-detailed-{architect,product,walkthrough,ui,qa}.md`（架构师 / 产品经理 / 走读开发 / UI / 测试）
+- **设计文档**: `docs/dev/SYSTEM_FUNCTION_DOC_PRD.md`（PRD-SFD-001）/ `docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md`（ARCH-SFD-001）
+- **测试覆盖**: SU 单元测试 20 个模块、全仓 500+ 用例（`test_su_*.py` 实测 520 个 `def test_`），全部通过
+  - 新增 6 个单测模块（112 用例）：`test_su_detailed_precheck` / `test_su_detailed_packages` / `test_su_detailed_outline` / `test_su_detailed_scan` / `test_su_detailed_assemble` / `test_su_detailed_cli`
+  - e2e 场景 [9]-[13]（对应 S-1~S-5；[10]-[13] 零浏览器依赖恒执行）
 
 ## 核心实现
 

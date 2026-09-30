@@ -28,6 +28,20 @@
 #       第 6 节"未采集"显式声明断言
 #   [8] DB/Redis 容器场景（需 SU_TEST_MYSQL_DSN / SU_TEST_REDIS_URL 外部
 #       注入，缺省显式 SKIP——env 探测缺失不假通过也不 FAIL）
+#   [9] SFD S-1 全链路（复用场景[2]三件套 + findings 注入 + render-only
+#       收口）：detailed-doc → 五合规草稿 → assemble 终稿 8 节（浏览器场景，
+#       playwright 缺失时显式 SKIP）
+#   [10] SFD S-2 降级装配：只放 2 份草稿 → exit 0 出稿、degraded 节与
+#        声明齐备（builder 链路，零浏览器恒执行）
+#   [11] SFD S-3 凭据收口：草稿注入假凭据（C1/C3/C4 + C2 脱敏自引用反例）
+#        → exit 2 且终稿未被更新（builder 链路，零浏览器恒执行）
+#   [12] SFD S-4 CLI 违例矩阵：三 flag 互斥 / 生命周期组合 / 缺必填 /
+#        非空目录零副作用（builder 链路，零浏览器恒执行）
+#   [13] SFD S-5 幂等：重跑 detailed-doc + assemble 终稿逐字节一致
+#        （builder 链路，零浏览器恒执行）
+#
+# SFD 场景（[10]-[13]）走 su_state_builder 链路零浏览器依赖，playwright
+# 缺失时照常执行（ARCH-SFD-001 §10.3：详说阶段零网络零凭据面）。
 #
 # write-counter 基线口径（架构 §11.2）：每场景独立起 fixture server 进程，
 # 进程内存计数天然归零；SU 全链路跑完 POST==0 即 route guard 零写红线证据。
@@ -63,7 +77,7 @@ while [ "$#" -gt 0 ]; do
       ONLY_SCENARIOS="${1#--only=}"; shift
       ;;
     -h|--help)
-      printf '用法: %s [--only N[,N...]]\n  --only 只跑指定场景编号（0-8）；[0][1] 恒执行\n' "$(basename "$0")"
+      printf '用法: %s [--only N[,N...]]\n  --only 只跑指定场景编号（0-13）；[0][1] 恒执行\n' "$(basename "$0")"
       exit 0
       ;;
     *)
@@ -73,12 +87,19 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-# scenario_selected <编号>：该编号场景是否应执行。空白名单（未传 --only）
-# 恒真；[0][1] 不受 --only 限制恒执行（前置探测/素材契约，成本极低）。
+# scenario_selected <编号>：该场景是否应执行。空白名单（未传 --only）
+# 恒真；[0][1] 不受 --only 限制恒执行（前置探测/素材契约，成本极低）；
+# [8]（容器场景，缺 DSN 时场景内部首分支即 SKIP 成本≈0）与 [10]-[13]
+# （SFD builder 链路，零浏览器、不绑定 su_site fixture 站点）同样不受
+# --only 限制——[1] 站点冒烟恒执行的成本上界即其全部成本。
+# （2026-09-30 教训：旧版把浏览器型场景排除在 --only 白名单外却仍起
+# su_site 站点空等——场景[1]的站点在批次收尾统一 kill，--only 批次
+# 无场景消费站点时挂到看门狗 300s 被强杀，整批 rc=1。）
 scenario_selected() {
   local id="$1" item
   case "${id}" in
-    0|1) return 0 ;;
+    0|1|8) return 0 ;;
+    10|11|12|13) return 0 ;;
   esac
   [ -z "${ONLY_SCENARIOS}" ] && return 0
   # 逗号/空格分隔白名单逐项匹配
@@ -126,6 +147,27 @@ skip() { RESULTS+=("$1:SKIP"); log "SKIP  $1${2:+ —— $2}"; }
 # 清理 trap：杀光本脚本拉起的全部子进程 + 删除临时工作区
 # ---------------------------------------------------------------------------
 CHILD_PIDS=()
+# 看门狗 pid 登记簿：run_su 每次拉起的 sleep 300 看门狗都登记于此。
+# 命令替换（$( )）子 shell 里的 kill/wait 各自作用于子 shell 的作业表，
+# 主 shell 作业表里的看门狗必须回到主流程统一收割——否则收尾 EXIT trap
+# 的 `wait` 会挂等到 sleep 300 到期，整批挂死 5 分钟（2026-09-30 实测
+# 教训：--only 10-13 批次在场景[10]命令替换后挂满看门狗时长）。
+WATCHDOG_PIDS=()
+
+# reap_watchdogs：收割已结束的登记看门狗并清空（主流程调用；对仍在
+# sleep 的看门狗 wait 会阻塞——主流程调用点均在 run_su 同步收尾后，
+# 看门狗已被 watchdog_stop kill，wait 立即返回）
+reap_watchdogs() {
+  local pid
+  for pid in "${WATCHDOG_PIDS[@]:-}"; do
+    if [ -n "${pid}" ]; then
+      kill -TERM "${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+    fi
+  done
+  WATCHDOG_PIDS=()
+  WATCHDOG_PID=""
+}
 
 cleanup() {
   local pid
@@ -134,8 +176,22 @@ cleanup() {
       kill -TERM "${pid}" 2>/dev/null || true
     fi
   done
-  # 给子进程 2 秒优雅退出后强杀残留
-  sleep 1
+  # 看门狗一并停掉（只 kill 不 wait——wait 未注册 pid 会挂等到 sleep 300
+  # 到期；已退出的由下方轮询回收，未退出的残留由 shell 退出时系统回收）
+  for pid in "${WATCHDOG_PIDS[@]:-}"; do
+    [ -n "${pid}" ] && kill -TERM "${pid}" 2>/dev/null || true
+  done
+  # 给子进程 2 秒优雅退出后强杀残留（轮询式，不用裸 sleep+wait）
+  local waited=0
+  while [ "${waited}" -lt 20 ]; do
+    local alive=0
+    for pid in "${CHILD_PIDS[@]:-}"; do
+      [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null && alive=1
+    done
+    [ "${alive}" = "0" ] && break
+    sleep 0.1
+    waited=$((waited + 1))
+  done
   for pid in "${CHILD_PIDS[@]:-}"; do
     if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
       kill -KILL "${pid}" 2>/dev/null || true
@@ -160,10 +216,10 @@ trap cleanup EXIT
 RC=0
 SU_PID=""
 watchdog_stop() {
-  # 停止看门狗（kill 直接作用于子 shell 进程；wait 回收防僵尸）
+  # 停止看门狗（只 kill 不 wait——命令替换子 shell 里 wait 未注册 pid 会
+  # 挂等到 sleep 300 到期；回收统一交给主流程 reap_watchdogs / cleanup）
   if [ -n "${WATCHDOG_PID:-}" ]; then
     kill "${WATCHDOG_PID}" 2>/dev/null || true
-    wait "${WATCHDOG_PID}" 2>/dev/null || true
     WATCHDOG_PID=""
   fi
 }
@@ -179,14 +235,18 @@ run_su() {
     >"${scen_dir}/run.log" 2>&1 &
   SU_PID=$!
   CHILD_PIDS+=("${SU_PID}")
-  # 看门狗：300s 未退出则 KILL（防挂死拖垮整套件）
+  # 看门狗：300s 未退出则 KILL（防挂死拖垮整套件）；登记 WATCHDOG_PIDS
+  # 供 cleanup 兜底回收（命令替换子 shell 里 watchdog_stop 的 wait 会
+  # 挂等到 sleep 300 到期——主流程 reap_watchdogs 非阻塞收割防挂死）
   (
     sleep 300
     kill -KILL "${SU_PID}" 2>/dev/null || true
   ) &
   WATCHDOG_PID=$!
+  WATCHDOG_PIDS+=("${WATCHDOG_PID}")
   wait "${SU_PID}"; RC=$?
   watchdog_stop
+  reap_watchdogs
 }
 
 # wait_site_ready <port> [最大尝试次数]：轮询 write-counter 直到站点可服务
@@ -219,7 +279,10 @@ import json, sys
 with open(sys.argv[1], encoding="utf-8") as fh:
     d = json.load(fh)
 try:
-    print(eval(sys.argv[2], {"__builtins__": {}}, {"d": d}))
+    # 内建注入 len/str/int/float：eval 的 __builtins__ 置空后表达式仍需
+    # 基础类型转换（2026-09-30 教训：str(...) 表达式报 name 'str' not defined）
+    print(eval(sys.argv[2], {"__builtins__": {}},
+               {"d": d, "len": len, "str": str, "int": int, "float": float}))
 except Exception as exc:  # 提取失败打印哨兵供断言捕获
     print("ERR:{0}".format(exc))
 PYEOF
@@ -240,6 +303,107 @@ run_scoped_count() {
   run_id="$(sqlite3 "${db}" "SELECT run_id FROM run_meta ORDER BY started_at DESC LIMIT 1" 2>/dev/null)"
   [ -n "${run_id}" ] || { echo ""; return; }
   sqlite3 "${db}" "$(printf "${sql}" "${run_id}")" 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# SFD（专家详说）共享工装（场景 [9]-[13]，ARCH-SFD-001 §10.3）
+# ---------------------------------------------------------------------------
+
+# sfd_seed_workspace <sys_root> <sid>：builder 种子库 + 直插合法 findings
+# （render-only 前置校验要求磁盘 understanding.json 含 findings 段）。
+# 直插 findings 表属测试设施建设（与 builder 直连 INSERT、单测工装
+# fixtures/sfd_harness.inject_findings 同性质），入库形态过
+# validate_findings_schema 口径。
+sfd_seed_workspace() {
+  local sys_root="$1" sid="$2"
+  mkdir -p "${sys_root}/state"
+  # builder CLI 成功时 stdout 打印 seed_ids JSON（id 映射）——消费其退出码
+  # 即可，输出必须重定向丢弃：sfd_seed_workspace 被 sfd_builder_chain 经
+  # $() 调用，其 stdout 全部拼进 sys_root 返回值（2026-09-30 实测教训：
+  # seed_ids JSON 混入 sys_root 导致草稿放置 FileNotFoundError）
+  "${PYTHON}" -B "${STATE_BUILDER_PY}" \
+    "${sys_root}/state/understanding.sqlite" "${sid}" completed >/dev/null || return 1
+  "${PYTHON}" -B - "${sys_root}" <<'PYEOF' || return 1
+"""builder 库直插 1 条合法 findings（evidence_refs 引用真实种子行 id）。"""
+import json
+import sqlite3
+import sys
+import time
+from pathlib import Path
+
+sys_root = Path(sys.argv[1])
+db = sys_root / "state" / "understanding.sqlite"
+conn = sqlite3.connect(str(db))
+conn.row_factory = sqlite3.Row
+try:
+    pid = conn.execute(
+        "SELECT page_id FROM pages WHERE url_key='/orders'").fetchone()["page_id"]
+    tid = conn.execute(
+        "SELECT table_id FROM db_tables WHERE table_name='orders'"
+    ).fetchone()["table_id"]
+    finding = {
+        "claim": "订单列表页经 GET /api/orders 读取 orders 表（e2e SFD 注入结论）",
+        "kind": "mapping",
+        "confidence": "high",
+        "evidence_refs": ["pages:{0}".format(pid), "db_tables:{0}".format(tid)],
+    }
+    conn.execute(
+        "INSERT INTO findings(claim, confidence, evidence_refs, status,"
+        " kind, created_at) VALUES(?,?,?,?,?,?)",
+        (finding["claim"], finding["confidence"],
+         json.dumps(finding["evidence_refs"], ensure_ascii=False),
+         "proposed", finding["kind"], time.time()))
+    conn.commit()
+finally:
+    conn.close()
+# render-only 磁盘前置：最小 understanding.json 含 findings 段
+# （findings 由渲染层从状态库回灌，此处与 render-only 校验口径对齐）
+(sys_root / "understanding.json").write_text(json.dumps(
+    {"findings": [finding]}, ensure_ascii=False, indent=2), encoding="utf-8")
+PYEOF
+}
+
+# sfd_place_drafts <sys_root> <keep>：按 PROMPT-SFD 契约放置合规草稿。
+# keep=all 五份齐；keep=part 只放 01+04（S-2 降级素材）。引用编号动态取
+# evidence-index 首条 seq（跨 render 稳定）。
+sfd_place_drafts() {
+  local sys_root="$1" keep="$2"
+  # stderr 汇入场景级排障日志（本函数经 $() 调用——stdout 必须绝对纯净，
+  # 任何杂散输出都会拼进 sys_root 返回值；stdout 成功时无输出、失败时由
+  # python traceback 走 stderr）
+  local sys_parent
+  sys_parent="$(dirname "${sys_root}")"
+  "${PYTHON}" -B - "${sys_root}" "${keep}" 2>>"${sys_parent}/place_drafts.err" <<'PYEOF' || return 1
+"""放置合规专家草稿（首行节头逐字、04 含 SFD-SECTION: 5 标记、真实 E-n）。"""
+import json
+import sys
+from pathlib import Path
+
+sys_root = Path(sys.argv[1])
+keep = sys.argv[2]
+entries = json.loads((sys_root / "evidence" / "evidence-index.json")
+                     .read_text("utf-8"))["entries"]
+e1 = "E{0:04d}".format(entries[0]["seq"])
+sections = sys_root / "detailed" / "sections"
+sections.mkdir(parents=True, exist_ok=True)
+drafts = {
+    "01-architecture.doc.md":
+        "# 1. 系统定位与技术架构\n\n订单管理系统，三层架构（{0}）。\n".format(e1),
+    "02-product.doc.md":
+        "# 2. 功能全景与业务流程\n\n核心流：下单落 orders 表（{0}）。\n".format(e1),
+    "03-pages.doc.md":
+        "# 3. 页面功能详说\n\n订单列表页展示订单明细（{0}）。\n".format(e1),
+    "04-data-semantics.doc.md":
+        "# 4. 数据模型业务语义\n\norders 表存订单主数据（{0}）。\n"
+        "<!-- SFD-SECTION: 5 -->\n\nGET /api/orders 供订单列表页消费。\n".format(e1),
+    "05-quality.doc.md":
+        "# 6. 质量盲区与风险建议\n\nT3 删除动作未执行，风险高（{0}）。\n".format(e1),
+}
+wanted = sorted(drafts) if keep == "all" else [
+    "01-architecture.doc.md", "04-data-semantics.doc.md"]
+for name in wanted:
+    (sections / name).write_text(drafts[name], encoding="utf-8")
+PYEOF
 }
 
 # start_scene_site <场景名>：为场景独立起 su_site 进程（写计数天然归零），
@@ -393,15 +557,15 @@ fi
 # 场景 [2]~[7]（playwright 缺失时整体显式 SKIP，绝不假通过）
 # ---------------------------------------------------------------------------
 if [ "${DEPS_OK}" -ne 1 ]; then
-  for s in "[2]全链路" "[3]安全红线" "[4]断点续跑" "[5]预算" "[6]凭据错误" "[7]render-only"; do
+  for s in "[2]全链路" "[3]安全红线" "[4]断点续跑" "[5]预算" "[6]凭据错误" "[7]render-only" "[9]SFD全链路"; do
     skip "${s}" "playwright/chromium 缺失（见场景[0]）"
   done
 else
   # ---- 场景 [2]：全链路 ----------------------------------------------------
   log "===== 场景 [2] 全链路采集 ====="
   S2="${WORK_ROOT}/s2"; mkdir -p "${S2}"
-  S2_DIR=""   # 全链路产物目录（场景[3]/[7] 素材，独立重跑兜底时覆写）
-  # 未选中 [2] 但选中了产物消费方 [3]/[7]：照常跑 [2] 供素材（行为与全量
+  S2_DIR=""   # 全链路产物目录（场景[3]/[7]/[9] 素材，独立重跑兜底时覆写）
+  # 未选中 [2] 但选中了产物消费方 [3]/[7]/[9]：照常跑 [2] 供素材（行为与全量
   # 一致），只在收尾如实打 SKIP——绝不因 --only 削弱消费方场景的真实性
   S2_SELECTED=1
   scenario_selected 2 || S2_SELECTED=0
@@ -413,7 +577,7 @@ else
     fi
   fi
   if [ "${S2_SELECTED}" = "0" ] && [ "${S2_SUPPLY}" = "0" ]; then
-    skip "[2]全链路" "--only 未选择（S2_DIR 置占位，[3]/[7] 走独立兜底）"
+    skip "[2]全链路" "--only 未选择（S2_DIR 置占位，[3]/[7]/[9] 走独立兜底）"
   elif start_scene_site s2; then
     make_config "${S2}/config.json" "${SITE_PORT}"
     # REQ-SU-004.4 自动重登链路注入（2026-09-28 P1-1 修复回归锁）：
@@ -1013,6 +1177,435 @@ PYEOF
     if [ -z "${S8_ERR}" ]; then pass "[8]DB-Redis容器"; else fail "[8]DB-Redis容器" "${S8_ERR}"; fi
     kill -TERM "${SITE_PID}" 2>/dev/null || true
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# 场景 [9]：SFD S-1 全链路（复用场景[2]三件套；DEPS_OK 分支内——浏览器场景）
+# ---------------------------------------------------------------------------
+if [ "${DEPS_OK}" -eq 1 ]; then
+  log "===== 场景 [9] SFD 全链路（detailed-doc → 五草稿 → assemble） ====="
+  S9="${WORK_ROOT}/s9"; mkdir -p "${S9}"
+  S9_ERR=""
+  S9_OUT=""   # 详说阶段 --out 根目录（场景[2]或兜底跑的输出根）
+  if ! scenario_selected 9; then
+    skip "[9]SFD全链路" "--only 未选择"
+  else
+    # 三件套素材兜底（与场景[3]同款，2026-09-30）：--only 9 单独执行或
+    # [2] 未跑成功时，独立起重跑一次采集（delay 100ms 快采）供素材，
+    # 绝不因 --only 削弱本场景真实性
+    if [ ! -f "${S2_DIR:-/nonexistent}/UNDERSTANDING.md" ]; then
+      log "场景[2]产物缺失——场景[9]独立重跑兜底"
+      if start_scene_site s9; then
+        make_config "${S9}/config.json" "${SITE_PORT}"
+        run_su "${S9}" --config "${S9}/config.json" --out "${S9}/out" \
+          --system-id su-fixture --skip-llm-phase --delay-ms 100 \
+          --page-timeout-ms 15000 || true
+        kill -TERM "${SITE_PID}" 2>/dev/null || true
+        S9_OUT="${S9}/out"
+        S9_DIR="${S9}/out/su-fixture"
+      else
+        S9_ERR="兜底站点启动失败"
+      fi
+    else
+      S9_OUT="${S2}/out"
+      S9_DIR="${S2_DIR}"
+    fi
+  fi
+  if [ -n "${S9_OUT}" ] && [ ! -f "${S9_DIR}/UNDERSTANDING.md" ]; then
+    S9_ERR="三件套素材缺失（UNDERSTANDING.md 不存在，采集兜底失败）"
+    S9_OUT=""
+  fi
+  if [ -n "${S9_OUT}" ]; then
+    # 9a：findings 注入（直插状态库 + 磁盘 findings 段）→ render-only 收口
+    S9SID="su-fixture"   # 直接在采集产物目录上追加详说阶段（真实用户口径）
+    "${PYTHON}" -B - "${S9_DIR}" <<'PYEOF' >"${S9}/inject.log" 2>&1
+"""向场景[2]状态库直插 1 条合法 findings（e2e 测试设施注入）。"""
+import json
+import sqlite3
+import sys
+import time
+from pathlib import Path
+
+sys_root = Path(sys.argv[1])
+db = sys_root / "state" / "understanding.sqlite"
+conn = sqlite3.connect(str(db))
+conn.row_factory = sqlite3.Row
+try:
+    # 引用素材自适应（2026-09-30）：真实采集库 url_key 含协议主机端口
+    # （动态端口不可预知）——按后缀 '/orders' 匹配；api_observations 主键
+    # 列名为 endpoint_id（state_store schema）；db_tables 在未配置
+    # database 的降级口径下为空，绝不引用
+    pid_row = conn.execute(
+        "SELECT page_id FROM pages"
+        " WHERE url_key LIKE '%/orders' AND status='done'"
+        " ORDER BY page_id LIMIT 1").fetchone()
+    if pid_row is None:
+        raise SystemExit("pages 缺 /orders done 行（采集素材异常）")
+    refs = ["pages:{0}".format(pid_row["page_id"])]
+    claim = "订单列表页展示订单明细（e2e S-1 注入结论）"
+    ao = conn.execute(
+        "SELECT endpoint_id FROM api_observations"
+        " WHERE url_path LIKE '%/api/orders%' AND method='GET'"
+        " ORDER BY endpoint_id LIMIT 1").fetchone()
+    if ao is not None:
+        refs.append("api_observations:{0}".format(ao["endpoint_id"]))
+        claim = "订单列表页经 GET /api/orders 读取订单数据（e2e S-1 注入结论）"
+    finding = {
+        "claim": claim,
+        "kind": "mapping",
+        "confidence": "high",
+        "evidence_refs": refs,
+    }
+    conn.execute(
+        "INSERT INTO findings(claim, confidence, evidence_refs, status,"
+        " kind, created_at) VALUES(?,?,?,?,?,?)",
+        (finding["claim"], finding["confidence"],
+         json.dumps(finding["evidence_refs"], ensure_ascii=False),
+         "proposed", finding["kind"], time.time()))
+    conn.commit()
+finally:
+    conn.close()
+u_path = sys_root / "understanding.json"
+u = json.loads(u_path.read_text("utf-8"))
+u["findings"] = [finding]
+u_path.write_text(json.dumps(u, ensure_ascii=False, indent=2), "utf-8")
+print("injected refs: {0}".format(refs))
+PYEOF
+    [ $? -eq 0 ] || S9_ERR="findings 注入失败（见 ${S9}/inject.log）"
+    if [ -z "${S9_ERR}" ]; then
+      run_su "${S9}" --out "${S9_OUT}" --system-id "${S9SID}" --render-only
+      [ "${RC}" -eq 0 ] || S9_ERR="render-only 收口退出码 ${RC}（期望 0）"
+    fi
+    # 9b：--detailed-doc → 素材包五件 + manifest 锚点 + 大纲 8 节 + 派发指引
+    # REQ-SFD-012 AC2 sha 守卫基线：详说阶段绝不改动 SU 既有产物，
+    # 进入 --detailed-doc 前对 SU 产物快照 sha256，装配收口后逐字节比对
+    if [ -z "${S9_ERR}" ]; then
+      SU_SHA_BEFORE="$(cd "${S9_DIR}" && shasum -a 256 UNDERSTANDING.md understanding.json \
+        summary.json evidence/evidence-index.json 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
+    fi
+    if [ -z "${S9_ERR}" ]; then
+      run_su "${S9}" --out "${S9_OUT}" --system-id "${S9SID}" --detailed-doc
+      [ "${RC}" -eq 0 ] || S9_ERR="detailed-doc 退出码 ${RC}（期望 0）"
+    fi
+    if [ -z "${S9_ERR}" ]; then
+      grep -q "\[SFD\] 专家派发" "${S9}/run.log" \
+        || S9_ERR="派发指引缺失（见 ${S9}/run.log）"
+      for pkg in architect product dev ui qa; do
+        [ -f "${S9_DIR}/detailed/inputs/${pkg}.json" ] \
+          || S9_ERR="${S9_ERR} 素材包缺失 ${pkg}.json"
+      done
+      head -5 "${S9_DIR}/SYSTEM_FUNCTION_DOC.md" | grep -q '^<!-- status: outline -->$' \
+        || S9_ERR="${S9_ERR} 大纲缺 status: outline 标记"
+      [ "$(grep -c '^## [1-8]\. ' "${S9_DIR}/SYSTEM_FUNCTION_DOC.md")" -eq 8 ] \
+        || S9_ERR="${S9_ERR} 大纲节数 ≠ 8"
+    fi
+    # manifest 锚点字段（P0-1b）+ 禁入 key 物理不进包（ADR-2）
+    if [ -z "${S9_ERR}" ]; then
+      "${PYTHON}" -B - "${S9_DIR}" >"${S9}/manifest.log" 2>&1 <<'PYEOF' || S9_ERR="manifest/白名单核验失败（见 ${S9}/manifest.log）"
+"""五包 manifest 锚点 + redis_keys/findings_prompt/lenses 物理不进包断言。"""
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+blob_all = []
+for role in ("architect", "product", "dev", "ui", "qa"):
+    pkg = json.loads((root / "detailed/inputs" / f"{role}.json").read_text("utf-8"))
+    mf = pkg["manifest"]
+    for key in ("run_id", "evidence_index_sha256", "started_at", "sources"):
+        assert key in mf, f"{role}.json manifest 缺 {key}"
+    assert set(pkg["data"]), "data 段为空"
+    blob_all.append(json.dumps(pkg, ensure_ascii=False))
+dev = json.loads((root / "detailed/inputs" / "dev.json").read_text("utf-8"))
+assert dev["manifest"].get("db_samples_masked_by") == "DataMasker"
+blob = "\n".join(blob_all)
+for banned in ("findings_prompt", '"lenses"', "redis_keys"):
+    assert banned not in blob, f"禁入 key {banned} 出现在素材包"
+print("manifest 锚点与白名单核验通过")
+PYEOF
+    fi
+    # 9c：五份合规草稿 → --assemble 终稿 8 节 + report
+    if [ -z "${S9_ERR}" ] && ! sfd_place_drafts "${S9_DIR}" all; then
+      S9_ERR="合规草稿放置失败"
+    fi
+    if [ -z "${S9_ERR}" ]; then
+      run_su "${S9}" --out "${S9_OUT}" --system-id "${S9SID}" --assemble
+      [ "${RC}" -eq 0 ] || S9_ERR="assemble 退出码 ${RC}（期望 0，见 run.log）"
+    fi
+    if [ -z "${S9_ERR}" ]; then
+      head -5 "${S9_DIR}/SYSTEM_FUNCTION_DOC.md" | grep -q '^<!-- status: final -->$' \
+        || S9_ERR="终稿缺 status: final 标记"
+      [ "$(grep -c '^## [1-8]\. ' "${S9_DIR}/SYSTEM_FUNCTION_DOC.md")" -eq 8 ] \
+        || S9_ERR="${S9_ERR} 终稿节数 ≠ 8"
+      REP9="$(json_get "${S9_DIR}/detailed/assembly-report.json" \
+        "'{0}'.format([d['ref_invalid'], d['credential_scan']['status'], len(d['sections'])])" 2>/dev/null)"
+      [ "${REP9}" = "[0, 'clean', 8]" ] \
+        || S9_ERR="${S9_ERR} report 断言失败：${REP9}"
+      # 合法引用必须进清单——草稿五份各含 E-n，ref_total 至少覆盖草稿引用数
+      # （引用体系全链路参与：E-n 识别→清单→统计）
+      REFT9="$(json_get "${S9_DIR}/detailed/assembly-report.json" \
+        "str(d['ref_total'])" 2>/dev/null)"
+      [ -n "${REFT9}" ] && [ "${REFT9}" -ge 5 ] 2>/dev/null \
+        || S9_ERR="${S9_ERR} report ref_total=${REFT9}（期望 ≥5）"
+      # S-1 语义：e2e 场景[3] 同款红线——详说产物目录零凭据明文
+      if grep -rqF "${SU_PASSWORD}" "${S9_DIR}/detailed" "${S9_DIR}/SYSTEM_FUNCTION_DOC.md" 2>/dev/null; then
+        S9_ERR="${S9_ERR} 详说产物泄露 fixture 凭据明文"
+      fi
+      # REQ-SFD-012 AC2 sha 守卫：详说全链路（detailed-doc+assemble）对 SU
+      # 既有产物（UNDERSTANDING.md/understanding.json/summary/evidence-index）
+      # 必须零改动——聚合 sha 与装配前基线逐字节一致
+      SU_SHA_AFTER="$(cd "${S9_DIR}" && shasum -a 256 UNDERSTANDING.md understanding.json \
+        summary.json evidence/evidence-index.json 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
+      [ -n "${SU_SHA_BEFORE}" ] && [ "${SU_SHA_BEFORE}" = "${SU_SHA_AFTER}" ] \
+        || S9_ERR="${S9_ERR} SU 既有产物被详说阶段改动（sha 基线失配）"
+    fi
+    if [ -z "${S9_ERR}" ]; then pass "[9]SFD全链路"; else fail "[9]SFD全链路" "${S9_ERR}"; fi
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 场景 [10]-[13]：SFD 降级/凭据收口/CLI 违例/幂等（builder 链路，零浏览器，
+# playwright 缺失照常执行——详说阶段零网络零凭据面，ARCH-SFD-001 §10.3）
+# ---------------------------------------------------------------------------
+
+# sfd_builder_chain <scen_dir> <sid>：builder 种子 → render-only → detailed-doc
+# 三步前置（[10]-[13] 共同基座）。成功回显 sys_root；任一步失败回显空串。
+# 全局 RC 反映最后一步 CLI 退出码。
+# 实现约束（2026-09-30 实测教训）：禁用 run_su——本函数经 $() 命令替换
+# 调用，子 shell 里 `wait SU_PID` 可正常收割，但收尾 `wait WATCHDOG_PID`
+# 在子 shell 作业表中的行为不可靠（看门狗 sleep 300 等待挂满），整批卡死
+# 至看门狗超时。SU 详说/渲染链路毫秒级无浏览器挂起面，前台同步跑 +
+# 手工超时守护（180s）即可，语义与 run_su 等价。
+sfd_builder_chain() {
+  local scen_dir="$1" sid="$2"
+  local out="${scen_dir}/out" sys_root="${scen_dir}/out/${sid}"
+  sfd_seed_workspace "${sys_root}" "${sid}" || { echo ""; return 1; }
+  sfd_run_su_sync "${scen_dir}" --out "${out}" --system-id "${sid}" --render-only
+  [ "${RC}" -eq 0 ] || { echo ""; return 1; }
+  sfd_run_su_sync "${scen_dir}" --out "${out}" --system-id "${sid}" --detailed-doc
+  [ "${RC}" -eq 0 ] || { echo ""; return 1; }
+  echo "${sys_root}"
+}
+
+# sfd_run_su_sync <场景目录> <参数...>：run_su 的命令替换安全形态——
+# 前台同步执行 SU CLI，180s 手工超时守护（sleep+kill -0 轮询，不产生
+# 需 wait 的后台作业），stdout/stderr 汇入 场景目录/run.log，RC 回传
+# 退出码（124=超时）。
+sfd_run_su_sync() {
+  local scen_dir="$1"; shift
+  mkdir -p "${scen_dir}"
+  ( cd "${REPO_ROOT}" && exec "${PYTHON}" -B "${SU_CLI}" "$@" ) \
+    >>"${scen_dir}/run.log" 2>&1 &
+  local pid=$!
+  CHILD_PIDS+=("${pid}")
+  local waited=0
+  while kill -0 "${pid}" 2>/dev/null; do
+    if [ "${waited}" -ge 1800 ]; then   # 180s = 1800 × 0.1s
+      kill -KILL "${pid}" 2>/dev/null || true
+      RC=124
+      return "${RC}"
+    fi
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  wait "${pid}"; RC=$?
+  return "${RC}"
+}
+
+# ---- 场景 [10]：SFD S-2 降级装配（2/5 草稿 → 恰 4 节 degraded、exit 0）----
+log "===== 场景 [10] SFD 降级装配 ====="
+if ! scenario_selected 10; then
+  skip "[10]SFD降级装配" "--only 未选择"
+else
+  S10="${WORK_ROOT}/s10"; mkdir -p "${S10}"
+  S10_ERR=""
+  S10_ROOT="$(sfd_builder_chain "${S10}" sfd-deg)"
+  [ -n "${S10_ROOT}" ] || S10_ERR="builder 前置链路失败（见 ${S10}/run.log）"
+  if [ -z "${S10_ERR}" ] && ! sfd_place_drafts "${S10_ROOT}" part; then
+    S10_ERR="部分草稿放置失败"
+  fi
+  if [ -z "${S10_ERR}" ]; then
+    run_su "${S10}" --out "${S10}/out" --system-id sfd-deg --assemble
+    [ "${RC}" -eq 0 ] || S10_ERR="降级装配退出码 ${RC}（期望 0——降级不崩）"
+  fi
+  if [ -z "${S10_ERR}" ]; then
+    # 缺 02/03/05 → 第 2/3/6 节 degraded；04 缺 SFD 标记与否不受影响
+    # （part 保留 04 全文含标记 → 4/5 ok）。期望 degraded_sections=[2,3,6]
+    DEG10="$(json_get "${S10_ROOT}/detailed/assembly-report.json" \
+      "str(d['degraded_sections'])" 2>/dev/null)"
+    [ "${DEG10}" = "[2, 3, 6]" ] || S10_ERR="degraded_sections=${DEG10}（期望 [2, 3, 6]）"
+    grep -q '\*\*\[降级\]\*\*' "${S10_ROOT}/SYSTEM_FUNCTION_DOC.md" \
+      || S10_ERR="${S10_ERR} 终稿缺降级声明"
+    head -5 "${S10_ROOT}/SYSTEM_FUNCTION_DOC.md" | grep -q '^<!-- status: final -->$' \
+      || S10_ERR="${S10_ERR} 降级出稿仍须 status: final"
+  fi
+  if [ -z "${S10_ERR}" ]; then pass "[10]SFD降级装配"; else fail "[10]SFD降级装配" "${S10_ERR}"; fi
+fi
+
+# ---- 场景 [11]：SFD S-3 凭据扫描收口（注入命中 → exit 2 终稿未更新）----
+log "===== 场景 [11] SFD 凭据扫描收口 ====="
+if ! scenario_selected 11; then
+  skip "[11]SFD凭据收口" "--only 未选择"
+else
+  S11="${WORK_ROOT}/s11"; mkdir -p "${S11}"
+  S11_ERR=""
+  S11_ROOT="$(sfd_builder_chain "${S11}" sfd-scan)"
+  [ -n "${S11_ROOT}" ] || S11_ERR="builder 前置链路失败（见 ${S11}/run.log）"
+  if [ -z "${S11_ERR}" ] && ! sfd_place_drafts "${S11_ROOT}" all; then
+    S11_ERR="合规草稿放置失败"
+  fi
+  # 基线：先合规装配出一版终稿（保护对象——命中时必须原样保持）
+  if [ -z "${S11_ERR}" ]; then
+    run_su "${S11}" --out "${S11}/out" --system-id sfd-scan --assemble
+    [ "${RC}" -eq 0 ] || S11_ERR="基线装配退出码 ${RC}（期望 0）"
+  fi
+  if [ -z "${S11_ERR}" ]; then
+    cp "${S11_ROOT}/SYSTEM_FUNCTION_DOC.md" "${S11}/final.baseline"
+    # 篡改 03 草稿注入四判据向量（假凭据全部运行时拼接，仓库不落明文）：
+    # C1 手机号形态 + C3 键值对 + C2 明文 URL + C2 脱敏豁免反例（P1-10：
+    # 该行本身不得单独触发命中，仅随行统计无害）+ C4 结构化向量入 04 草稿
+    "${PYTHON}" -B - "${S11_ROOT}" <<'PYEOF' || S11_ERR="假凭据注入失败"
+"""向合规草稿注入 S-3 判据向量（含 C2 脱敏自引用反例，运行时拼接）。"""
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+sections = root / "detailed" / "sections"
+p3 = sections / "03-pages.doc.md"
+p3.write_text(
+    p3.read_text("utf-8")
+    + "\n联系人手机号 " + "138" + "0013" + "8000" + " 请复核\n"
+    + "password=" + "Tr9" + "uXa2" + "Lk5" + "\n"
+    + "mysql://" + "deploy" + ":" + "Qz7" + "Wm2" + "@db.internal:3306/appdb\n"
+    + "审计转录 mysql://***" + "REDACTED" + "***@db.internal:3306/appdb 已脱敏\n",
+    encoding="utf-8")
+p4 = sections / "04-data-semantics.doc.md"
+p4.write_text(
+    p4.read_text("utf-8")
+    + '\n{"auth_code": "' + "k7f2" + "q9d4" + "x1m8" + "vb3c" + '"}\n',
+    encoding="utf-8")
+PYEOF
+  fi
+  # 篡改素材包注入素材包面 C4 命中（dev 包 samples 注入拼接 token）
+  if [ -z "${S11_ERR}" ]; then
+    "${PYTHON}" -B - "${S11_ROOT}" <<'PYEOF' || S11_ERR="素材包篡改失败"
+"""dev 素材包 samples 注入 C4 双因子向量（PRD S-3 采样穿透口径）。"""
+import json
+import sys
+from pathlib import Path
+
+pkg = Path(sys.argv[1]) / "detailed/inputs/dev.json"
+payload = json.loads(pkg.read_text("utf-8"))
+tables = payload["data"].get("db_tables") or [{}]
+tables[0]["samples"] = {"auth_code": "k7f2" + "q9d4" + "x1m8" + "vb3c"}
+pkg.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                          indent=2), encoding="utf-8")
+PYEOF
+  fi
+  if [ -z "${S11_ERR}" ]; then
+    # 重跑装配需 --force（基线终稿 status: final 保护）——命中判定发生在
+    # 落盘前，--force 只放开保护门，不影响"命中不落盘"红线
+    run_su "${S11}" --out "${S11}/out" --system-id sfd-scan --assemble --force
+    [ "${RC}" -eq 2 ] || S11_ERR="凭据命中退出码 ${RC}（期望 2）"
+    grep -q "凭据扫描命中" "${S11}/run.log" \
+      || S11_ERR="${S11_ERR} run.log 缺凭据扫描命中报告"
+    # 命中类别断言（C3 至少必现；C4 素材包面与 C1/C2 草稿面按判据口径核对）
+    grep -qE "\[kv_credential\]|\[pii\]" "${S11}/run.log" \
+      || S11_ERR="${S11_ERR} 缺 kv/pii 类别命中报告"
+    grep -q "\[entropy_key\]" "${S11}/run.log" \
+      || S11_ERR="${S11_ERR} 缺 entropy_key 类别命中报告（素材包 C4）"
+    # 报告只记位置类别不含原文（不成泄露面）
+    if grep -q "k7f2q9d4x1m8vb3c\|13800138000" "${S11}/run.log" 2>/dev/null; then
+      S11_ERR="${S11_ERR} 扫描报告泄露注入原文"
+    fi
+    # 终稿未被更新（与基线逐字节一致）
+    cmp -s "${S11}/final.baseline" "${S11_ROOT}/SYSTEM_FUNCTION_DOC.md" \
+      || S11_ERR="${S11_ERR} 命中后终稿被更新（红线违例）"
+  fi
+  if [ -z "${S11_ERR}" ]; then pass "[11]SFD凭据收口"; else fail "[11]SFD凭据收口" "${S11_ERR}"; fi
+fi
+
+# ---- 场景 [12]：SFD S-4 CLI 违例矩阵（全部 exit 2 + 零副作用）----
+log "===== 场景 [12] SFD CLI 违例矩阵 ====="
+if ! scenario_selected 12; then
+  skip "[12]SFD-CLI违例" "--only 未选择"
+else
+  S12="${WORK_ROOT}/s12"; mkdir -p "${S12}"
+  S12_ERR=""
+  # 12a：三 flag 两两互斥（argparse 标准 exit 2）
+  for pair in "--render-only --detailed-doc" "--render-only --assemble" \
+              "--detailed-doc --assemble"; do
+    run_su "${S12}" --out "${S12}/none" --system-id none ${pair}
+    [ "${RC}" -eq 2 ] || S12_ERR="${S12_ERR} 互斥组 ${pair} 退出码 ${RC}≠2"
+  done
+  # 12b：生命周期参数组合拒绝（builder 产物上判定——先于编排即 exit 2）
+  S12_ROOT="$(sfd_builder_chain "${S12}" sfd-cli)"
+  if [ -z "${S12_ROOT}" ]; then
+    S12_ERR="${S12_ERR} builder 前置链路失败（见 ${S12}/run.log）"
+  else
+    for combo in "--detailed-doc --fresh" "--detailed-doc --resume" \
+                 "--detailed-doc --skip-llm-phase" "--assemble --fresh" \
+                 "--assemble --resume" "--assemble --skip-llm-phase"; do
+      run_su "${S12}" --out "${S12}/out" --system-id sfd-cli ${combo}
+      [ "${RC}" -eq 2 ] || S12_ERR="${S12_ERR} 组合 ${combo} 退出码 ${RC}≠2"
+    done
+    # 12c：缺 --out / --system-id 必填违例（两模式 × 两参数）
+    run_su "${S12}" --system-id sfd-cli --detailed-doc
+    [ "${RC}" -eq 2 ] || S12_ERR="${S12_ERR} 缺 --out(detailed) 退出码 ${RC}≠2"
+    run_su "${S12}" --out "${S12}/out" --assemble
+    [ "${RC}" -eq 2 ] || S12_ERR="${S12_ERR} 缺 --system-id(assemble) 退出码 ${RC}≠2"
+    # 12d：非空目录零副作用——违例判定先于任何产物写面
+    S12EMPTY="${S12}/empty-dir"; mkdir -p "${S12EMPTY}"
+    run_su "${S12}" --out "${S12EMPTY}" --system-id sfd-x --assemble
+    [ "${RC}" -eq 2 ] || S12_ERR="${S12_ERR} 缺前置装配退出码 ${RC}≠2"
+    if [ -n "$(ls -A "${S12EMPTY}" 2>/dev/null)" ]; then
+      S12_ERR="${S12_ERR} 违例路径在空目录留下产物（先读后写违例）"
+    fi
+    # 12e：既有终稿 status: final 保护（先装配一版，再无 --force 重跑）
+    sfd_place_drafts "${S12_ROOT}" all >/dev/null 2>&1 \
+      || S12_ERR="${S12_ERR} 草稿放置失败"
+    run_su "${S12}" --out "${S12}/out" --system-id sfd-cli --assemble
+    [ "${RC}" -eq 0 ] || S12_ERR="${S12_ERR} 基线装配退出码 ${RC}≠0"
+    run_su "${S12}" --out "${S12}/out" --system-id sfd-cli --assemble
+    [ "${RC}" -eq 2 ] || S12_ERR="${S12_ERR} 终稿保护退出码 ${RC}≠2"
+    run_su "${S12}" --out "${S12}/out" --system-id sfd-cli --assemble --force
+    [ "${RC}" -eq 0 ] || S12_ERR="${S12_ERR} --force 放行退出码 ${RC}≠0"
+  fi
+  if [ -z "${S12_ERR}" ]; then pass "[12]SFD-CLI违例"; else fail "[12]SFD-CLI违例" "${S12_ERR}"; fi
+fi
+
+# ---- 场景 [13]：SFD S-5 幂等（重跑 detailed-doc + assemble 字节一致）----
+log "===== 场景 [13] SFD 幂等 ====="
+if ! scenario_selected 13; then
+  skip "[13]SFD幂等" "--only 未选择"
+else
+  S13="${WORK_ROOT}/s13"; mkdir -p "${S13}"
+  S13_ERR=""
+  S13_ROOT="$(sfd_builder_chain "${S13}" sfd-idem)"
+  [ -n "${S13_ROOT}" ] || S13_ERR="builder 前置链路失败（见 ${S13}/run.log）"
+  if [ -z "${S13_ERR}" ] && ! sfd_place_drafts "${S13_ROOT}" all; then
+    S13_ERR="合规草稿放置失败"
+  fi
+  if [ -z "${S13_ERR}" ]; then
+    run_su "${S13}" --out "${S13}/out" --system-id sfd-idem --assemble
+    [ "${RC}" -eq 0 ] || S13_ERR="首轮装配退出码 ${RC}（期望 0）"
+  fi
+  if [ -z "${S13_ERR}" ]; then
+    cp "${S13_ROOT}/SYSTEM_FUNCTION_DOC.md" "${S13}/final.v1"
+    # 同一起点重装配：--force 重置骨架（终稿保护放行）后重装配
+    run_su "${S13}" --out "${S13}/out" --system-id sfd-idem --detailed-doc --force
+    [ "${RC}" -eq 0 ] || S13_ERR="重跑 detailed-doc --force 退出码 ${RC}（期望 0）"
+  fi
+  if [ -z "${S13_ERR}" ]; then
+    run_su "${S13}" --out "${S13}/out" --system-id sfd-idem --assemble
+    [ "${RC}" -eq 0 ] || S13_ERR="重装配退出码 ${RC}（期望 0）"
+  fi
+  if [ -z "${S13_ERR}" ]; then
+    cmp -s "${S13}/final.v1" "${S13_ROOT}/SYSTEM_FUNCTION_DOC.md" \
+      || { S13_ERR="两次装配终稿不一致"; diff "${S13}/final.v1" \
+             "${S13_ROOT}/SYSTEM_FUNCTION_DOC.md" | head -6 >>"${S13}/run.log"; }
+  fi
+  if [ -z "${S13_ERR}" ]; then pass "[13]SFD幂等"; else fail "[13]SFD幂等" "${S13_ERR}"; fi
 fi
 
 # ---------------------------------------------------------------------------

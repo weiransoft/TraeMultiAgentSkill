@@ -44,6 +44,12 @@ from su.browser_login import BrowserLogin  # noqa: E402
 from su.config import SuConfig, load_config, scrub_text  # noqa: E402
 from su.db_inspector import DbInspector  # noqa: E402
 from su.deps import DependencyReport, probe_all  # noqa: E402
+from su.detailed_doc import (  # noqa: E402
+    check_existing_final as _sfd_check_existing_final,
+    build_paths as _sfd_build_paths,
+    run_assemble,
+    run_detailed_doc,
+)
 from su.document_renderer import DocumentRenderer  # noqa: E402
 from su.dto import SuConfigError, SuDepsError, SuError, SuLoginError  # noqa: E402
 from su.limiter import BudgetTracker, RateLimiter  # noqa: E402
@@ -359,10 +365,19 @@ class SystemUnderstanding:
     def run(self) -> int:
         """CLI 运行主入口：分支编排 + 退出码状态机收口。
 
+        分支判定顺序（ARCH-SFD-001 §3.2）：SFD 详说两模式先于 --render-only
+        （三者互斥由 argparse mode_group 保证——同给时 argparse 标准
+        SystemExit(2)，根本到不了本方法；getattr 兜底属既有惯例，防御
+        测试替身/编程式构造 args 时缺属性，非笔误）。
+
         Returns:
-            int: 0/2/3/4/5/130（--render-only 只可能返回 0/2/130）。
+            int: 0/2/3/4/5/130（--render-only 与 SFD 两模式只可能返回 0/2/130）。
         """
         try:
+            if getattr(self._args, "detailed_doc", False):
+                return self._run_detailed_doc()
+            if getattr(self._args, "assemble", False):
+                return self._run_assemble()
             if self._render_only:
                 return self._run_render_only()
             return self._run_full_pipeline()
@@ -629,6 +644,151 @@ class SystemUnderstanding:
             self._lens_report.set("redis", "collected")
         else:
             self._lens_report.set("redis", "skipped", "Redis 无采集数据（历史原因不可考：未配置/驱动缺失/连接失败）")
+
+    # ------------------------------------------------------------------
+    # SFD 专家详说分支（ARCH-SFD-001 §3.2 薄封装，REQ-SFD-005）
+    # ------------------------------------------------------------------
+
+    def _run_detailed_doc(self) -> int:
+        """--detailed-doc 薄封装：组合拒绝判定 → 必填校验 → 终稿保护 → 详说编排。
+
+        判定顺序（ARCH §3.2 规范条款，逐步收口绝不静默忽略）：
+          1. --fresh/--resume/--skip-llm-phase 任一为真 → SuConfigError exit 2
+             （详说只消费既有落盘产物，与采集生命周期参数组合无意义；
+             互斥违例中 argparse 只拦三模式互斥，本三项属代码层显式拒绝）；
+          2. --out / --system-id 必填（两 SFD 模式同口径，P1-5b/P2-12）；
+          3. 既有终稿 status: final 且未 --force → exit 2（P1-5d，
+             detailed_doc.check_existing_final 判定）；
+          4. 打开状态库（只读用途：precheck 只调 read_latest_run/stats），
+             库缺失时注入 None 走"run 状态不可考"降级口径（AP-3）。
+        本分支**不要求 playwright/凭据/配置**（REQ-SFD-005），不构造
+        SuConfig，不 acquire_lock。SIGINT：详说阶段全部是原子写文件操作，
+        无锁无状态库写面，KeyboardInterrupt 由 run() 兜底以 130 退出
+        （半成品不覆写上一版由 write_text_atomic 保证，PRD E-6）。
+
+        Returns:
+            int: 0 成功 / 2 前置违例（DetailedDocError=SuConfigError 收口）。
+        """
+        args = self._args
+        self._reject_collection_lifecycle_flags("--detailed-doc")
+        out_root, system_id = self._require_out_and_system_id("--detailed-doc")
+        _setup_logging(bool(getattr(args, "verbose", False)))
+        # 既有终稿 status: final 保护（先于编排——避免无效路径上白跑素材包）
+        paths = _sfd_build_paths(out_root, system_id)
+        _sfd_check_existing_final(
+            paths, bool(getattr(args, "force", False)))
+        store = self._open_readonly_store(paths)
+        try:
+            return run_detailed_doc(out_root, system_id, store=store)
+        finally:
+            if store is not None:
+                store.close()
+
+    def _run_assemble(self) -> int:
+        """--assemble 薄封装：组合拒绝判定 → 必填校验 → 装配编排（轻校验在层内）。
+
+        判定顺序与 _run_detailed_doc 一致（P1-5a/P1-5b）：
+          1. --fresh/--resume/--skip-llm-phase 组合 → 显式 exit 2；
+          2. --out / --system-id 必填；
+          3. 装配编排 run_assemble（detailed/ 缺项、既有终稿 status: final
+             保护与漂移锚点判定均在 detailed_doc.run_assemble 轻校验内收口）。
+
+        Returns:
+            int: 0 成功（含降级出稿）/ 2 前置违例或凭据扫描命中。
+        """
+        args = self._args
+        self._reject_collection_lifecycle_flags("--assemble")
+        out_root, system_id = self._require_out_and_system_id("--assemble")
+        _setup_logging(bool(getattr(args, "verbose", False)))
+        return run_assemble(out_root, system_id,
+                            force=bool(getattr(args, "force", False)))
+
+    def _reject_collection_lifecycle_flags(self, mode: str) -> None:
+        """SFD 模式与采集生命周期参数的组合拒绝（ARCH §3.2 判定第 1 步）。
+
+        显式性判定（绝不静默忽略三参数，同时不误杀默认值）：
+          - --skip-llm-phase：store_true，args 为真即用户显式给出；
+          - --fresh：store_false(dest=resume)，args.resume 为假即显式给出；
+          - --resume：dest=resume default=True，无法从解析结果值区分显式
+            与否——改用 sys.argv 扫描判定（main 以 parse_args() 默认 argv
+            解析 sys.argv[1:]，同进程同口径成立）；显式给出同样拒绝。
+
+        Args:
+            mode: 当前模式名（--detailed-doc / --assemble，进报错文案）。
+
+        Raises:
+            SuConfigError: 任一参数显式给出（exit_code=2，message 前缀
+            [SFD]，ARCH §3.2 "绝不静默忽略"红线）。
+        """
+        args = self._args
+        conflict: List[str] = []
+        if bool(getattr(args, "skip_llm_phase", False)):
+            conflict.append("--skip-llm-phase")
+        if getattr(args, "resume", True) is False:
+            # --fresh 翻转 resume→False（互斥组内 --resume 恒 True，不误报）
+            conflict.append("--fresh")
+        if "--resume" in sys.argv[1:]:
+            conflict.append("--resume")
+        if conflict:
+            raise SuConfigError(
+                "[SFD] {0} 与采集生命周期参数（{1}）组合无意义，拒绝执行".format(
+                    mode, "、".join(conflict)),
+                hints=["详说阶段只消费既有落盘产物；采集/重跑参数请先完成 "
+                       "SU 流水线（含 --render-only 收口）再进入详说模式"])
+
+    def _require_out_and_system_id(self, mode: str) -> "tuple":
+        """SFD 两模式 --out / --system-id 必填校验（P1-5b/P2-12 同口径）。
+
+        Args:
+            mode: 当前模式名（进报错文案，仿 _run_render_only :498-510 口径）。
+
+        Returns:
+            tuple[Path, str]: (输出根目录, 系统标识)。
+
+        Raises:
+            SuConfigError: 任一缺失（exit_code=2）。
+        """
+        args = self._args
+        out_raw = getattr(args, "out", None)
+        if not out_raw:
+            raise SuConfigError(
+                "{0} 必须显式提供 --out <目录>（指向 SU 已收口的输出根目录）".format(mode),
+                hints=["示例：python scripts/system_understanding.py "
+                       "--out docs/system-understanding --system-id <id> {0}".format(mode)])
+        system_id = getattr(args, "system_id", None)
+        if not system_id:
+            # SFD 模式无凭据面，system_id 唯一合法来源是显式 --system-id
+            raise SuConfigError(
+                "{0} 必须显式提供 --system-id <输出子目录名>（SU 运行的目录名）".format(mode),
+                hints=["输出目录结构为 <out>/<system_id>/，--system-id 即其中的目录名"])
+        return Path(out_raw), str(system_id)
+
+    @staticmethod
+    def _open_readonly_store(paths) -> Optional[StateStore]:
+        """打开详说只读状态库（read_latest_run/stats 两个只读方法面）。
+
+        状态库缺失（拷贝/归档场景）返回 None → precheck 走"run 状态不可考"
+        宽松口径（ARCH §2.2.1 第 5 步，AP-3 缺失即声明）；损坏库同样按
+        不可考降级（详说不做任何状态库写操作，保守放行由文件面校验兜底）。
+
+        Args:
+            paths: detailed_doc.DetailedPaths（取 state_db 路径）。
+
+        Returns:
+            Optional[StateStore]: 可用状态库（调用方负责 close()）；
+            缺失/损坏时 None。
+        """
+        db_path = paths.state_db
+        if not db_path.is_file():
+            return None
+        try:
+            # 构造即建 schema（IF NOT EXISTS 语义），对既有 completed 库
+            # 零副作用——详说不持锁（precheck 只读，REQ-SFD-001 AC3）
+            return StateStore(db_path, paths.sys_root.name)
+        except Exception:  # noqa: BLE001 - 损坏库按"状态不可考"降级（AP-3）
+            logger.warning("详说只读状态库打开失败（%s），按 run 状态不可考降级",
+                           str(db_path))
+            return None
 
     # ------------------------------------------------------------------
     # 阶段 0：预检
@@ -1207,10 +1367,29 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-llm-phase", action="store_true",
                         help="只跑确定性采集，产出『待 LLM 语义回填』骨架文档"
                              "（配合宿主 LLM 两阶段工作流）")
-    parser.add_argument("--render-only", action="store_true",
-                        help="仅渲染：输出目录已有 completed/interrupted 状态库且 "
-                             "understanding.json 含 findings 段时，跳过采集直接校验入库 "
-                             "findings 并重渲染全部产物（findings 校验失败退出码 2）")
+    # SFD 三模式互斥组（ARCH-SFD-001 §3.1）：--render-only 为既有行迁入组内，
+    # 参数名/help/语义零变化（仅参数容器位置变化，属既有 CLI 行为面唯一改动点）；
+    # 两个 flag 同给时 argparse 标准报错 SystemExit(2)——恰为 REQ-SFD-005 AC1
+    # 要求的 exit 2，无需代码层重复互斥判断
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument("--render-only", action="store_true",
+                            help="仅渲染：输出目录已有 completed/interrupted 状态库且 "
+                                 "understanding.json 含 findings 段时，跳过采集直接校验入库 "
+                                 "findings 并重渲染全部产物（findings 校验失败退出码 2）")
+    mode_group.add_argument("--detailed-doc", action="store_true",
+                            help="专家详说（第三阶段）：前置校验 SU 产物 → 生成五专家"
+                                 "素材包与 8 节大纲骨架 → 打印派发指引（REQ-SFD-001~005；"
+                                 "要求 findings 已回填且锚定 run（understanding.json "
+                                 "meta.run_id 行）∈ {completed, interrupted}——2026-09-30 "
+                                 "审查修订 P0-2：锚定口径非最新行）")
+    mode_group.add_argument("--assemble", action="store_true",
+                            help="装配详说终稿：读取 detailed/sections/ 专家草稿 → "
+                                 "E-n 引用校验 → 凭据扫描 → 原子写 SYSTEM_FUNCTION_DOC.md "
+                                 "+ assembly-report.json（可独立于 --detailed-doc 反复执行）")
+    # 互斥组之外新增独立开关（2026-09-30 审查修订 P1-5d）
+    parser.add_argument("--force", action="store_true",
+                        help="仅与 --detailed-doc/--assemble 配合：覆盖既有终稿"
+                             "（头部 status: final）时跳过 exit 2 保护；仅此场景使用")
     parser.add_argument("--verbose", action="store_true",
                         help="调试日志（DEBUG 级；全程仍过 RedactingFormatter 脱敏）")
     return parser

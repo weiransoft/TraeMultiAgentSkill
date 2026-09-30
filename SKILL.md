@@ -1,7 +1,7 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档）。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md）。
 ---
 # Multi-Agent Team Dispatcher (AI-Enhanced)
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
@@ -24,6 +24,10 @@ description: 基于任务类型动态调度到合适的智能体角色（架构�
 - 🔍 黑盒 Web 系统反向理解：Playwright 自动登录 + 图式 BFS 页面遍历 + DB/Redis 只读内省 + UI↔API↔DB 三角关联，产出 10 节《系统功能理解文档》
 - 🚫 五条安全红线：凭据不落盘明文、DB 严格只读、Redis 只读白名单、浏览器网络层拦截全部非 GET 与白名单外域、危险按钮零点击
 - 🤖 两阶段工作流：脚本层零 LLM 采集证据，宿主 LLM 按 `docs/spec/role-prompts/su-llm-backfill.md` 契约回填语义结论，CLI `--render-only` 校验收口
+
+**v2.9.1 新增（SU 专家详说 SFD）**:
+- 🧾 `--detailed-doc` 前置校验（锚定 run_id、findings 双源一致）→ 五视角素材包 + 8 节大纲骨架；宿主 LLM 派发五专家（`docs/spec/role-prompts/su-detailed-*.md`）；`--assemble` 装配 `SYSTEM_FUNCTION_DOC.md` + `assembly-report.json`
+- 🔒 E-n 引用 (seq,ref) 双键 + 锚点漂移检测 + 四判据凭据扫描；终稿原子写、`--force` 保护；零网络零凭据零新依赖（`scripts/su/detailed_doc.py`）
 
 **v2.5 新增（Cybernetics 工程控制论增强）**:
 > 参考来源：https://github.com/Jiaqi-Guo-0114/cybernetics-agent  
@@ -844,6 +848,21 @@ python3 scripts/system_understanding.py --out docs/system-understanding --system
 **五条安全红线（不可协商）**: ① 凭据不进 LLM 上下文、不落盘明文（统一 redact 管线 + 日志全程脱敏）；② DB 会话只读 + 语句白名单校验器，严禁任何 DDL/DML；③ Redis 命令硬编码只读白名单；④ 浏览器网络层拦截全部非 GET 请求与白名单外域；⑤ 危险按钮（删除/提交/支付等）零点击、只记录。软依赖（playwright/pymysql/psycopg2/redis）缺失时诚实降级并给出安装命令，绝不以假数据冒充已采集结果。
 
 详细使用指南见 `docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md`。
+
+#### 专家详说（v2.9.1 — SU 第三阶段 SFD）
+
+SU 采集+回填收口后的第三阶段（`scripts/su/detailed_doc.py`，零网络/零凭据/零新依赖，不启动浏览器不连库）：
+
+```bash
+# 1) 前置校验 + 五视角素材包 + 8 节大纲骨架
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --detailed-doc
+# 2) 宿主 LLM 派发五专家（su-detailed-architect/product/walkthrough/ui/qa.md），
+#    产出 detailed/sections/0N-xxx.doc.md
+# 3) 装配终稿 SYSTEM_FUNCTION_DOC.md + assembly-report.json
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id <id> --assemble
+```
+
+契约：E-n 引用 (seq,ref) 双键 + 锚点漂移检测；四判据凭据扫描；终稿原子写、`--force` 终稿保护；详说模式拒绝 `--fresh/--resume/--skip-llm-phase` 组合。
 
 ## 文档结构
 

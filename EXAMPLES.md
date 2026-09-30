@@ -10,6 +10,7 @@
   - [示例 11: Karpathy 原则检查 (v2.4)](#示例-11-karpathy-原则检查-v24)
   - [示例 12: Claude Code 平台调用 (v2.4)](#示例-12-claude-code-平台调用-v24)
   - [示例 13: 既有系统理解 SU (v2.9)](#示例-13-既有系统理解-su-v29)
+  - [示例 14: 遗留系统专家详说 SFD (v2.9.1)](#示例-14-遗留系统专家详说-sfd-v291)
 - [最佳实践](#-最佳实践)
 
 ## 🎯 基础示例
@@ -891,6 +892,48 @@ python3 scripts/system_understanding.py --out docs/system-understanding --system
 ```
 
 > 登录页有验证码/2FA？人工登录一次导出 storage_state，加 `--storage-state <path>` 旁路自动登录。
+> 详细指南：[docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
+
+---
+
+### 示例 14: 遗留系统专家详说 SFD (v2.9.1)
+
+**场景**: 示例 13 的遗留工单系统已完成 SU 采集 + 回填（`UNDERSTANDING.md` 与 `understanding.json` 已收口）。现在团队要一份**逐功能深入详说**的《系统功能详说文档》——不只"系统有什么"，还要"每个功能为什么这样设计、数据怎么流、边界在哪、风险是什么"。由五位专家（架构师/产品经理/走读开发/UI/测试）分节撰写，脚本负责前置校验与终稿装配，全程零网络、零凭据、零新依赖。
+
+**第 1 步：详说准备**（前置校验 + 五视角素材包 + 8 节大纲骨架）:
+```bash
+# 前置校验：锚定 understanding.json 的 meta.run_id、findings 双源一致性；
+# 通过后生成 detailed/inputs/ 素材包（白名单提取 + scrub 复核 + 锚点 manifest）
+# 与 8 节大纲骨架。不启动浏览器、不连库。
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id erp-legacy --detailed-doc
+```
+
+**第 2 步：宿主 LLM 派发五专家**（按 `--detailed-doc` 输出的派发指引）:
+```
+架构师   → docs/spec/role-prompts/su-detailed-architect.md   + inputs/architect.*
+产品经理 → docs/spec/role-prompts/su-detailed-product.md     + inputs/product.*
+走读开发 → docs/spec/role-prompts/su-detailed-walkthrough.md + inputs/walkthrough.*
+UI       → docs/spec/role-prompts/su-detailed-ui.md          + inputs/ui.*
+测试     → docs/spec/role-prompts/su-detailed-qa.md          + inputs/qa.*
+每位专家产出 detailed/sections/0N-xxx.doc.md（E-n 引用必须用 (seq, ref) 双键）
+```
+
+**第 3 步：装配终稿**:
+```bash
+# 校验各节 E-n 引用锚点漂移 + 四判据凭据扫描，装配终稿（原子写）
+python3 scripts/system_understanding.py --out docs/system-understanding --system-id erp-legacy --assemble
+```
+
+**预期产物** (`docs/system-understanding/erp-legacy/`):
+```
+📁 detailed/inputs/              # 五视角素材包（白名单 + scrub 复核 + 锚点 manifest）
+📁 detailed/sections/0N-xxx.doc.md  # 五专家分节稿
+📄 SYSTEM_FUNCTION_DOC.md        # 《系统功能详说文档》终稿（8 节）
+📄 assembly-report.json          # 装配报告（引用校验、漂移检测、凭据扫描结果）
+```
+
+> 终稿已存在时 `--assemble` 默认拒绝覆盖，需显式 `--force`。
+> 详说模式拒绝与 `--fresh` / `--resume` / `--skip-llm-phase` 组合（退出码 2）。
 > 详细指南：[docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md](docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md)
 
 ---

@@ -340,9 +340,9 @@ class SuStateBuilderTest(unittest.TestCase):
                     "SELECT status, system_id FROM run_meta").fetchone()
                 self.assertEqual(row["status"], "completed")
                 self.assertEqual(row["system_id"], "fixture-local")
-                # 种子页面 4 条且 id 映射真实
+                # 种子页面 5 条（含 timeout 盲区页素材）且 id 映射真实
                 self.assertEqual(
-                    conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0], 4)
+                    conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0], 5)
                 for url_key, page_id in ids["page_ids"].items():
                     row = conn.execute(
                         "SELECT url_key FROM pages WHERE page_id=?",

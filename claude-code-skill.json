@@ -1,7 +1,7 @@
 {
   "name": "multi-agent-team",
-  "version": "2.9.0",
-  "description": "Multi-Agent Team Dispatcher - 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持 Claude Code SubAgent 调用、Karpathy 四大核心原则、Ponytail 决策梯、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、UI/UX 巡检与视觉回归、既有系统理解能力（SU，v2.9）。",
+  "version": "2.9.1",
+  "description": "Multi-Agent Team Dispatcher - 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持 Claude Code SubAgent 调用、Karpathy 四大核心原则、Ponytail 决策梯、Cybernetics 工程控制论、Autonomous Mode 自主编排、Dynamic Workflows 6 大动态工作流模式、插件热加载 V3 架构、UI/UX 巡检与视觉回归、既有系统理解能力（SU，v2.9）、SU 专家详说（SFD，v2.9.1：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md）。",
   "author": "Claw Team",
   "license": "MIT",
   "homepage": "https://github.com/weiransoft/TraeMultiAgentSkill",
@@ -279,6 +279,21 @@
         "path": "docs/guides/SYSTEM_UNDERSTANDING_GUIDE.md",
         "description": "既有系统理解能力（SU）使用指南：两阶段工作流、配置示例、CLI 参数表、FAQ",
         "trigger": "使用 SU 能力理解既有 Web 系统时"
+      },
+      "sfd_prd": {
+        "path": "docs/dev/SYSTEM_FUNCTION_DOC_PRD.md",
+        "description": "SU 专家详说（SFD）需求文档（PRD-SFD-001）：--detailed-doc/--assemble 功能需求与验收标准",
+        "trigger": "需要 SFD 能力需求口径与验收标准时"
+      },
+      "sfd_architecture": {
+        "path": "docs/dev/SYSTEM_FUNCTION_DOC_ARCHITECTURE.md",
+        "description": "SU 专家详说（SFD）架构设计（ARCH-SFD-001）：前置校验、五视角素材包、引用与漂移契约、四判据凭据扫描",
+        "trigger": "需要 SFD 内部实现与契约细节时"
+      },
+      "sfd_expert_prompts": {
+        "path": "docs/spec/role-prompts/",
+        "description": "SFD 五专家派发提示词：su-detailed-{architect,product,walkthrough,ui,qa}.md（架构师/产品经理/走读开发/UI/测试）",
+        "trigger": "对 SU 产物执行专家详说分节撰写时"
       }
     }
   },
