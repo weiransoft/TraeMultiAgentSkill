@@ -4,7 +4,7 @@
 
 ## 概述
 
-本目录包含用于多角色代码分析的 prompt 模板。每个角色（架构师、产品经理、独立开发者、UI设计师、测试专家）都有专属的分析视角和输出格式。v2.6 新增逻辑漏洞审查专家角色和 Ponytail 决策梯评审清单。
+本目录包含用于多角色代码分析的 prompt 模板。每个角色（架构师、产品经理、独立开发者、UI设计师、测试专家）都有专属的分析视角和输出格式。v2.6 新增逻辑漏洞审查专家角色和 Ponytail 决策梯评审清单。**v2.10 新增业界调研专家和 4 个方案评审角色 prompt，用于方案撰写全流程。**
 
 ## 角色列表
 
@@ -23,6 +23,16 @@
 | 角色 | Prompt 模板 | 关注点 |
 |------|-------------|--------|
 | 逻辑漏洞审查专家 | [logic-vulnerability-analysis.md](logic-vulnerability-analysis.md) | 逻辑漏洞、业务漏洞、权限授权、数据一致性、竞态条件 |
+
+### v2.10 新增：业界调研 + 方案评审角色
+
+| 角色 | Prompt 模板 | 关注点 | 强制要求 |
+|------|-------------|--------|---------|
+| 业界调研专家 | [industry-research-prompt.md](industry-research-prompt.md) | 国内外最佳实践、方案对比矩阵、项目适配分析、推荐决策 | 真实 WebSearch + 浏览器插件，禁止凭空生成 |
+| 方案评审员（架构师视角） | [proposal-architect-review.md](proposal-architect-review.md) | 架构可行性、技术选型、可扩展性、安全性、代码集成路径 | 必须扫描项目最新代码并引用 |
+| 方案评审员（产品经理视角） | [proposal-pm-review.md](proposal-pm-review.md) | 用户价值、需求覆盖、商业可行性、产品集成路径、验收标准 | 必须扫描项目最新代码并引用 |
+| 方案评审员（测试专家视角） | [proposal-test-review.md](proposal-test-review.md) | 可测试性、测试策略、验收标准可验证性、质量风险 | 必须扫描项目最新代码并引用 |
+| 方案评审员（独立开发者视角） | [proposal-coder-review.md](proposal-coder-review.md) | 可实现性、代码复杂度、实现路径、工作量、Ponytail 合规 | 必须扫描项目最新代码并引用 |
 
 ## Ponytail 决策梯评审清单（v2.6 新增）
 

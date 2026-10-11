@@ -1,0 +1,206 @@
+{
+  "pattern_id": "vue-dual-stack-migration",
+  "name": "React→Vue3 双栈迁移",
+  "version": "1.0",
+  "description": "React 仓前端代码逐块迁移到 Vue3，后端 API + TypeScript 类型共享，保持功能 parity。6 步工作流 + 14 条通用踩坑 checklist + 4 个可复用代码模板。",
+  "metadata": {
+    "phase": "production",
+    "priority": "P0",
+    "isolation_requirement": "none",
+    "default_token_budget": 8000,
+    "applicable_roles": ["solo-coder", "architect", "test-expert"],
+    "source_cases": [
+      { "batch": "B5", "scope": "审计/红队/合规/评测", "components": 10 },
+      { "batch": "B6", "scope": "引擎配置/LoRA/灰度发布", "components": 3 },
+      { "batch": "B7", "scope": "系统管理/用户管理", "components": 11 }
+    ],
+    "universal_rules": [
+      "后端类型即事实契约——每次引用字段前 grep 后端类型定义文件确认真实字段名",
+      "组件按复杂度拆分，自管 mutation 模式避免 prop drilling",
+      "类型检查零错误才能进下一批",
+      "命名风格/数据结构/枚举值/API 边界四类映射规则"
+    ],
+    "known_caveats": [
+      "运行时浏览器验证需在真实环境执行",
+      "部分项目可能存在 flaky 测试，需重跑确认"
+    ]
+  },
+  "parameters_schema": {
+    "react_repo_path": {
+      "type": "string",
+      "required": true,
+      "description": "React 仓路径（冻结，作为迁移参照源）"
+    },
+    "vue_repo_path": {
+      "type": "string",
+      "required": true,
+      "description": "Vue3 仓路径（迁移目标）"
+    },
+    "target_routes": {
+      "type": "array",
+      "required": true,
+      "description": "需要替换占位组件的路由路径列表",
+      "items": { "type": "string" }
+    },
+    "batch_label": {
+      "type": "string",
+      "required": false,
+      "description": "批次标签（如 B1/B2）",
+      "default": "B-new"
+    },
+    "component_split_strategy": {
+      "type": "string",
+      "required": false,
+      "description": "组件拆分策略",
+      "enum": ["auto", "single-file", "parent-children", "max-3-drawers"],
+      "default": "auto"
+    }
+  },
+  "workflow": {
+    "step_1_intel": "情报收集：确认 Vue 仓 API 模块就绪 + 锁定后端类型契约 + 读 React 源文件逻辑 + 确认路由权限门控",
+    "step_2_route": "路由替换：占位组件 → 真实懒加载 import",
+    "step_3_build": "组件创建：按复杂度拆分子组件，自管 mutation 模式",
+    "step_4_typecheck": "类型检查：零错误才能继续，优先 grep 后端类型定义",
+    "step_5_gate": "门禁回归：类型检查 → 单元测试 → 构建全绿",
+    "step_6_runtime": "运行时验证：导航新路由 + Network 面板 + Console 面板"
+  },
+  "pitfall_checklist": [
+    {
+      "id": "T1",
+      "category": "type-contract",
+      "root_cause": "命名风格不一致",
+      "pattern": "后端序列化使用 snake_case（如 is_active），前端习惯 camelCase（如 enabled），直接用前端习惯名导致类型错误",
+      "solution": "每次引用后端字段前，先 grep 后端类型定义文件确认真实字段名，不要凭习惯猜测"
+    },
+    {
+      "id": "T2",
+      "category": "type-contract",
+      "root_cause": "嵌套数据结构误判",
+      "pattern": "后端关联字段是完整对象数组（如 roles: RoleRecord[]），前端误以为是简单 ID 数组（roles: string[]）",
+      "solution": "看后端类型定义的嵌套层级，不要简化；需要简单 ID 时显式 .map(r => r.id) 提取"
+    },
+    {
+      "id": "T3",
+      "category": "type-contract",
+      "root_cause": "请求体字段边界误判",
+      "pattern": "Update 类型只暴露部分可写字段，前端误以为 Create 类型的所有字段都可用于 Update",
+      "solution": "对比 Create/Update 两种类型定义，缺失的字段就是不可更新的边界"
+    },
+    {
+      "id": "T4",
+      "category": "type-contract",
+      "root_cause": "分页参数命名不一致",
+      "pattern": "不同项目后端约定不同（page_size/size/limit），前端照搬经验参数名导致请求 400",
+      "solution": "查专用查询参数类型定义，以定义文件为准"
+    },
+    {
+      "id": "V1",
+      "category": "vue3",
+      "root_cause": "内置组件 v-model 冲突",
+      "pattern": "Element Plus Drawer/Dialog 自定义 visible prop 与内置 modelValue 同名冲突，vite build 编译报错",
+      "solution": "显式桥接：:model-value=\"visible\" @update:model-value=\"(v) => emit('update:visible', v)\""
+    },
+    {
+      "id": "V2",
+      "category": "vue3",
+      "root_cause": "defineEmits 签名混用",
+      "pattern": "混用对象签名和函数签名导致 TypeScript 类型推断混乱",
+      "solution": "统一用对象形式声明 emits"
+    },
+    {
+      "id": "C1",
+      "category": "composable",
+      "root_cause": "方法名记忆错误",
+      "pattern": "useRequest 暴露 refetch() 不是 refresh()",
+      "solution": "每次用新 composable 时，先 grep 导出 API 签名"
+    },
+    {
+      "id": "C2",
+      "category": "composable",
+      "root_cause": "Ref 嵌套不解包",
+      "pattern": "useRequest/useMutation 的 loading 是 Ref<boolean>，script 里需要 .value 或 computed 解包",
+      "solution": "script 里写 computed(() => xxxReq.loading.value)，template 直接用"
+    },
+    {
+      "id": "C3",
+      "category": "composable",
+      "root_cause": "onSuccess 参数数量不确定",
+      "pattern": "不同 composable 的 onSuccess 回调参数数量不同，前端凭旧项目习惯写多参数导致 TS 错误",
+      "solution": "读 composable 源码或类型定义文件确认回调签名"
+    },
+    {
+      "id": "C4",
+      "category": "composable",
+      "root_cause": "ComputedRef 类型不兼容 params 选项",
+      "pattern": "useRequest 的 params 选项期望普通 Ref，但前端传了 computed",
+      "solution": "不用 params 选项，改用 watch + run() 手动触发"
+    },
+    {
+      "id": "C5",
+      "category": "composable",
+      "root_cause": "mutation loading 在 button 上直接用",
+      "pattern": "template 里 :loading=\"mutation.loading\" 会报 TS 错误",
+      "solution": "统一 computed(() => mutation.loading.value) 解包"
+    },
+    {
+      "id": "E1",
+      "category": "element-plus",
+      "root_cause": "ElTable slot row 类型",
+      "pattern": "#default=\"{ row }\" 中 row 的类型是 Element Plus 内部 DefaultRow，不是业务类型",
+      "solution": "用 (row as any).fieldName 显式断言"
+    },
+    {
+      "id": "E2",
+      "category": "element-plus",
+      "root_cause": "ElForm :rules 类型严格",
+      "pattern": "ElForm 的 :rules prop 期望类型签名与通用数组推导不匹配",
+      "solution": ":rules=\"rules as any\" 强制转换（Element Plus 社区公认 workaround）"
+    },
+    {
+      "id": "B1",
+      "category": "build",
+      "root_cause": "vite build 不能动态 import 不存在的文件",
+      "pattern": "import('./Xxx.vue').catch(...) 在 build 阶段尝试解析，文件不存在直接报错",
+      "solution": "未实现组件直接 import 占位组件，不用 .catch() 降级"
+    }
+  ],
+  "type_mapping_rules": [
+    {
+      "rule_id": "mapping-1",
+      "category": "命名风格",
+      "rule": "后端序列化 snake_case → 前端需原样使用，不要臆造 camelCase",
+      "example": "is_active（后端）≠ enabled（前端习惯）"
+    },
+    {
+      "rule_id": "mapping-2",
+      "category": "数据结构",
+      "rule": "后端嵌套对象数组 → 前端需显式 map 提取或访问嵌套属性",
+      "example": "roles: RoleRecord[] → .map(r => r.id)"
+    },
+    {
+      "rule_id": "mapping-3",
+      "category": "枚举值",
+      "rule": "后端 Union type → 前端需配置 Tag type / 中文标签映射表",
+      "example": "Record<EnumValue, TagType>，Tag type 只能是 Element Plus 合法值"
+    },
+    {
+      "rule_id": "mapping-4",
+      "category": "API 边界",
+      "rule": "后端 Update 类型字段有限（白名单）→ 前端只传可写字段",
+      "example": "对比 Create/Update 两种类型定义，缺失字段 = 不可更新边界"
+    }
+  ],
+  "success_criteria": [
+    "所有占位组件替换为真实懒加载 import",
+    "类型检查零错误",
+    "单元测试全绿（允许 1 个 flaky 重跑通过）",
+    "构建成功（警告可忽略）",
+    "双栈元数据完全一致",
+    "关键 API/类型字段与后端定义文件真实字段名匹配（无臆造）"
+  ],
+  "universal_component_pattern": {
+    "name": "自管 mutation 模式",
+    "description": "父组件只负责 v-model:visible + :target-record + @success emit；子组件自管 useRequest（watch 按需加载）+ useMutation + 表单校验 + 403 错误处理",
+    "anti_pattern": "prop drilling（把 mutation 实例往下传）"
+  }
+}

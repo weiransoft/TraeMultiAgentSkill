@@ -1,12 +1,15 @@
 name: multi-agent-team
-version: 2.9.2
+version: 2.10.0
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说 + v2.10 方案撰写全流程）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
   
   核心特性：
+  - v2.10 方案撰写全流程：业界调研→方案撰写→4 角色交叉评审→共识收敛→闭环修改
+  - v2.10 业界最佳实践真实调研：WebSearch + 浏览器插件真实执行，拒绝凭空生成
+  - v2.10 多角色方案交叉评审：架构师/产品经理/测试专家/独立开发者 4 视角评审，强制结合项目最新代码
   - Karpathy 四大核心原则强制执行（Think Before Coding / Simplicity First / Surgical Changes / Goal-Driven）
   - Ponytail 决策梯：6 步决策梯 + 16 条不可简化红线，少写多余代码
   - Cybernetics 工程控制论增强：三环控制模型 + 反馈控制环 + 性能画像 + 守护协调器
@@ -53,6 +56,8 @@ ai_capabilities:
   visual_regression: true        # 脚本层（像素级对比）
   tfidf_similarity: true         # 脚本层（本地降级算法）
   hashing_similarity: true       # 脚本层（本地降级算法）
+  v2_10_industry_research: true  # 宿主 LLM 提示词层（WebSearch + 浏览器插件真实调研）
+  v2_10_proposal_review: true    # 宿主 LLM 提示词层（多角色交叉评审 + 共识收敛）
 
 capabilities:
   - name: product-manager
@@ -349,6 +354,136 @@ capabilities:
           type: string
           description: assembly-report.json 装配报告（引用校验、锚点漂移检测、凭据扫描结果，v2.9.1）
 
+  - name: industry_research
+    description: |
+      v2.10 业界最佳实践调研能力：真实执行业界调研
+
+      核心能力：
+      - WebSearch 多路并行搜索（中英文查询变体 + site: 限定权威来源）
+      - 浏览器插件深度阅读（访问完整页面 + 提取关键架构描述和代码片段）
+      - 信息交叉验证（至少 2-3 个独立来源确认同一结论）
+      - 主流方案对比矩阵（方案/框架对比维度：适用场景、优势、劣势、生产验证、社区活跃度）
+      - 与当前项目的对比分析（现有技术栈、约束条件、适配路径、风险评估）
+      - 推荐决策（推荐方案 + 备选方案 + 避坑清单）
+
+      强制约束：所有结论必须有真实来源支撑（URL 可追溯）；优先近 2 年内容；禁止凭空生成。
+
+    input_schema:
+      type: object
+      properties:
+        research_topic:
+          type: string
+          description: 调研主题（如 "实时协作编辑架构"）
+        project_context:
+          type: object
+          description: 当前项目上下文（技术栈、现有架构、约束条件）
+          properties:
+            tech_stack:
+              type: array
+              items:
+                type: string
+            existing_architecture:
+              type: string
+            constraints:
+              type: array
+              items:
+                type: string
+        depth:
+          type: string
+          enum: [quick, standard, deep]
+          default: standard
+          description: 调研深度（quick=5-8 来源 / standard=10-15 / deep=20+）
+    output_schema:
+      type: object
+      properties:
+        report_path:
+          type: string
+          description: 调研报告文件路径（docs/proposals/{task-id}/industry-research.md）
+        source_count:
+          type: integer
+          description: 信息来源总数
+        recommendation:
+          type: object
+          description: 推荐决策
+          properties:
+            primary:
+              type: string
+            alternatives:
+              type: array
+              items:
+                type: string
+            pitfalls:
+              type: array
+              items:
+                type: string
+        comparison_matrix:
+          type: array
+          items:
+            type: object
+            description: 方案对比矩阵
+
+  - name: proposal_review
+    description: |
+      v2.10 多角色方案交叉评审能力
+
+      核心能力：
+      - 4 角色独立评审（架构师/产品经理/测试专家/独立开发者）
+      - 强制结合项目最新代码（每个评审必须扫描代码并引用具体文件路径/行号）
+      - 结构化评审输出（评分 + 🔴阻断性问题 + 🟡建议 + 🟢亮点）
+      - 共识收敛机制（≥2 角色同时提出的问题升级为共识问题）
+      - 闭环修改判定（修改后再评审，最多 3 轮循环）
+
+      Prompt 模板：
+      - docs/spec/role-prompts/proposal-architect-review.md
+      - docs/spec/role-prompts/proposal-pm-review.md
+      - docs/spec/role-prompts/proposal-test-review.md
+      - docs/spec/role-prompts/proposal-coder-review.md
+
+    input_schema:
+      type: object
+      properties:
+        proposal_doc:
+          type: string
+          description: 待评审方案文档路径
+        project_root:
+          type: string
+          description: 项目根目录路径（用于扫描最新代码）
+        review_roles:
+          type: array
+          items:
+            type: string
+          enum: [architect, product_manager, test_expert, solo_coder]
+          default: [architect, product_manager, test_expert, solo_coder]
+          description: 参与评审的角色列表
+        industry_research:
+          type: string
+          description: 业界调研报告路径（可选，用于评审时参考）
+    output_schema:
+      type: object
+      properties:
+        reviews_path:
+          type: string
+          description: 评审意见目录（docs/proposals/{task-id}/reviews/）
+        consensus_report:
+          type: string
+          description: 共识收敛报告路径（docs/proposals/{task-id}/consensus-report.md）
+        final_proposal:
+          type: string
+          description: 最终方案文档路径（docs/proposals/{task-id}/proposal-final.md）
+        all_passed:
+          type: boolean
+          description: 是否所有角色评审通过
+        consensus_issues:
+          type: array
+          items:
+            type: string
+          description: 共识问题清单
+        divergence_points:
+          type: array
+          items:
+            type: string
+          description: 分歧点清单
+
 dependencies: []
 
 ai_integration:
@@ -419,6 +554,60 @@ workflows:
         name: 验证
         role: test-expert
         action: verify_fix
+
+  - workflow_id: proposal-review-workflow
+    name: 方案撰写全流程（v2.10 新增）
+    description: |
+      业界调研 → 方案撰写 → 4 角色交叉评审 → 共识收敛 → 闭环修改。
+      复用 adversarial-verify 动态工作流模式 + WorkflowLoopController 循环机制。
+      业界调研由宿主 LLM 配合浏览器插件真实执行（WebSearch + browser_use）。
+      所有评审 prompt 强制要求结合项目最新代码。
+    version: "2.10"
+    steps:
+      - step_id: industry-research
+        name: 业界调研（真实执行）
+        role: industry-researcher
+        action: research_best_practices
+        description: |
+          WebSearch 多路并行搜索 + 浏览器深度阅读 + 信息交叉验证 + 方案对比矩阵 + 项目适配分析。
+          所有结论必须有真实来源支撑（禁止凭空生成）。
+
+      - step_id: proposal-writing
+        name: 方案撰写（结合调研 + 项目代码）
+        role: host_llm
+        action: write_proposal
+        depends_on: [industry-research]
+        description: |
+          结合 Phase 0 调研报告 + 扫描项目最新代码，撰写初版方案文档。
+          必须定义清晰的验收标准（可量化、可验证）和与现有代码的集成路径。
+
+      - step_id: multi-role-review
+        name: 多角色交叉评审（4 角色并行）
+        role: [architect, product-manager, test-expert, solo-coder]
+        action: review_proposal
+        depends_on: [proposal-writing]
+        parallel: true
+        description: |
+          架构师/产品经理/测试专家/独立开发者 4 视角独立评审，
+          强制要求扫描项目最新代码并引用具体文件路径/行号。
+
+      - step_id: consensus-convergence
+        name: 共识收敛
+        role: host_llm
+        action: converge_consensus
+        depends_on: [multi-role-review]
+        description: |
+          汇总 4 份评审意见，识别共识点（≥2 角色同时提出）和分歧点。
+
+      - step_id: modify-loop
+        name: 根据共识修改 + 闭环判定
+        role: host_llm
+        action: modify_until_consensus
+        depends_on: [consensus-convergence]
+        loop_until: all_roles_pass OR max_iterations(3)
+        description: |
+          根据共识问题清单修改方案，然后回到 multi-role-review 再评审。
+          最多 3 轮循环，超过上限则输出当前方案 + 剩余问题清单交由用户裁决。
 
 context_management:
   type: dual-layer
@@ -492,6 +681,19 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.10.0
+      date: "2026-10-07"
+      changes:
+        - 新增方案撰写全流程（proposal-review-workflow）：Phase 0 业界调研 → Phase 1 方案撰写 → Phase 2 多角色交叉评审（4 角色并行）→ Phase 3 共识收敛 → Phase 4 闭环修改，复用 adversarial-verify 动态工作流模式 + WorkflowLoopController 循环机制
+        - 业界最佳实践真实调研（industry_research capability）：WebSearch 多路并行搜索 + 浏览器插件深度阅读 + 信息交叉验证 + 主流方案对比矩阵 + 项目适配分析 + 推荐决策，所有结论必须有真实来源支撑
+        - 多角色方案交叉评审（proposal_review capability）：架构师/产品经理/测试专家/独立开发者 4 视角独立评审，强制要求结合项目最新代码并引用具体文件路径/行号
+        - 共识收敛机制：≥2 角色同时提出的 🔴 阻断性问题升级为共识问题（必须修改），≥3 角色同时提出的 🟡 建议性问题升级为建议采纳
+        - 闭环修改判定：修改后再评审，最多 3 轮循环，超过上限则输出当前方案 + 剩余问题清单交由用户裁决
+        - 新增 Prompt 模板（docs/spec/role-prompts/）：industry-research-prompt.md、proposal-architect-review.md、proposal-pm-review.md、proposal-test-review.md、proposal-coder-review.md
+        - SKILL.md 新增「方案撰写全流程」章节（五阶段工作流 + Phase 0-4 详细说明 + CLI 使用方式 + 产出物 + 架构设计 + 绝对禁止清单）
+        - skill-manifest.yaml：新增 v2_10_industry_research / v2_10_proposal_review ai_capabilities、industry_research / proposal_review capabilities、proposal-review-workflow workflow
+        - 绝对禁止清单：跳过业界调研直接开始写方案、凭空捏造业界最佳实践、评审时不结合项目代码、跳过共识收敛直接修改、无限循环不收敛
+
     - version: 2.9.2
       date: "2026-09-30"
       changes:
@@ -574,4 +776,4 @@ metadata:
         - 简单的上下文管理
 
 created_at: "2026-03-16T00:00:00"
-updated_at: "2026-09-30T00:00:00"
+updated_at: "2026-10-07T00:00:00"

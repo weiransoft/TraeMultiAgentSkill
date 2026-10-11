@@ -1,7 +1,7 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md），v2.9.2 修复 D1（understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致）。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md），v2.9.2 修复 D1（understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致），v2.10 新增方案撰写全流程（业界调研→方案撰写→多角色交叉评审→共识收敛→方案修改闭环）。
 ---
 # Multi-Agent Team Dispatcher (AI-Enhanced)
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
@@ -507,6 +507,182 @@ python3 scripts/run_workflow_loop.py \
 ❌ 开发完成后不对照文档检查就发布（v2.8 新增）
 ❌ 代码中残留 TODO/FIXME 未实现就发布（v2.8 新增）
 
+## 方案撰写全流程（v2.10 新增 — 业界调研 → 多角色交叉评审闭环）
+
+> **设计理念**: 好的方案需要先看清业界怎么做（调研）、结合自己项目的实际情况（代码扫描）、再被不同角度的人反复挑刺（多角色交叉评审）、最终收敛到共识方案。这个五阶段闭环确保方案不是"想当然"拍出来的，而是经过真实验证和多维度审视的。
+>
+> **v2.10 核心机制**: 复用现有 adversarial-verify 动态工作流模式 + WorkflowLoopController 循环机制做「评审→修改→再评审」闭环；业界调研由宿主 LLM 配合浏览器插件（WebSearch + browser_use）真实执行；所有评审 prompt 强制要求**结合项目最新代码**进行评审。
+
+### 五阶段工作流
+
+```
+Phase 0: 业界调研（浏览器搜索 + 项目代码扫描）
+    ↓ 产出调研报告
+Phase 1: 方案撰写（结合调研结论 + 项目最新代码）
+    ↓ 产出初版方案文档
+Phase 2: 多角色交叉评审（4 角色并行评审）
+    ├─ 架构师视角评审
+    ├─ 产品经理视角评审
+    ├─ 测试专家视角评审
+    └─ 独立开发者视角评审
+    ↓ 产出 4 份独立评审意见
+Phase 3: 共识收敛（提取共识点 + 分歧点）
+    ↓ 产出共识结论
+Phase 4: 根据共识修改方案
+    ↓ 修改后回到 Phase 2 再评审
+    ↑─────────── 循环直到共识达成 ───────────┘
+```
+
+### Phase 0：业界调研（真实执行，禁止凭空生成）
+
+**执行方式**: 宿主 LLM 作为调研专家，配合浏览器插件执行真实搜索
+
+**详细步骤**:
+
+```
+Step 1 — 关键词提取（从任务描述中提取核心技术关键词）
+    ↓
+Step 2 — 多路径并行搜索（WebSearch 查询 + 浏览器深度阅读）
+    - 中文查询："{topic} 最佳实践" / "{topic} 架构设计" / "{topic} 生产环境"
+    - 英文查询："{topic} best practices 2026" / "{topic} at scale"
+    - 使用 site:github.com / site:techblog.google 限定权威来源
+    ↓
+Step 3 — 信息交叉验证（至少 2-3 个独立来源确认同一结论）
+    ↓
+Step 4 — 结构化整理（主流方案对比矩阵 + 正反意见 + 项目适配分析）
+    ↓
+Step 5 — 产出调研报告（docs/proposal/{task-id}/industry-research.md）
+```
+
+**强制约束**:
+- 所有结论必须有**真实来源支撑**（URL 可追溯）
+- 优先 **近 2 年内容**（2024-2026）
+- 必须包含**与当前项目的对比分析**（现有技术栈、约束条件、适配路径）
+- 必须给出**推荐决策**（推荐方案 + 备选方案 + 避坑清单）
+
+**Prompt 模板**: `docs/spec/role-prompts/industry-research-prompt.md`
+
+### Phase 1：方案撰写（结合调研 + 项目代码）
+
+**执行方式**: 宿主 LLM 结合 Phase 0 调研报告和项目最新代码撰写方案
+
+**强制约束**:
+- 必须**扫描项目最新代码**（文件列表、模块结构、依赖关系、现有实现）
+- 必须**引用业界调研结论**（说明方案与业界最佳实践的关系）
+- 必须**定义清晰的验收标准**（可量化、可验证）
+- 必须**标注与现有代码的集成路径**（哪些文件需要修改、哪些需要新增）
+
+### Phase 2：多角色交叉评审（4 角色并行）
+
+**执行方式**: 宿主 LLM 以 4 种不同角色的视角分别评审方案，**必须结合项目最新代码**
+
+| 评审角色 | Prompt 模板 | 核心评审维度 |
+|----------|-------------|-------------|
+| 架构师 | [proposal-architect-review.md](../spec/role-prompts/proposal-architect-review.md) | 架构可行性、技术选型、可扩展性、安全性、代码集成路径 |
+| 产品经理 | [proposal-pm-review.md](../spec/role-prompts/proposal-pm-review.md) | 用户价值、需求覆盖、商业可行性、产品集成路径、验收标准 |
+| 测试专家 | [proposal-test-review.md](../spec/role-prompts/proposal-test-review.md) | 可测试性、测试策略、验收标准可验证性、质量风险 |
+| 独立开发者 | [proposal-coder-review.md](../spec/role-prompts/proposal-coder-review.md) | 可实现性、代码复杂度、实现路径、工作量、Ponytail 合规 |
+
+**每个评审必须包含**:
+1. 总体评分（X/10）和评审结论（通过/有条件通过/不通过）
+2. 各维度详细评分
+3. 🔴 **阻断性问题清单**（必须修改才能通过）
+4. 🟡 建议性改进
+5. 🟢 亮点
+6. 与**项目最新代码**结合的具体证据（文件路径、行号、现有实现）
+
+### Phase 3：共识收敛
+
+**执行方式**: 宿主 LLM 汇总 4 份评审意见，识别共识点和分歧点
+
+**收敛规则**:
+
+```
+共识判定：
+- 🔴 阻断性问题：≥ 2 个角色同时提出 → 共识问题（必须修改）
+- 🟡 建议性问题：≥ 3 个角色同时提出 → 建议采纳
+- 分歧点：不同角色有相反意见 → 标记为分歧，需进一步讨论
+
+收敛输出：
+- 共识问题清单（必须修改的问题，按优先级排序）
+- 分歧点清单（不同意见，附各角色论据）
+- 当前方案总体结论（共识达成？还有哪些差距？）
+```
+
+### Phase 4：根据共识修改 + 闭环判定
+
+**执行方式**: 宿主 LLM 根据共识问题清单修改方案文档，然后回到 Phase 2 再评审
+
+**闭环判定**:
+- 若所有角色评审通过（无 🔴 阻断性问题）→ ✅ 共识达成，方案定稿
+- 若仍有 🔴 阻断性问题 → 继续修改循环
+- **最大循环次数**: 默认 3 次，防止无限循环
+- 超过上限 → 输出当前方案 + 剩余问题清单，交由用户裁决
+
+### CLI 使用方式
+
+```bash
+# 方式 1：完整方案撰写全流程
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "设计实时协作编辑架构方案" \
+    --proposal-review
+
+# 方式 2：仅执行业界调研（用于预研）
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "调研分布式任务队列业界最佳实践" \
+    --industry-research-only
+
+# 方式 3：仅执行多角色评审（已有方案文档）
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "评审 ./docs/proposals/real-time-edit.md" \
+    --proposal-review-only \
+    --proposal-doc ./docs/proposals/real-time-edit.md
+```
+
+### 产出物
+
+| 阶段 | 产出物 | 位置 |
+|------|--------|------|
+| Phase 0 | 业界调研报告 | `docs/proposals/{task-id}/industry-research.md` |
+| Phase 1 | 初版方案文档 | `docs/proposals/{task-id}/proposal-v1.md` |
+| Phase 2 | 4 份评审意见 | `docs/proposals/{task-id}/reviews/{role}-review.md` |
+| Phase 3 | 共识收敛报告 | `docs/proposals/{task-id}/consensus-report.md` |
+| Phase 4 | 最终方案文档 | `docs/proposals/{task-id}/proposal-final.md` |
+
+### 架构设计
+
+此工作流本质是 **adversarial-verify** 动态工作流模式的一个专门化变体（生成→多角色审查→修复循环），通过 WorkflowLoopController 管理「评审→修改→再评审」闭环。
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                    ProposalReviewWorkflow                          │
+│                                                                   │
+│  Phase 0 ──> Phase 1 ──> Phase 2 ──> Phase 3 ──> Phase 4         │
+│ (research) (proposal)   (review)   (consensus)  (modify)         │
+│                              │                     │              │
+│                              └─────────────────────┘              │
+│                                       │                           │
+│                               loop until consensus achieved       │
+│                               max 3 iterations                     │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+**核心特性**:
+- ✅ **真实调研**: 使用 WebSearch + 浏览器插件做真实业界调研，拒绝凭空生成
+- ✅ **代码结合**: 每个评审模板强制要求扫描项目最新代码并结合评审
+- ✅ **多角色交叉**: 4 个不同角色独立评审，避免单点视角偏见
+- ✅ **共识机制**: 多角色共同提出的问题升级为"共识问题"，必须解决
+- ✅ **闭环收敛**: 修改后再评审，直到所有角色通过或达到上限
+- ✅ **Karpathy 对齐**: 每个阶段都遵循 Karpathy 四大原则
+- ✅ **Ponytail 合规**: 独立开发者评审包含完整的 Ponytail 决策梯检查
+
+**绝对禁止**:
+❌ 跳过业界调研直接开始写方案（除非用户明确要求）
+❌ 凭空捏造"业界最佳实践"（必须有真实来源）
+❌ 评审时不结合项目代码（必须扫描最新代码）
+❌ 跳过共识收敛直接修改（必须先达成共识）
+❌ 无限循环不收敛（3 次迭代上限，超过则输出当前方案交由用户裁决）
+
 ## 高级功能
 ### 代码走读与审查 (v2.3)
 ```bash
@@ -900,6 +1076,7 @@ Trae Multi-Agent Dispatcher 提供了：
 - ✅ 智能角色识别（5 个核心角色 + AI 语义匹配）
 - ✅ 多角色协同 + 共识机制
 - ✅ 八阶段标准工作流程（v2.8 新增阶段 8：文档对照代码审查）
+- ✅ 方案撰写全流程（v2.10，业界调研→方案撰写→4 角色交叉评审→共识收敛→闭环修改）
 - ✅ Karpathy 四大核心原则强制执行（v2.4）
 - ✅ Cybernetics 工程控制论三环控制（v2.5）
 - ✅ Ponytail 决策梯 + 16 条不可简化红线（v2.6）

@@ -510,6 +510,44 @@ def parse_arguments():
         help="Loop Engineering 自然语言停止条件",
     )
 
+    # v2.10 新增：方案撰写全流程（Proposal Review Workflow）flags
+    parser.add_argument(
+        "--proposal-review",
+        action="store_true",
+        default=False,
+        help="v2.10 启用方案撰写全流程：业界调研→方案撰写→多角色交叉评审→共识收敛→闭环修改",
+    )
+    parser.add_argument(
+        "--industry-research-only",
+        action="store_true",
+        default=False,
+        help="v2.10 仅执行业界最佳实践调研（Phase 0，用于预研）",
+    )
+    parser.add_argument(
+        "--proposal-review-only",
+        action="store_true",
+        default=False,
+        help="v2.10 仅执行多角色方案评审（Phase 2-3，用于评审已有方案文档）",
+    )
+    parser.add_argument(
+        "--proposal-doc",
+        type=str,
+        default=None,
+        help="v2.10 待评审方案文档路径（配合 --proposal-review-only 使用）",
+    )
+    parser.add_argument(
+        "--proposal-max-iterations",
+        type=int,
+        default=3,
+        help="v2.10 方案评审闭环最大迭代次数（默认 3，范围 [1, 10]）",
+    )
+    parser.add_argument(
+        "--proposal-consensus-threshold",
+        type=int,
+        default=2,
+        help="v2.10 共识问题判定阈值（默认 2，≥N 个角色同时提出则升级为共识问题）",
+    )
+
     return parser.parse_args()
 
 

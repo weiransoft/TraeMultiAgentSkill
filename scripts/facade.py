@@ -90,6 +90,30 @@ def _dispatch_through_v3(args) -> int:
         log(f"❌ {e}", "ERROR")
         return 1
 
+    # v2.10 新增：proposal-review 系列 flag 的最小路由和互斥校验
+    proposal_mode = getattr(args, "proposal_review", False)
+    research_only = getattr(args, "industry_research_only", False)
+    review_only = getattr(args, "proposal_review_only", False)
+
+    # proposal-review 与 --autonomous / --loop / --multi-goal 互斥校验
+    proposal_flags_present = proposal_mode or research_only or review_only
+    if proposal_flags_present:
+        if getattr(args, "autonomous", False):
+            log("❌ --proposal-review 系列标志与 --autonomous 互斥，不能同时使用", "ERROR")
+            return 1
+        if args.loop and args.loop > 1:
+            log("❌ --proposal-review 系列标志与 --loop 互斥，不能同时使用", "ERROR")
+            return 1
+        if getattr(args, "multi_goal", None):
+            log("❌ --proposal-review 系列标志与 --multi-goal 互斥，不能同时使用", "ERROR")
+            return 1
+
+        # v2.10：proposal-review 是提示词层工作流（宿主 LLM 执行五阶段）
+        # 脚本层仅做最小拦截，输出工作流指令供宿主 LLM 接管
+        if proposal_mode or research_only or review_only:
+            _handle_proposal_review_mode(args, project_root, proposal_mode, research_only, review_only)
+            return 0
+
     # Phase 17 v3 §2.9：启动 hot reload watcher（如启用）
     # 关键：放在 validate_mutex 之后（避免无效 args 启动 watcher）
     _start_hot_reload_if_enabled(dispatcher, args, project_root)
@@ -232,6 +256,115 @@ def _safe_watcher_stop(watcher) -> None:
         _facade_logger.warning(f"[facade] watcher.stop 异常：{e}")
 
 
+# === v2.10：方案撰写全流程 Proposal Review 工作流处理 ===
+
+
+def _handle_proposal_review_mode(
+    args,
+    project_root: Path,
+    proposal_mode: bool,
+    research_only: bool,
+    review_only: bool,
+) -> None:
+    """v2.10：处理 proposal-review 系列 flag。
+
+    此工作流是提示词层执行的——宿主 LLM 负责按 SKILL.md 的五阶段定义
+    执行业界调研→方案撰写→多角色交叉评审→共识收敛→闭环修改。
+    脚本层仅做最小拦截，输出结构化指令供宿主 LLM 接管。
+
+    Args:
+        args: argparse.Namespace — CLI 解析结果
+        project_root: Path — 项目根目录
+        proposal_mode: bool — 完整五阶段工作流
+        research_only: bool — 仅 Phase 0 业界调研
+        review_only: bool — 仅 Phase 2-3 多角色评审
+    """
+    task_desc = args.task or "(未指定任务)"
+    max_iterations = getattr(args, "proposal_max_iterations", 3)
+    consensus_threshold = getattr(args, "proposal_consensus_threshold", 2)
+    proposal_doc = getattr(args, "proposal_doc", None)
+
+    log("=" * 60, "INFO")
+    log("📋 v2.10 方案撰写全流程（Proposal Review Workflow）已启动", "INFO")
+    log("=" * 60, "INFO")
+    log(f"📌 项目根目录: {project_root}", "INFO")
+    log(f"📌 任务描述: {task_desc}", "INFO")
+
+    # 根据模式输出对应的工作流指令
+    if research_only:
+        log("\n【模式】仅执行 Phase 0：业界最佳实践调研", "INFO")
+        log("=" * 40, "INFO")
+        log("📖 宿主 LLM 执行指令：", "INFO")
+        log("  请读取 docs/spec/role-prompts/industry-research-prompt.md", "INFO")
+        log("  按其中定义的五步骤执行业界调研：", "INFO")
+        log("    Step 1 - 关键词提取（从任务描述中提取核心技术关键词）", "INFO")
+        log("    Step 2 - 多路径并行搜索（WebSearch + 浏览器深度阅读）", "INFO")
+        log("    Step 3 - 信息交叉验证（至少 2-3 个独立来源确认）", "INFO")
+        log("    Step 4 - 结构化整理（主流方案对比矩阵 + 项目适配分析）", "INFO")
+        log("    Step 5 - 产出调研报告（docs/proposals/{task-id}/industry-research.md）", "INFO")
+        log("", "INFO")
+        log("  ⚠️ 强制约束：所有结论必须有真实来源支撑（禁止凭空生成）", "WARNING")
+
+    elif review_only:
+        log("\n【模式】仅执行 Phase 2-3：多角色交叉评审 + 共识收敛", "INFO")
+        log("=" * 40, "INFO")
+
+        if not proposal_doc:
+            log("❌ --proposal-review-only 需要配合 --proposal-doc 指定待评审方案路径", "ERROR")
+            return
+
+        proposal_path = Path(proposal_doc)
+        if not proposal_path.exists():
+            log(f"❌ 待评审方案文档不存在: {proposal_path}", "ERROR")
+            return
+
+        log(f"📖 待评审方案: {proposal_path}", "INFO")
+        log("📖 宿主 LLM 执行指令：", "INFO")
+        log("  Phase 2 - 4 角色独立评审（必须扫描项目最新代码）", "INFO")
+        log("    角色 1: 架构师 — docs/spec/role-prompts/proposal-architect-review.md", "INFO")
+        log("    角色 2: 产品经理 — docs/spec/role-prompts/proposal-pm-review.md", "INFO")
+        log("    角色 3: 测试专家 — docs/spec/role-prompts/proposal-test-review.md", "INFO")
+        log("    角色 4: 独立开发者 — docs/spec/role-prompts/proposal-coder-review.md", "INFO")
+        log("", "INFO")
+        log("  Phase 3 - 共识收敛", "INFO")
+        log(f"    共识阈值: ≥ {consensus_threshold} 个角色同时提出 = 共识问题", "INFO")
+        log("", "INFO")
+        log("  ⚠️ 强制约束：每个评审必须扫描项目最新代码并引用具体文件路径/行号", "WARNING")
+
+    else:  # proposal_mode（完整五阶段）
+        log("\n【模式】完整五阶段方案撰写全流程", "INFO")
+        log("=" * 40, "INFO")
+        log(f"📖 宿主 LLM 执行指令（按 SKILL.md 「方案撰写全流程」章节）：", "INFO")
+        log("", "INFO")
+        log("  Phase 0 — 业界调研（真实执行，禁止凭空生成）", "INFO")
+        log("    Prompt: docs/spec/role-prompts/industry-research-prompt.md", "INFO")
+        log("    工具: WebSearch 多路并行搜索 + 浏览器插件深度阅读", "INFO")
+        log("", "INFO")
+        log("  Phase 1 — 方案撰写（结合调研 + 项目代码）", "INFO")
+        log("    必须扫描项目最新代码，引用业界调研结论，定义清晰验收标准", "INFO")
+        log("", "INFO")
+        log("  Phase 2 — 多角色交叉评审（4 角色并行）", "INFO")
+        log("    架构师 / 产品经理 / 测试专家 / 独立开发者", "INFO")
+        log("    每个角色必须扫描项目最新代码并引用具体文件路径/行号", "INFO")
+        log("", "INFO")
+        log("  Phase 3 — 共识收敛", "INFO")
+        log(f"    共识阈值: ≥ {consensus_threshold} 个角色同时提出 = 共识问题", "INFO")
+        log("", "INFO")
+        log("  Phase 4 — 根据共识修改 + 闭环判定", "INFO")
+        log(f"    最大迭代次数: {max_iterations}（超过则输出当前方案交由用户裁决）", "INFO")
+        log("", "INFO")
+        log("  ⚠️ 强制约束清单（v2.10 绝对禁止）：", "WARNING")
+        log("    ❌ 跳过业界调研直接开始写方案", "WARNING")
+        log("    ❌ 凭空捏造业界最佳实践", "WARNING")
+        log("    ❌ 评审时不结合项目代码", "WARNING")
+        log("    ❌ 跳过共识收敛直接修改", "WARNING")
+        log("    ❌ 无限循环不收敛", "WARNING")
+
+    log("", "INFO")
+    log("✅ 工作流指令已输出，宿主 LLM 请按以上指令执行。", "SUCCESS")
+    log("   详细说明见 SKILL.md 「方案撰写全流程」章节", "INFO")
+
+
 __all__ = [
     "main_compat",
     "_dispatch_through_v3",
@@ -250,4 +383,6 @@ __all__ = [
     "_start_hot_reload_if_enabled",
     "_cleanup_all_watchers",
     "_safe_watcher_stop",
+    # v2.10 新增：方案撰写全流程
+    "_handle_proposal_review_mode",
 ]

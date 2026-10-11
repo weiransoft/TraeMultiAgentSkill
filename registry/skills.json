@@ -101,6 +101,68 @@
       },
       "created_at": "2026-09-28T00:00:00.000000",
       "updated_at": "2026-09-30T00:00:00.000000"
+    },
+    "vue-dual-stack-migration": {
+      "name": "vue-dual-stack-migration",
+      "version": "1.0.0",
+      "description": "React→Vue3 双栈迁移通用 pattern：React 仓逐块迁移到 Vue3，后端 API+TypeScript 类型共享保功能 parity。6 步工作流 + 14 条通用踩坑 checklist（类型契约/Vue3框架/Composable/Element Plus/构建 5 大类）+ 4 个可复用代码模板（自管 mutation 模式/ElDrawer 桥接/按需加载/Dialog）。跨项目可复用，不绑定具体项目类型名/文件名/批次号。",
+      "author": "Vue Migration Pattern",
+      "status": "active",
+      "capabilities": [
+        {
+          "name": "migration_workflow",
+          "description": "6 步迁移工作流：情报收集 → 路由替换 → 组件创建 → 类型检查 → 门禁回归 → 运行时验证。情报收集是关键前置步骤——先 grep 后端类型定义锁定真实字段名，再写代码避免臆造。",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "react_repo_path": { "type": "string", "description": "React 仓路径（冻结，迁移参照源）" },
+              "vue_repo_path": { "type": "string", "description": "Vue3 仓路径（迁移目标）" },
+              "target_routes": { "type": "array", "items": { "type": "string" }, "description": "需要替换占位组件的路由列表" },
+              "batch_label": { "type": "string", "description": "批次标签（如 B1/B2，可选）" }
+            },
+            "required": ["react_repo_path", "vue_repo_path", "target_routes"]
+          }
+        },
+        {
+          "name": "pitfall_checklist",
+          "description": "14 条通用踩坑 Checklist，按根因分类：类型契约 4 条（snake_case vs camelCase/嵌套结构误判/Update 边界/分页参数）、Vue3 框架 2 条（v-model 冲突/defineEmits 签名）、Composable 5 条（refetch 方法名/嵌套 Ref 不解包/onSuccess 参数不确定/ComputedRef 不兼容 params/loading 直接用）、Element Plus 2 条（ElTable slot row 类型/ElForm :rules 类型严格）、构建 1 条（vite 不能 import 不存在文件）。每条给出通用 pattern 和通用解法方法论。"
+        },
+        {
+          "name": "component_communication_pattern",
+          "description": "自管 mutation 组件通信模式：父组件只负责 v-model:visible 双向绑定 + :target-record 只读传递 + @success emit 监听刷新；子组件自管 useRequest（watch 按需加载触发）+ useMutation（create/update/delete/reset）+ 表单校验 + 403 错误处理。核心原则：避免 prop drilling，每个子组件是自包含单元。"
+        },
+        {
+          "name": "type_mapping_rules",
+          "description": "4 类通用类型映射规则：命名风格（snake_case 原样使用不臆造 camelCase）、数据结构（嵌套对象数组需显式 map 提取）、枚举值（Union type 需配置 Tag type + 中文标签映射表）、API 边界（Update 类型字段有限，缺失字段=不可更新边界）。"
+        }
+      ],
+      "dependencies": [],
+      "metadata": {
+        "pattern_id": "vue-dual-stack-migration",
+        "pattern_prompt": "docs/dev/pattern_prompts/vue-dual-stack-migration.md",
+        "pattern_example": "docs/dev/pattern_examples/vue-dual-stack-migration.json",
+        "patterns_reference": "docs/dev/PATTERNS_REFERENCE.md #模式-7vue-dual-stack-migrationreactvue3-双栈迁移",
+        "universal_rules": [
+          "后端类型即事实契约——每次引用字段前 grep 后端类型定义文件",
+          "组件按复杂度拆分，自管 mutation 模式避免 prop drilling",
+          "类型检查零错误才能进下一批",
+          "4 类类型映射规则：命名风格/数据结构/枚举值/API 边界"
+        ],
+        "source_cases": [
+          { "batch": "B5", "scope": "审计/红队/合规/评测", "components": 10, "hits": 3 },
+          { "batch": "B6", "scope": "引擎配置/LoRA/灰度发布", "components": 3, "hits": 4 },
+          { "batch": "B7", "scope": "系统管理/用户管理", "components": 11, "hits": 7 }
+        ],
+        "known_caveats": [
+          "运行时浏览器验证需在真实环境执行",
+          "不同项目 composable 签名可能不同，读源码确认回调参数数量",
+          "部分项目可能存在 flaky 测试，需重跑确认"
+        ],
+        "test_gates": ["类型检查零错误", "单元测试全绿", "构建成功"],
+        "trigger_keywords": ["迁移", "React→Vue", "双栈", "lazyView", "parity", "类型契约", "自管 mutation", "useRequest", "useMutation"]
+      },
+      "created_at": "2026-10-11T00:00:00.000000",
+      "updated_at": "2026-10-11T00:00:00.000000"
     }
   }
 }

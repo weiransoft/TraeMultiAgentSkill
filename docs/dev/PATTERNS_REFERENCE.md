@@ -29,8 +29,9 @@
 | 4 | `generate-filter` | 生成与筛选 | 大量生成 → 标准筛选 → 去重 | 中 | 🟡 P1 |
 | 5 | `tournament` | 锦标赛模式 | N 个候选两两 PK → 选冠军 | 低 | 🟡 P1 |
 | 6 | `loop-until-done` | 循环直到完成 | 动态生成 subagent 直至停止条件 | 低 | 🟢 P2 |
+| 7 | `vue-dual-stack-migration` | React→Vue3 双栈迁移 | React 仓逐块迁移到 Vue3，后端 API+类型共享保 parity | 高 | 🔴 P0（实测） |
 
-**Phase 0 实现范围**：🔴 P0 的 3 个核心模式（1/2/3）  
+**Phase 0 实现范围**：🔴 P0 的 3 个核心模式（1/2/3） + 🔴 P0（实测）的 vue-dual-stack-migration（B5/B6/B7 三批次验证，20+ 组件交付）
 **Phase 1+ 实现范围**：按需追加 P1/P2 模式
 
 ### 0.3 阅读指引
@@ -681,7 +682,143 @@ WorkflowStep 现有字段不变，新增 `pattern_executor: Optional[str]` 字�
 
 ---
 
+### 模式 7：vue-dual-stack-migration（React→Vue3 双栈迁移）
+
+#### 7.1.1 模式定义
+
+```yaml
+pattern_id: vue-dual-stack-migration
+name: React→Vue3 双栈迁移
+one_liner: React 仓逐块迁移到 Vue3，后端 API+TypeScript 类型共享，保持功能 parity
+core_problem: React 仓已有完整实现 + 后端 API + 类型定义，但 Vue 仓只有 lazyView 占位
+key_insight: "后端类型即事实契约"——先 grep 锁定真实 API/类型，再写代码，避免臆造字段
+phase: B5-B7 来源批次验证（参考，非规范正文）
+priority: 🔴 P0（高频复用）
+```
+
+#### 7.1.2 适用场景
+
+✅ **适合**：
+- 后端 API 已稳定，React 仓是参照源，Vue 仓待迁移
+- 双栈要求功能 parity，后端 TypeScript 类型共享
+- 分批迁移（每次一个功能模块），逐块替换 lazyView 占位
+
+❌ **不适合**：
+- 后端 API 还在频繁变动（类型契约不稳定）
+- 无 React 仓参照源（Vue 仓需从零实现）
+- Vue 仓 API/类型模块尚未就绪（需先补 API 层）
+
+#### 7.1.3 参数 Schema
+
+```json
+{
+  "react_repo_path": { "type": "string", "required": true },
+  "vue_repo_path": { "type": "string", "required": true },
+  "target_routes": { "type": "array", "items": { "type": "string" }, "required": true },
+  "batch_label": { "type": "string", "required": false, "default": "B-new" },
+  "component_split_strategy": {
+    "type": "string",
+    "required": false,
+    "enum": ["auto", "single-file", "parent-children", "max-3-drawers"],
+    "default": "auto"
+  }
+}
+```
+
+#### 7.1.4 工作流 6 步（必须按序执行）
+
+| # | 步骤 | 核心动作 | 门禁 |
+|---|------|---------|------|
+| 1 | 情报收集 | grep Vue 仓 API 模块 + grep services/types 真实字段 + 读 React 源文件 + 确认路由 meta | API/类型全齐才能继续 |
+| 2 | 路由替换 | lazyView('Xxx') → () => import('@/views/xxx/Xxx.vue') | meta.requireAdmin 确认 |
+| 3 | 组件创建 | 按复杂度拆分子组件，**自管 mutation 模式** | 组件拆分决策树 |
+| 4 | typecheck | 每次写完立即跑，优先 grep 真实类型 | 零错误才能继续 |
+| 5 | 门禁回归 | typecheck → vitest run → build | 全绿才能进下一批 |
+| 6 | 运行时验证 | 浏览器导航 + Network + Console | **待执行项（诚实标记）** |
+
+#### 7.1.5 核心模式：自管 mutation 组件通信
+
+```
+父组件只负责：
+  - v-model:visible 双向绑定 Drawer/Dialog 开关
+  - :user-record 传递目标记录
+  - @success 监听 → listReq.refetch() 刷新列表
+
+子组件自管：
+  - useRequest（按需加载，watch props.xxx 触发）
+  - useMutation（create/update/delete/reset）
+  - 表单校验 + 403 错误处理
+```
+
+#### 7.1.6 踩坑 Checklist（14 条，跨项目通用）
+
+> **分类说明**：按根因分类，每条给出**通用 pattern** 和**通用解法方法论**。每个新项目迁移时，需对照该项目的后端类型定义文件锁定真实字段名。
+
+**类型契约类（4 条）**
+
+| # | 根因分类 | 通用 pattern | 通用解法方法论 |
+|---|---------|------------|--------------|
+| T1 | 命名风格不一致 | 后端序列化/反序列化使用 snake_case（如 `is_active`），前端习惯 camelCase（如 `enabled`），直接用前端习惯名导致 TypeScript 类型错误 | 每次引用后端字段前，**先 grep 后端类型定义文件**确认真实字段名，不要凭习惯猜测 |
+| T2 | 嵌套数据结构误判 | 后端返回的关联字段是**完整对象数组**（如 `roles: RoleRecord[]`），前端误以为是简单 ID 数组（`roles: string[]`），解构/遍历时报类型错误 | 看后端类型定义的**嵌套层级**，不要简化；需要简单 ID 时显式 `.map(r => r.id)` 提取 |
+| T3 | 请求体字段边界误判 | 后端 Update 类型只暴露**部分可写字段**（如只有 email/status/scenario），前端误以为 Create 类型的所有字段都可用于 Update | grep Update/Edit 专用类型定义，对比 Create 类型，**缺失的字段就是不可更新的边界** |
+| T4 | 分页参数命名不一致 | 不同项目后端约定不同：有的 `page_size`、有的 `size`、有的 `limit`；前端照搬另一个项目的参数名导致请求 400 | 查 Query 参数专用类型定义，**以定义文件为准**，不要凭经验猜 |
+
+**Vue3 框架类（2 条）**
+
+| # | 根因分类 | 通用 pattern | 通用解法方法论 |
+|---|---------|------------|--------------|
+| V1 | 内置组件 v-model 冲突 | Element Plus 的 Drawer/Dialog 等内置组件的 `v-model` 绑定的是组件自身的 `modelValue` prop，当子组件**自定义了同名 visible prop** 时，vite build 阶段编译器报错 | 用显式桥接写法：`:model-value="visible" @update:model-value="(v) => emit('update:visible', v)"` 替代 `v-model` |
+| V2 | 编译器类型安全限制 | `defineEmits` 混用对象签名和函数签名会导致 TypeScript 类型推断混乱 | 统一用**对象形式**声明 emits |
+
+**Composable 类（5 条）**
+
+| # | 根因分类 | 通用 pattern | 通用解法方法论 |
+|---|---------|------------|--------------|
+| C1 | 方法名记忆错误 | useRequest 暴露的是 `refetch()` 不是 `refresh()` | 每次用新 composable 时，**先 grep 它的导出 API 签名** |
+| C2 | Ref 嵌套不解包 | useRequest/useMutation 的 `loading` 都是 `Ref<boolean>`，script 里需要 `.value` 或 `computed` 解包 | script 里写 `computed(() => xxxReq.loading.value)`，template 直接用 |
+| C3 | onSuccess 参数数量不确定 | 不同 composable 的 `onSuccess` 回调参数数量不同，前端凭旧项目习惯写多参数导致 TS 错误 | **读 composable 源码或类型定义文件**确认回调签名 |
+| C4 | ComputedRef 类型不兼容 | useRequest 的 `params` 选项期望普通 Ref，但前端传了 `computed(...)`，泛型签名不兼容 | 不用 params 选项，改用 `watch(trigger, () => req.run(trigger), { immediate: true })` 手动触发 |
+| C5 | mutation loading 在 button 上直接用 | template 里 `:loading="mutation.loading"` 会报 TS 错误 | 统一 `computed(() => mutation.loading.value)` 解包 |
+
+**Element Plus 类（2 条）**
+
+| # | 根因分类 | 通用 pattern | 通用解法方法论 |
+|---|---------|------------|--------------|
+| E1 | ElTable slot row 类型 | `#default="{ row }"` 中 row 的类型是 Element Plus 内部 DefaultRow，不是业务类型 | 用 `(row as any).fieldName` 显式断言访问业务字段 |
+| E2 | ElForm :rules 类型严格 | ElForm 的 :rules prop 期望类型签名与通用数组推导不匹配，TS 报错 | 用 `:rules="rules as any"` 强制转换（Element Plus 社区公认 workaround） |
+
+**构建类（1 条）**
+
+| # | 根因分类 | 通用 pattern | 通用解法方法论 |
+|---|---------|------------|--------------|
+| B1 | vite build 不能动态 import 不存在的文件 | `import('./Xxx.vue').catch(...)` 在 vite build 阶段尝试解析，文件不存在直接报错 | 未实现组件**直接 import 占位组件**，不用 `.catch()` 降级 |
+
+#### 7.1.7 类型映射速查规则（通用分类）
+
+| 规则 | 分类 | 通用描述 | 反例 |
+|---|---|---|---|
+| 1 | 命名风格 | 后端序列化 snake_case → 前端需原样使用 | 后端 `is_active` ≠ 前端习惯 `enabled` |
+| 2 | 数据结构 | 后端嵌套对象数组 → 前端显式 `.map(r => r.id)` 提取 | 后端 `RoleRecord[]` ≠ 前端误判 `string[]` |
+| 3 | 枚举值 | 后端 Union type → 前端配置 Tag type + 中文标签映射表 | Element Plus Tag type 只能是 success/warning/danger/info/primary |
+| 4 | API 边界 | 后端 Update 类型字段有限 → 前端只传可写字段 | 对比 Create/Update 类型，缺失字段 = 不可更新边界 |
+
+#### 7.1.8 来源案例（参考，非规范正文）
+
+> 以下批次是本模式的**来源验证**——pattern 已被实战检验过，但规范正文中的类型名/字段名是**抽象描述**，不是具体项目的真实类型。每个新项目迁移时，必须重新 grep 该项目的后端类型定义文件锁定真实字段名。
+
+| 批次 | 迁移范围 | 交付组件数 | 踩坑命中 |
+|---|---|---|---|
+| B5 | 审计/红队/合规/评测 | 10 | 3 |
+| B6 | 引擎配置/LoRA/灰度发布 | 3 | 4 |
+| B7 | 系统管理/用户管理/个人信息 | 11 | 7 |
+| **合计** | | **24** | **14 条（全部覆盖）** |
+
+**通用 pattern 不依赖这些项目专属细节**，仅作为 pattern 已被实战验证的证据。
+
+---
+
 *手册版本：v1.0（Phase 0' 配套）*  
 *创建日期：2026-06-03*  
+*最近更新：2026-10-11（追加模式 7 vue-dual-stack-migration，B5/B6/B7 实测验证）*  
 *下一步：用户/架构师评审 → 启动 Phase 0 代码实施*  
 *配套文件：模式选择 JSON 示例（待 Phase 0' 补完）+ 提示词模板（待 Phase 0' 补完）*
