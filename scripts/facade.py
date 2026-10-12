@@ -90,29 +90,54 @@ def _dispatch_through_v3(args) -> int:
         log(f"❌ {e}", "ERROR")
         return 1
 
-    # v2.10 新增：proposal-review 系列 flag 的最小路由和互斥校验
+    # v2.10 + v2.11：特殊模式 flag 的统一互斥校验（放在路由分发之前，确保任何顺序下互斥都生效）
     proposal_mode = getattr(args, "proposal_review", False)
     research_only = getattr(args, "industry_research_only", False)
     review_only = getattr(args, "proposal_review_only", False)
-
-    # proposal-review 与 --autonomous / --loop / --multi-goal 互斥校验
     proposal_flags_present = proposal_mode or research_only or review_only
-    if proposal_flags_present:
-        if getattr(args, "autonomous", False):
-            log("❌ --proposal-review 系列标志与 --autonomous 互斥，不能同时使用", "ERROR")
-            return 1
-        if args.loop and args.loop > 1:
-            log("❌ --proposal-review 系列标志与 --loop 互斥，不能同时使用", "ERROR")
-            return 1
-        if getattr(args, "multi_goal", None):
-            log("❌ --proposal-review 系列标志与 --multi-goal 互斥，不能同时使用", "ERROR")
-            return 1
 
-        # v2.10：proposal-review 是提示词层工作流（宿主 LLM 执行五阶段）
-        # 脚本层仅做最小拦截，输出工作流指令供宿主 LLM 接管
-        if proposal_mode or research_only or review_only:
-            _handle_proposal_review_mode(args, project_root, proposal_mode, research_only, review_only)
-            return 0
+    bfa_mode = getattr(args, "business_flow_analysis", False)
+    bfa_design_only = getattr(args, "business_flow_design_only", False)
+    bfa_flags_present = bfa_mode or bfa_design_only
+
+    autonomous_present = getattr(args, "autonomous", False)
+    loop_present = args.loop and args.loop > 1
+    multi_goal_present = bool(getattr(args, "multi_goal", None))
+
+    # proposal-review 与 business-flow-analysis 互斥
+    if proposal_flags_present and bfa_flags_present:
+        log("❌ --proposal-review 系列与 --business-flow-analysis 系列互斥，不能同时使用", "ERROR")
+        return 1
+
+    # proposal-review 与 --autonomous / --loop / --multi-goal 互斥
+    if proposal_flags_present:
+        if autonomous_present:
+            log("❌ --proposal-review 系列与 --autonomous 互斥", "ERROR"); return 1
+        if loop_present:
+            log("❌ --proposal-review 系列与 --loop 互斥", "ERROR"); return 1
+        if multi_goal_present:
+            log("❌ --proposal-review 系列与 --multi-goal 互斥", "ERROR"); return 1
+
+    # business-flow-analysis 与 --autonomous / --loop / --multi-goal 互斥
+    if bfa_flags_present:
+        if autonomous_present:
+            log("❌ --business-flow-analysis 与 --autonomous 互斥", "ERROR"); return 1
+        if loop_present:
+            log("❌ --business-flow-analysis 与 --loop 互斥", "ERROR"); return 1
+        if multi_goal_present:
+            log("❌ --business-flow-analysis 与 --multi-goal 互斥", "ERROR"); return 1
+
+    # --- 路由分发 ---
+
+    # v2.10：proposal-review 系列路由
+    if proposal_flags_present:
+        _handle_proposal_review_mode(args, project_root, proposal_mode, research_only, review_only)
+        return 0
+
+    # v2.11：business-flow-analysis 系列路由
+    if bfa_flags_present:
+        _handle_business_flow_analysis_mode(args, project_root, bfa_mode, bfa_design_only)
+        return 0
 
     # Phase 17 v3 §2.9：启动 hot reload watcher（如启用）
     # 关键：放在 validate_mutex 之后（避免无效 args 启动 watcher）
@@ -365,6 +390,151 @@ def _handle_proposal_review_mode(
     log("   详细说明见 SKILL.md 「方案撰写全流程」章节", "INFO")
 
 
+# === v2.11：业务动线分析与页面设计闭环 ===
+
+
+def _handle_business_flow_analysis_mode(
+    args,
+    project_root: Path,
+    bfa_mode: bool,
+    bfa_design_only: bool,
+) -> None:
+    """v2.11：处理 business-flow-analysis 系列 flag。
+
+    此工作流是提示词层执行的——宿主 LLM 负责按 SKILL.md 六阶段定义
+    执行业务动线分析和页面设计闭环。脚本层仅做最小拦截，输出结构化指令。
+
+    架构复用：
+    - Phase 0 SU 页面发现 → 复用 v2.9 SU BFS 遍历
+    - Phase 3 多角色评审 → 复用 v2.10 proposal-review 闭环
+    - Phase 5 UI/UX 测试 → 复用 v2.7 uiux_analyzer + visual_regression
+
+    Args:
+        args: argparse.Namespace — CLI 解析结果
+        project_root: Path — 项目根目录
+        bfa_mode: bool — 完整六阶段工作流（SU→分析→设计→评审→开发→测试）
+        bfa_design_only: bool — 跳过分析，直接设计（需 --analysis-report）
+    """
+    task_desc = args.task or "(未指定任务)"
+    skip_su = getattr(args, "skip_su", False)
+    su_json_path = getattr(args, "su_json_path", None)
+    skip_design = getattr(args, "skip_design", False)
+    analysis_report = getattr(args, "analysis_report", None)
+
+    log("=" * 60, "INFO")
+    log("🔍 v2.11 业务动线分析与页面设计闭环已启动", "INFO")
+    log("=" * 60, "INFO")
+    log(f"📌 项目根目录: {project_root}", "INFO")
+    log(f"📌 任务描述: {task_desc}", "INFO")
+
+    # 根据模式输出对应的工作流指令
+    if bfa_design_only:
+        log("\n【模式】跳动线分析，直接进入页面设计", "INFO")
+        log("=" * 40, "INFO")
+
+        if not analysis_report:
+            log("❌ --business-flow-design-only 需要配合 --analysis-report 指定分析报告路径", "ERROR")
+            return
+
+        report_path = Path(analysis_report)
+        if not report_path.exists():
+            log(f"❌ 业务动线分析报告不存在: {report_path}", "ERROR")
+            return
+
+        log(f"📖 分析报告: {report_path}", "INFO")
+        log("📖 宿主 LLM 执行指令：", "INFO")
+        log("  Phase 2 — 缺失页面详细设计（GAP-DESIGN 9 段式）", "INFO")
+        log("    Prompt: docs/spec/role-prompts/page-gap-design.md", "INFO")
+        log("    按其中定义的模板，为每个 GAP/BREAK 输出完整设计：", "INFO")
+        log("      1. 页面目标（填补哪个断点？）", "INFO")
+        log("      2. 用户旅程（来自现有页面 → 跳转回现有页面）", "INFO")
+        log("      3. 页面信息架构（独立页/对话框/侧边抽屉？）", "INFO")
+        log("      4. 交互流程（加载/空/正常/异常 4 状态）", "INFO")
+        log("      5. 数据模型（前端 state + API 契约 + DB 变更）", "INFO")
+        log("      6. 路由守卫与权限", "INFO")
+        log("      7. 与现有页面的衔接点（★ 强制：精准到代码位置）", "INFO")
+        log("      8. 改动范围评估（新增/修改文件数 + 行数）", "INFO")
+        log("      9. 验收标准（可测 checklist）", "INFO")
+        log("", "INFO")
+        log("  ⚠️ Karpathy + Ponytail 约束：", "WARNING")
+        log("    优先复用现有组件/API/类型，能用对话框解决不新建页面", "WARNING")
+        log("    修改现有文件不超过 5 处，精准到路径和行号范围", "WARNING")
+
+    else:  # bfa_mode（完整六阶段）
+        log("\n【模式】完整六阶段业务动线分析闭环", "INFO")
+        log("=" * 40, "INFO")
+        log("📖 宿主 LLM 执行指令（按 SKILL.md 「业务动线分析」章节）：", "INFO")
+        log("", "INFO")
+
+        # Phase 0
+        if skip_su:
+            log("  Phase 0 — SU 页面发现（已跳过，使用现有产物）", "INFO")
+            if su_json_path:
+                log(f"    使用产物: {su_json_path}", "INFO")
+            log("    从 understanding.json 的 ui.pages + navigation 作为页面全景盘点的数据源", "INFO")
+        else:
+            log("  Phase 0 — SU 页面发现（复用 v2.9）", "INFO")
+            log("    已有 SU 产物 → 直接使用，跳过采集", "INFO")
+            log("    无产物时执行：python3 scripts/system_understanding.py --config ... --skip-llm-phase", "INFO")
+            log("    产出: understanding.json（含 ui.pages + navigation）", "INFO")
+        log("", "INFO")
+
+        # Phase 1
+        log("  Phase 1 — 业务动线分析", "INFO")
+        log("    Prompt: docs/spec/role-prompts/business-flow-analysis.md", "INFO")
+        log("    5 Step：", "INFO")
+        log("      Step 1 — 页面全景盘点（SU + 代码扫描 → 完整页面清单 + 业务域分组）", "INFO")
+        log("      Step 2 — 流转路径梳理（入口 → 操作 → API → DB → 出口）", "INFO")
+        log("      Step 3 — 5 类断点检测（BREAK-1 入口断裂 / BREAK-2 出口断裂 /", "INFO")
+        log("                 BREAK-3 前置条件缺失 / BREAK-4 数据衔接断裂 / BREAK-5 业务闭环断裂）", "INFO")
+        log("      Step 4 — 5 类漏洞扫描（VULN-1 数据泄漏 / VULN-2 状态不一致 /", "INFO")
+        log("                 VULN-3 操作不可达 / VULN-4 边界缺失 / VULN-5 导航不一致）", "INFO")
+        log("      Step 5 — 欠缺页面清单（GAP-001 ~ N）", "INFO")
+        log("", "INFO")
+        log("    ⚠️ 强制约束：每个页面/断点/漏洞必须有 SU 采集或代码证据", "WARNING")
+        log("", "INFO")
+
+        if skip_design:
+            log("  （--skip-design 已设置，Phase 2-5 跳过）", "WARNING")
+        else:
+            # Phase 2
+            log("  Phase 2 — 缺失页面详细设计（GAP-DESIGN 9 段式）", "INFO")
+            log("    Prompt: docs/spec/role-prompts/page-gap-design.md", "INFO")
+            log("    为每个 GAP/BREAK 输出完整设计（页面目标→用户旅程→...→验收标准）", "INFO")
+            log("", "INFO")
+
+            # Phase 3
+            log("  Phase 3 — 多角色交叉评审（复用 v2.10 proposal-review）", "INFO")
+            log("    4 角色独立评审 + 共识收敛（≥2 角色同时提出 = 共识问题）", "INFO")
+            log("    最多 3 轮闭环修改", "INFO")
+            log("", "INFO")
+
+            # Phase 4
+            log("  Phase 4 — 执行开发", "INFO")
+            log("    独立开发者按 GAP-DESIGN 逐条实现", "INFO")
+            log("    验收标准必须全部通过 + 新增代码必须有单元测试", "INFO")
+            log("", "INFO")
+
+            # Phase 5
+            log("  Phase 5 — UI/UX 视觉测试（复用 v2.7）", "INFO")
+            log("    python3 scripts/uiux_analyzer.py --url {test_url} --out uiux_report.json", "INFO")
+            log("    python3 scripts/visual_regression.py --baseline ... --current ... --out diff_report.json", "INFO")
+            log("    测试维度：可访问性/交互质量/布局响应式/UX 反模式/视觉回归", "INFO")
+            log("", "INFO")
+
+        log("  ⚠️ 强制约束清单（v2.11 绝对禁止）：", "WARNING")
+        log("    ❌ 凭空分析/设计（必须有 SU 产物或代码证据）", "WARNING")
+        log("    ❌ 断点/漏洞描述模糊（必须精准到具体页面/组件/API）", "WARNING")
+        log("    ❌ 设计不标注与现有页面的衔接点（入口/出口必须到代码位置）", "WARNING")
+        log("    ❌ 复用路径上新增不必要的组件/API", "WARNING")
+        if not skip_design:
+            log("    ❌ 跳过 UI/UX 测试就认定完成", "WARNING")
+
+    log("", "INFO")
+    log("✅ 工作流指令已输出，宿主 LLM 请按以上指令执行。", "SUCCESS")
+    log("   详细说明见 SKILL.md 「业务动线分析与页面设计闭环」章节", "INFO")
+
+
 __all__ = [
     "main_compat",
     "_dispatch_through_v3",
@@ -385,4 +555,6 @@ __all__ = [
     "_safe_watcher_stop",
     # v2.10 新增：方案撰写全流程
     "_handle_proposal_review_mode",
+    # v2.11 新增：业务动线分析与页面设计闭环
+    "_handle_business_flow_analysis_mode",
 ]

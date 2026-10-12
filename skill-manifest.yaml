@@ -1,12 +1,16 @@
 name: multi-agent-team
-version: 2.10.0
+version: 2.11.0
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说 + v2.10 方案撰写全流程）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说 + v2.10 方案撰写全流程 + v2.11 业务动线分析与页面设计闭环）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
   
   核心特性：
+  - v2.11 业务动线分析与页面设计闭环：SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 视觉测试
+  - v2.11 5 类逻辑断点检测：入口断裂(BREAK-1) / 出口断裂(BREAK-2) / 前置条件缺失(BREAK-3) / 数据衔接断裂(BREAK-4) / 业务闭环断裂(BREAK-5)
+  - v2.11 5 类业务线漏洞扫描：数据泄漏(VULN-1) / 状态不一致(VULN-2) / 操作不可达(VULN-3) / 边界缺失(VULN-4) / 导航不一致(VULN-5)
+  - v2.11 缺失页面详细设计模板：GAP-DESIGN 9 段式结构（页面目标→用户旅程→信息架构→交互流程→数据模型→路由守卫→衔接点→改动评估→验收标准）
   - v2.10 方案撰写全流程：业界调研→方案撰写→4 角色交叉评审→共识收敛→闭环修改
   - v2.10 业界最佳实践真实调研：WebSearch + 浏览器插件真实执行，拒绝凭空生成
   - v2.10 多角色方案交叉评审：架构师/产品经理/测试专家/独立开发者 4 视角评审，强制结合项目最新代码
@@ -58,6 +62,8 @@ ai_capabilities:
   hashing_similarity: true       # 脚本层（本地降级算法）
   v2_10_industry_research: true  # 宿主 LLM 提示词层（WebSearch + 浏览器插件真实调研）
   v2_10_proposal_review: true    # 宿主 LLM 提示词层（多角色交叉评审 + 共识收敛）
+  v2_11_business_flow_analysis: true # 宿主 LLM 提示词层（5 类断点检测 + 5 类漏洞扫描）
+  v2_11_page_gap_design: true    # 宿主 LLM 提示词层（GAP-DESIGN 9 段式详细设计模板）
 
 capabilities:
   - name: product-manager
@@ -484,6 +490,131 @@ capabilities:
             type: string
           description: 分歧点清单
 
+  - name: business_flow_analysis
+    description: |
+      v2.11 业务动线分析能力：从需求文档出发，结合 SU 页面遍历产物和项目代码，
+      系统性地发现页面间流转路径、数据衔接、逻辑断点和业务线漏洞。
+
+      核心能力：
+      - 5 类逻辑断点检测：入口断裂(BREAK-1) / 出口断裂(BREAK-2) /
+        前置条件缺失(BREAK-3) / 数据衔接断裂(BREAK-4) / 业务闭环断裂(BREAK-5)
+      - 5 类业务线漏洞扫描：数据泄漏路径(VULN-1) / 状态不一致(VULN-2) /
+        操作不可达(VULN-3) / 边界条件缺失(VULN-4) / 导航不一致(VULN-5)
+      - 页面全景盘点：复用 SU understanding.json 的 ui.pages + navigation
+      - 流转路径梳理：入口 → 操作 → API → DB → 出口，标注数据传递方式
+      - 欠缺页面清单：GAP-001 ~ N，对比需求和实际
+      - 强制证据要求：每个分析必须有 SU 采集产物或代码证据
+
+      Prompt 模板：docs/spec/role-prompts/business-flow-analysis.md
+
+    input_schema:
+      type: object
+      properties:
+        requirements_doc:
+          type: string
+          description: 需求文档路径（PRD/SPEC/README）
+        su_understanding_json:
+          type: string
+          description: SU 产物 understanding.json 路径（可选，优先复用）
+        project_root:
+          type: string
+          description: 项目根目录
+        break_categories:
+          type: array
+          items:
+            type: string
+            enum: [BREAK-1, BREAK-2, BREAK-3, BREAK-4, BREAK-5]
+          default: [BREAK-1, BREAK-2, BREAK-3, BREAK-4, BREAK-5]
+        vuln_categories:
+          type: array
+          items:
+            type: string
+            enum: [VULN-1, VULN-2, VULN-3, VULN-4, VULN-5]
+          default: [VULN-1, VULN-2, VULN-3, VULN-4, VULN-5]
+    output_schema:
+      type: object
+      properties:
+        report_path:
+          type: string
+          description: 业务动线分析报告路径
+        page_inventory:
+          type: string
+          description: 页面盘点清单 JSON 路径
+        breaks:
+          type: string
+          description: 断点清单 JSON 路径
+        vulns:
+          type: string
+          description: 漏洞清单 JSON 路径
+        gaps:
+          type: string
+          description: 欠缺页面清单 JSON 路径
+        break_count:
+          type: integer
+          description: 断点数量（含 critical 数量）
+        vuln_count:
+          type: integer
+          description: 漏洞数量（含 P0 数量）
+        gap_count:
+          type: integer
+          description: 欠缺页面数量
+
+  - name: page_gap_design
+    description: |
+      v2.11 缺失页面详细设计能力：针对业务动线分析发现的断点/漏洞，
+      输出与现有系统无缝衔接的页面详细设计。
+
+      核心能力：
+      - GAP-DESIGN 9 段式模板：页面目标→用户旅程→信息架构→交互流程→
+        数据模型→路由守卫→衔接点→改动评估→验收标准
+      - 与现有页面衔接点强制要求：入口/出口/组件复用精准到代码位置
+      - 改动范围精确评估：新增文件数/修改文件数/行数/风险等级
+      - Karpathy + Ponytail 约束：优先复用，能用对话框解决不新建页面
+
+      Prompt 模板：docs/spec/role-prompts/page-gap-design.md
+
+    input_schema:
+      type: object
+      properties:
+        analysis_report:
+          type: string
+          description: 业务动线分析报告路径（business_flow_analysis 产物）
+        project_root:
+          type: string
+          description: 项目根目录
+        gap_ids:
+          type: array
+          items:
+            type: string
+          description: 要设计的 GAP 编号列表（如 ["GAP-001", "BREAK-003"]）
+        min_priority:
+          type: string
+          enum: [P0, P1, P2, P3]
+          default: P0
+          description: 最低设计优先级（只设计 ≥ 此优先级的 GAP）
+    output_schema:
+      type: object
+      properties:
+        design_doc:
+          type: string
+          description: 缺失页面详细设计文档路径
+        reuse_checklist:
+          type: array
+          items:
+            type: object
+          description: 复用清单（组件/API/类型复用项）
+        change_checklist:
+          type: array
+          items:
+            type: object
+          description: 改动清单（新增/修改的文件列表 + 行数）
+        design_count:
+          type: integer
+          description: 设计的 GAP 数量
+        total_estimated_lines:
+          type: integer
+          description: 预估新增/修改的总行数
+
 dependencies: []
 
 ai_integration:
@@ -609,6 +740,71 @@ workflows:
           根据共识问题清单修改方案，然后回到 multi-role-review 再评审。
           最多 3 轮循环，超过上限则输出当前方案 + 剩余问题清单交由用户裁决。
 
+  - workflow_id: business-flow-analysis-workflow
+    name: 业务动线分析与页面设计闭环（v2.11 新增）
+    description: |
+      SU 页面发现 → 业务动线分析（5 类断点 + 5 类漏洞）→ 缺失页面设计
+      → proposal-review 评审 → 开发 → UI/UX 视觉测试。
+      复用 SU v2.9 页面遍历、proposal-review v2.10 评审闭环、UI/UX v2.7 测试工具。
+    version: "2.11"
+    steps:
+      - step_id: su-discovery
+        name: SU 页面发现（复用 v2.9）
+        role: system_understanding
+        action: collect_pages_and_nav
+        description: |
+          复用 SU BFS 页面遍历产出 understanding.json。
+          已有产物则跳过，无产物时执行采集。
+
+      - step_id: flow-analysis
+        name: 业务动线分析（5 类断点 + 5 类漏洞）
+        role: business_flow_analyst
+        action: analyze_page_flows
+        depends_on: [su-discovery]
+        description: |
+          5 Step：页面盘点 → 流转梳理 → 5 类断点检测(BREAK-1~5)
+          → 5 类漏洞扫描(VULN-1~5) → 欠缺页面清单(GAP-001~N)。
+          强制引用 SU 产物 + 代码扫描证据。
+
+      - step_id: gap-design
+        name: 缺失页面详细设计（GAP-DESIGN 9 段式）
+        role: page_gap_designer
+        action: design_missing_pages
+        depends_on: [flow-analysis]
+        description: |
+          每个缺失页面/断点输出 GAP-DESIGN 9 段式详细设计：
+          页面目标→用户旅程→信息架构→交互流程→数据模型→路由守卫→
+          与现有页面衔接点(强制)→改动范围评估→验收标准。
+          优先复用现有组件/API/类型，能用对话框解决不新建页面。
+
+      - step_id: multi-role-review
+        name: 多角色交叉评审（复用 v2.10 proposal-review）
+        role: [architect, product_manager, test_expert, solo_coder]
+        action: review_designs
+        depends_on: [gap-design]
+        loop_until: all_roles_pass OR max_iterations(3)
+        description: |
+          4 角色独立评审设计方案，共识收敛（≥2 角色同时提出的问题升级为共识问题）。
+          最多 3 轮闭环修改。
+
+      - step_id: execution
+        name: 执行开发
+        role: solo_coder
+        action: implement_designs
+        depends_on: [multi-role-review]
+        description: |
+          独立开发者按 GAP-DESIGN 逐条实现。
+          验收标准必须全部通过；新增代码必须有单元测试。
+
+      - step_id: uiux-test
+        name: UI/UX 视觉测试（复用 v2.7 工具链）
+        role: test_expert
+        action: run_uiux_and_visual_test
+        depends_on: [execution]
+        description: |
+          uiux_analyzer.py 巡检（可访问性/交互/布局/UX 反模式 4 大维度）
+          + visual_regression.py 像素级视觉回归。
+
 context_management:
   type: dual-layer
   
@@ -681,6 +877,20 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.11.0
+      date: "2026-10-12"
+      changes:
+        - 新增业务动线分析与页面设计闭环（business-flow-analysis-workflow）：Phase 0 SU 页面发现 → Phase 1 业务动线分析（5 类断点 BREAK-1~5 + 5 类漏洞 VULN-1~5）→ Phase 2 缺失页面设计（GAP-DESIGN 9 段式）→ Phase 3 多角色评审（复用 v2.10）→ Phase 4 执行开发 → Phase 5 UI/UX 视觉测试（复用 v2.7）
+        - 5 类逻辑断点检测：入口断裂(BREAK-1) / 出口断裂(BREAK-2) / 前置条件缺失(BREAK-3) / 数据衔接断裂(BREAK-4) / 业务闭环断裂(BREAK-5)
+        - 5 类业务线漏洞扫描：数据泄漏路径(VULN-1) / 状态不一致(VULN-2) / 操作不可达(VULN-3) / 边界条件处理缺失(VULN-4) / 导航不一致(VULN-5)
+        - 缺失页面详细设计模板（GAP-DESIGN 9 段式）：页面目标→用户旅程→信息架构→交互流程→数据模型→路由守卫→与现有页面衔接点(强制)→改动范围评估→验收标准
+        - 新增 Prompt 模板（docs/spec/role-prompts/）：business-flow-analysis.md（断点+漏洞检测方法论）、page-gap-design.md（缺失页面详细设计模板）
+        - SKILL.md 新增「业务动线分析与页面设计闭环」章节（六阶段工作流 + Phase 0-5 详细说明 + 架构复用关系图 + CLI 使用方式 + 产出物清单 + 绝对禁止清单）
+        - skill-manifest.yaml：新增 v2_11_business_flow_analysis / v2_11_page_gap_design ai_capabilities、business_flow_analysis / page_gap_design capabilities、business-flow-analysis-workflow workflow
+        - 架构复用：SU v2.9 页面遍历（understanding.json）+ proposal-review v2.10 评审闭环 + UI/UX v2.7 视觉测试，最小新增代码
+        - 强制约束：每个分析必须有 SU 采集产物或代码证据；每个设计必须标注与现有页面的衔接点（精准到代码位置）；修改现有文件不超过 5 处
+        - 绝对禁止清单：凭空分析/设计、不引用证据、断点描述模糊、设计不标注衔接点、不必要新增组件/API、跳过 UI/UX 测试
+
     - version: 2.10.0
       date: "2026-10-07"
       changes:
@@ -776,4 +986,4 @@ metadata:
         - 简单的上下文管理
 
 created_at: "2026-03-16T00:00:00"
-updated_at: "2026-10-07T00:00:00"
+updated_at: "2026-10-12T00:00:00"

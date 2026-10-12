@@ -548,6 +548,44 @@ def parse_arguments():
         help="v2.10 共识问题判定阈值（默认 2，≥N 个角色同时提出则升级为共识问题）",
     )
 
+    # v2.11 新增：业务动线分析与页面设计闭环 flags
+    parser.add_argument(
+        "--business-flow-analysis",
+        action="store_true",
+        default=False,
+        help="v2.11 执行业务动线分析与页面设计闭环：SU 页面发现→断点检测→漏洞扫描→缺失页面设计→评审→开发→UI/UX 测试",
+    )
+    parser.add_argument(
+        "--skip-design",
+        action="store_true",
+        default=False,
+        help="v2.11 仅做动线分析，跳过设计/评审/开发/测试阶段（配合 --business-flow-analysis）",
+    )
+    parser.add_argument(
+        "--business-flow-design-only",
+        action="store_true",
+        default=False,
+        help="v2.11 跳过分析，直接对已有动线报告做页面设计",
+    )
+    parser.add_argument(
+        "--analysis-report",
+        type=str,
+        default=None,
+        help="v2.11 业务动线分析报告路径（配合 --business-flow-design-only 使用）",
+    )
+    parser.add_argument(
+        "--skip-su",
+        action="store_true",
+        default=False,
+        help="v2.11 跳过 SU 页面发现阶段（已有 understanding.json 产物时使用）",
+    )
+    parser.add_argument(
+        "--su-json-path",
+        type=str,
+        default=None,
+        help="v2.11 已有 SU understanding.json 路径（配合 --skip-su 使用）",
+    )
+
     return parser.parse_args()
 
 

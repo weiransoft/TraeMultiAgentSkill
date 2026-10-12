@@ -34,6 +34,13 @@
 | 方案评审员（测试专家视角） | [proposal-test-review.md](proposal-test-review.md) | 可测试性、测试策略、验收标准可验证性、质量风险 | 必须扫描项目最新代码并引用 |
 | 方案评审员（独立开发者视角） | [proposal-coder-review.md](proposal-coder-review.md) | 可实现性、代码复杂度、实现路径、工作量、Ponytail 合规 | 必须扫描项目最新代码并引用 |
 
+### v2.11 新增：业务动线分析 + 缺失页面设计
+
+| 角色 | Prompt 模板 | 关注点 | 强制要求 |
+|------|-------------|--------|---------|
+| 业务动线分析师 | [business-flow-analysis.md](business-flow-analysis.md) | 5 类逻辑断点(BREAK-1~5) + 5 类业务线漏洞(VULN-1~5) + 欠缺页面清单 | 每个分析必须有 SU 采集产物或代码证据 |
+| 页面设计员 | [page-gap-design.md](page-gap-design.md) | 缺失页面 GAP-DESIGN 9 段式详细设计 | 与现有页面衔接点必须精准到代码位置 |
+
 ## Ponytail 决策梯评审清单（v2.6 新增）
 
 独立开发者（solo_coder）的代码分析模板已包含 Ponytail 决策梯评审清单（第 6 节），涵盖：

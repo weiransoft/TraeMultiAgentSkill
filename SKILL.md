@@ -1,7 +1,7 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md），v2.9.2 修复 D1（understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致），v2.10 新增方案撰写全流程（业界调研→方案撰写→多角色交叉评审→共识收敛→方案修改闭环）。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md），v2.9.2 修复 D1（understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致），v2.10 新增方案撰写全流程（业界调研→方案撰写→多角色交叉评审→共识收敛→方案修改闭环），v2.11 新增业务动线分析与页面设计闭环（SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 测试）。
 ---
 # Multi-Agent Team Dispatcher (AI-Enhanced)
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
@@ -683,6 +683,225 @@ python3 scripts/trae_agent_dispatch_v2.py \
 ❌ 跳过共识收敛直接修改（必须先达成共识）
 ❌ 无限循环不收敛（3 次迭代上限，超过则输出当前方案交由用户裁决）
 
+## 业务动线分析与页面设计闭环（v2.11 新增 — SU 发现 → 断点检测 → 漏洞修补 → 设计 → 评审 → 开发 → 测试）
+
+> **设计理念**: 一个运行中的 Web 系统，页面间的流转路径、数据衔接、逻辑守卫经常"长歪"——有页面没入口、有入口没出口、数据字段不匹配、权限守卫漏了。这个工作流从需求文档出发，结合项目代码和 SU 页面遍历产物，系统性地发现这些断点和漏洞，然后补设计、评审、开发、测试，形成完整闭环。
+>
+> **v2.11 架构**：复用三大既有能力 + 新建 2 个 prompt 模板
+> - **SU（v2.9）**：BFS 页面遍历 + understanding.json → 页面全景盘点的权威数据源
+> - **proposal-review（v2.10）**：4 角色交叉评审 + 共识收敛 → 设计方案的质量门禁
+> - **UI/UX 测试（v2.7）**：uiux_analyzer + visual_regression → 修改后的视觉和交互验证
+> - **新建 prompt**：business-flow-analysis.md（断点+漏洞检测方法论）、page-gap-design.md（缺失页面详细设计模板）
+
+### 六阶段工作流
+
+```
+Phase 0: SU 页面发现（复用 v2.9，已有产物则跳过）
+    ↓ 产出 understanding.json（含 navigation/pages）
+Phase 1: 业务动线分析（需求对照 + 断点检测 + 漏洞扫描）
+    ↓ 产出 business-flow-analysis-report.md
+Phase 2: 缺失页面详细设计（GAP-DESIGN-001 ~ N）
+    ↓ 产出 page-gap-design-doc.md
+Phase 3: 多角色评审（复用 v2.10 proposal-review 闭环）
+    ↓ 产出 consensus-report.md + 修改后的方案
+Phase 4: 执行开发（独立开发者按设计实现）
+    ↓ 产出代码改动 + 单元测试
+Phase 5: UI/UX 视觉测试（复用 v2.7 工具）
+    ↓ 产出 uiux_report.json + visual_diff_report.json
+```
+
+### Phase 0：SU 页面发现
+
+**执行方式**: 复用 v2.9 SU 能力
+
+```bash
+# 如果已有 SU 产物 → 直接使用，跳过采集
+# 如果没有 → 执行 SU 采集：
+python3 scripts/system_understanding.py --config config.json --skip-llm-phase
+```
+
+**关键产物**：
+- `understanding.json` → `ui.pages`（页面清单）+ `navigation`（导航结构）
+- `SYSTEM_FUNCTION_DOC.md` → 业务域和功能章节（SFD 详说产物，如有）
+
+### Phase 1：业务动线分析
+
+**执行方式**: 宿主 LLM 作为业务动线分析师
+
+**强制输入**（必须全部获取）：
+1. 需求文档（PRD/SPEC）或从 README/docs/issue tracker 中提取的业务描述
+2. SU 产物中的页面清单（understanding.json）
+3. 项目最新代码（前端路由/后端 API/DB 模型）
+
+**分析方法论**（5 个 Step，详见 [business-flow-analysis.md](../spec/role-prompts/business-flow-analysis.md)）：
+
+```
+Step 1 — 页面全景盘点（从 SU + 代码扫描 → 完整页面清单 + 业务域分组）
+Step 2 — 流转路径梳理（入口 → 操作 → API → DB → 出口，标注数据传递方式）
+Step 3 — 逻辑断点检测（5 类断点）
+    BREAK-1: 入口断裂（页面存在但无可达入口）
+    BREAK-2: 出口断裂（操作跳转目标不存在/不通）
+    BREAK-3: 前置条件缺失（权限/数据/状态守卫遗漏）
+    BREAK-4: 数据衔接断裂（API 字段 ≠ 前端消费字段）
+    BREAK-5: 业务闭环断裂（需求定义的链路跑不通）
+Step 4 — 业务线漏洞扫描（5 类漏洞）
+    VULN-1: 数据泄漏路径（URL 参数遍历）
+    VULN-2: 状态不一致风险
+    VULN-3: 操作不可达（无反馈）
+    VULN-4: 边界条件处理缺失
+    VULN-5: 导航不一致（入口名称不统一）
+Step 5 — 欠缺页面清单（GAP-001 ~ N，对比需求和实际）
+```
+
+**强制约束**：
+- 每个页面必须有真实证据（SU 采集 / 路由配置 / 代码文件）
+- 每个断点必须精准到具体页面/组件/API（不能只说"有断点"）
+- 每个漏洞必须标注影响范围和修复优先级（P0/P1/P2/P3）
+
+### Phase 2：缺失页面详细设计
+
+**执行方式**: 宿主 LLM 作为页面设计员
+
+**输入**：Phase 1 产出的业务动线分析报告
+
+**设计框架**（每个缺失页面/断点的设计结构，详见 [page-gap-design.md](../spec/role-prompts/page-gap-design.md)）：
+
+```markdown
+GAP-DESIGN-{n}：
+  1. 页面目标（填补哪个断点？核心价值？）
+  2. 用户旅程（来自现有页面 {xxx} → 动作 → 跳转回 {yyy}）
+  3. 页面信息架构（独立页 / 对话框 / 侧边抽屉？）
+  4. 交互流程（加载/空/正常/异常 4 状态）
+  5. 数据模型（前端 state + API 契约 + DB 变更）
+  6. 路由守卫与权限
+  7. 与现有页面的衔接点（★ 强制：入口/出口/组件复用，精准到代码位置）
+  8. 改动范围评估（新增文件数/修改文件数/行数/风险等级）
+  9. 验收标准（可测的 checklist）
+```
+
+**Karpathy 约束**：
+- 🎯 Simplicity First：优先复用现有组件/API/类型，能用对话框解决就不新建独立页面
+- 🔬 Surgical Changes：修改现有文件不超过 5 处，精准到路径和行号范围
+- 每个设计必须标注来源（GAP/BREAK 编号 + 需求文档章节）
+
+### Phase 3：多角色评审
+
+**执行方式**: 复用 v2.10 proposal-review 闭环
+
+```
+4 角色交叉评审（架构师/产品经理/测试专家/独立开发者）
+    ↓ 共识收敛（≥2 角色同时提出的问题 = 必须修改）
+    ↓ 修改后再评审（最多 3 轮）
+    ↓ 共识达成 → 进入开发
+```
+
+### Phase 4：执行开发
+
+**执行方式**: 独立开发者按 GAP-DESIGN 逐条实现
+
+**强制要求**：
+- 每条 GAP-DESIGN 对应的验收标准必须全部通过
+- 新增代码必须有单元测试
+- 修改现有文件必须遵循项目编码规范
+- 禁止设计之外的过度实现
+
+### Phase 5：UI/UX 视觉测试
+
+**执行方式**: 复用 v2.7 工具链
+
+```bash
+# UI/UX 巡检（4 大维度）
+python3 scripts/uiux_analyzer.py --url {test_url} --out uiux_report.json
+
+# 视觉回归（如果有 baseline）
+python3 scripts/visual_regression.py \
+    --baseline screenshots/baseline/login.png \
+    --current screenshots/current/login.png \
+    --out visual_diff_report.json
+```
+
+**测试维度**：
+- ✅ 可访问性（WCAG AA 对比度 / img alt / form label）
+- ✅ 交互质量（按钮最小尺寸 / 焦点可见性 / 加载反馈）
+- ✅ 布局与响应式（元素重叠 / 文字截断 / 视口溢出）
+- ✅ UX 反模式（强制注册 / 破坏性操作无确认 / 表单无校验）
+- ✅ 视觉回归（像素级 Diff / 红色文字错误检测）
+
+### CLI 使用方式
+
+```bash
+# 完整六阶段业务动线分析闭环
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "分析用户订单域的业务动线，发现断点并补设计" \
+    --business-flow-analysis
+
+# 已有 SU 产物 + 仅做分析（不进入设计/开发/测试）
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "只分析订单域业务动线" \
+    --business-flow-analysis \
+    --skip-design
+
+# 跳过分析，直接对已有动线报告做设计
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "根据分析报告设计审批页面" \
+    --business-flow-design-only \
+    --analysis-report ./docs/analysis/report.md
+```
+
+### 产出物
+
+| 阶段 | 产出物 | 位置 |
+|------|--------|------|
+| Phase 0 | SU 产物（已有则跳过） | `docs/system-understanding/{system_id}/understanding.json` |
+| Phase 1 | 业务动线分析报告 | `docs/analysis/{task-id}/business-flow-analysis-report.md` |
+| Phase 1 | 页面盘点清单 | `docs/analysis/{task-id}/page_inventory.json` |
+| Phase 1 | 断点清单 | `docs/analysis/{task-id}/breaks.json`（BREAK-001 ~ N） |
+| Phase 1 | 漏洞清单 | `docs/analysis/{task-id}/vulns.json`（VULN-001 ~ N） |
+| Phase 1 | 欠缺页面清单 | `docs/analysis/{task-id}/gaps.json`（GAP-001 ~ N） |
+| Phase 2 | 缺失页面详细设计 | `docs/analysis/{task-id}/page-gap-design-doc.md` |
+| Phase 3 | 共识收敛报告 | `docs/analysis/{task-id}/consensus-report.md` |
+| Phase 4 | 代码改动 | 项目代码（按 GAP-DESIGN 改动） |
+| Phase 5 | UI/UX 测试报告 | `docs/analysis/{task-id}/uiux_report.json` + `visual_diff_report.json` |
+
+### 架构复用关系图
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                  业务动线分析六阶段工作流（v2.11）                      │
+│                                                                      │
+│  Phase 0 ──> Phase 1 ──> Phase 2 ──> Phase 3 ──> Phase 4 ──> Phase 5│
+│  (SU 发现)  (动线分析)   (页面设计)   (多角色评审)  (执行开发)  (视觉测试)│
+│                                                                      │
+│  ┌─────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ SU v2.9 │  │   新建 prompt │  │ proposal-     │  │ UI/UX v2.7  │ │
+│  │ BFS遍历  │  │ business-    │  │ review v2.10 │  │ visual-      │ │
+│  │ pages   │  │ flow-analysis │  │ 4角色评审+    │  │ regression  │ │
+│  │ nav     │  │ page-gap-     │  │ 共识收敛      │  │ uiux-       │ │
+│  │         │  │ design        │  │ 闭环修改      │  │ analyzer    │ │
+│  └─────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                                      │
+│  ←────────── 复用已有能力，最小新增代码 ──────────→                    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**核心特性**：
+- ✅ **真实证据驱动**：每个页面/断点/漏洞必须有 SU 采集产物或代码证据，禁止凭空分析
+- ✅ **5 类断点检测**：入口断裂 / 出口断裂 / 前置条件缺失 / 数据衔接断裂 / 业务闭环断裂
+- ✅ **5 类漏洞扫描**：数据泄漏 / 状态不一致 / 操作不可达 / 边界缺失 / 导航不一致
+- ✅ **精准设计模板**：每个缺失页面的设计强制标注与现有页面的衔接点（入口/出口/组件复用，精准到代码位置）
+- ✅ **proposal-review 质量门禁**：设计方案必须经过 4 角色交叉评审 + 共识收敛
+- ✅ **视觉和交互验证**：修改完成后用 uiux_analyzer + visual_regression 自动检测
+- ✅ **Karpathy + Ponytail 约束**：每个设计必须遵循 Karpathy 四大原则和 Ponytail 决策梯
+
+### 绝对禁止
+
+❌ 凭空列出"应该有的页面"——必须有需求文档来源或代码证据
+❌ 不引用 SU 产物或代码直接做动线分析
+❌ 断点/漏洞描述模糊不清（必须精准到具体页面/组件/API）
+❌ 设计不标注与现有页面的衔接点（入口/出口必须到代码位置）
+❌ 复用路径上新增不必要的组件/API（Ponytail 决策梯强制检查）
+❌ 跳过 UI/UX 测试就认定完成
+
 ## 高级功能
 ### 代码走读与审查 (v2.3)
 ```bash
@@ -1077,6 +1296,7 @@ Trae Multi-Agent Dispatcher 提供了：
 - ✅ 多角色协同 + 共识机制
 - ✅ 八阶段标准工作流程（v2.8 新增阶段 8：文档对照代码审查）
 - ✅ 方案撰写全流程（v2.10，业界调研→方案撰写→4 角色交叉评审→共识收敛→闭环修改）
+- ✅ 业务动线分析与页面设计闭环（v2.11，SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 视觉测试）
 - ✅ Karpathy 四大核心原则强制执行（v2.4）
 - ✅ Cybernetics 工程控制论三环控制（v2.5）
 - ✅ Ponytail 决策梯 + 16 条不可简化红线（v2.6）
