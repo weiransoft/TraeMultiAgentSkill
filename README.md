@@ -1,6 +1,46 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致；v2.10 新增方案撰写全流程——业界调研+四角色交叉评审+共识收敛闭环；v2.11 新增业务动线分析与页面设计闭环——SU 页面发现→5 类断点检测+5 类漏洞扫描→缺失页面 GAP-DESIGN 9 段式设计→多角色评审→执行开发→UI/UX 视觉测试。
+
+## 🎉 2026 年 10 月最新更新 (v2.11)
+
+> 在 v2.10 方案评审闭环基础上向上扩展——SU 页面全景盘点 → 5 类逻辑断点 + 5 类业务线漏洞检测 → 缺失页面 GAP-DESIGN 9 段式设计 → 多角色评审 → 执行开发 → UI/UX 视觉测试，形成完整页面级业务质量闭环
+
+- ✅ **业务动线分析方法论 (v2.11)** - 5 Step 分析框架 + 强制证据约束
+  - 🔍 **5 类逻辑断点检测 (BREAK-1~5)**：入口断裂 / 出口断裂 / 前置条件缺失 / 数据衔接断裂 / 业务闭环断裂
+  - 🔒 **5 类业务线漏洞扫描 (VULN-1~5)**：数据泄漏 / 状态不一致 / 操作不可达 / 边界缺失 / 导航不一致
+  - 📋 **欠缺页面清单 (GAP-001~N)**：每个缺失页面精准到业务域和证据位置
+  - 🧭 **Prompt**: `docs/spec/role-prompts/business-flow-analysis.md`
+  - ⚠️ **强制约束**: 每个分析必须有 SU 产物或代码证据，禁止凭空推断
+
+- ✅ **缺失页面 GAP-DESIGN 9 段式 (v2.11)** - 填补断点的精准设计模板
+  - 1. 页面目标（填补哪个断点？）→ 2. 用户旅程（来自现有页面→跳转回现有页面）
+  - 3. 信息架构（独立页/对话框/侧边抽屉？）→ 4. 交互流程（加载/空/正常/异常 4 状态）
+  - 5. 数据模型（前端 state + API 契约 + DB 变更）→ 6. 路由守卫与权限
+  - 7. ⭐ **与现有页面的衔接点**（强制：精准到代码位置）
+  - 8. 改动范围评估 → 9. 验收标准
+  - 📐 **Ponytail 约束**: 优先复用现有组件/API，能用对话框解决不新建页面
+  - 🧭 **Prompt**: `docs/spec/role-prompts/page-gap-design.md`
+
+- ✅ **CLI 集成 + 互斥校验重构**
+  - 🚀 新增 6 个 v2.11 flags：`--business-flow-analysis` / `--skip-design` / `--business-flow-design-only` / `--analysis-report` / `--skip-su` / `--su-json-path`
+  - 🛡️ 统一前置互斥校验：proposal-review / business-flow-analysis / autonomous / loop / multi-goal 任何 flag 顺序下互斥均生效
+
+- ✅ **架构复用**
+  - Phase 0 SU 页面发现 → 复用 v2.9 SU BFS 遍历
+  - Phase 3 多角色评审 → 复用 v2.10 proposal-review 四角色闭环
+  - Phase 5 UI/UX 测试 → 复用 v2.7 uiux_analyzer + visual_regression
+
+## 🎉 2026 年 10 月更新 (v2.10)
+
+> 四角色交叉评审 + 共识收敛闭环——业界调研 → 方案撰写 → 多角色独立评审 → ≥N 角色共识收敛 → 迭代修改
+
+- ✅ **方案撰写全流程 (v2.10)** - Proposal Review Workflow，方案级质量门禁
+  - 🏛️ **四角色交叉评审**：架构师 / 产品经理 / 测试专家 / 独立开发者（每个角色必须扫描项目最新代码）
+  - 🔄 **共识收敛机制**：≥2 角色同时提出 = 共识问题，必须修复；最多 3 轮迭代闭环
+  - 🌐 **业界调研专家**：真实 WebSearch 多路并行 + 浏览器插件深度阅读
+  - 📝 **5 个 prompt 模板**：`industry-research-prompt.md` + 4 个 `proposal-*-review.md`
+  - 🚀 **7 个 CLI flags**：`--proposal-review` / `--industry-research-only` / `--proposal-review-only` / `--proposal-doc` / `--proposal-max-iterations` / `--proposal-consensus-threshold`
 
 ## 🎉 2026 年 9 月最新更新 (v2.9.2)
 
@@ -1594,6 +1634,8 @@ SOFTWARE.
 
 | 版本 | 日期 | 核心特性 |
 |------|------|---------|
+| v2.11 | 2026 年 10 月 | 业务动线分析 + 缺失页面设计闭环：5 类断点检测 BREAK-1~5、5 类漏洞扫描 VULN-1~5、GAP-DESIGN 9 段式、6 个 CLI flags、统一互斥校验 |
+| v2.10 | 2026 年 10 月 | 方案撰写全流程（Proposal Review Workflow）：业界调研 + 四角色交叉评审 + 共识收敛闭环、5 个 prompt 模板、7 个 CLI flags |
 | v2.9.1 | 2026 年 9 月 | SU 专家详说阶段（SFD）：`--detailed-doc` / `--assemble`、五专家派发、`detailed_doc.py`（SU 单测 20 模块） |
 | v2.7 | 2026 年 6 月 | UI/UX 巡检分析（`uiux_analyzer.py`，4 大检测维度）、视觉回归与显示完整性（`visual_regression.py`，3 大检测维度） |
 | v2.6 | 2026 年 6 月 | Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载 |

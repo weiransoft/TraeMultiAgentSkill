@@ -3,6 +3,103 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.11.0] - 2026-10-12
+
+### Added
+
+#### v2.11 — 业务动线分析与页面设计闭环
+
+在 v2.10 proposal-review 四角色评审闭环基础上，向上扩展"业务动线分析"阶段——
+通过 SU 页面全景盘点 → 流转路径梳理 → 5 类逻辑断点检测（BREAK-1~5）
++ 5 类业务线漏洞扫描（VULN-1~5）→ 欠缺页面清单（GAP-001~N）→
+缺失页面 GAP-DESIGN 9 段式详细设计 → 多角色交叉评审 → 执行开发 → UI/UX 视觉测试，
+形成完整的**页面级业务质量闭环**。
+
+##### 业务动线分析方法论（Phase 0-1）
+
+- ✅ 新增 prompt：`docs/spec/role-prompts/business-flow-analysis.md`
+  - 5 Step 分析框架：页面全景盘点 → 流转路径梳理 → 断点检测 → 漏洞扫描 → 欠缺页面清单
+  - 5 类逻辑断点：BREAK-1 入口断裂 / BREAK-2 出口断裂 / BREAK-3 前置条件缺失 /
+    BREAK-4 数据衔接断裂 / BREAK-5 业务闭环断裂
+  - 5 类业务线漏洞：VULN-1 数据泄漏 / VULN-2 状态不一致 / VULN-3 操作不可达 /
+    VULN-4 边界缺失 / VULN-5 导航不一致
+  - 强制约束：每个分析必须有 SU 采集产物或代码证据，禁止凭空推断
+
+##### 缺失页面详细设计（Phase 2）
+
+- ✅ 新增 prompt：`docs/spec/role-prompts/page-gap-design.md`
+  - GAP-DESIGN 9 段式模板：页面目标 → 用户旅程 → 信息架构 → 交互流程（加载/空/正常/异常）
+    → 数据模型（前端 state + API 契约 + DB 变更）→ 路由守卫与权限
+    → **与现有页面的衔接点**（★ 强制：精准到代码位置）
+    → 改动范围评估（新增/修改文件数 + 行数）→ 验收标准（可测 checklist）
+  - Ponytail 约束：优先复用现有组件/API/类型，能用对话框解决不新建页面
+
+##### CLI 集成（scripts/facade.py + scripts/cli/parser.py）
+
+- ✅ 新增 6 个 v2.11 CLI flags：
+  - `--business-flow-analysis`：完整六阶段闭环（SU→分析→设计→评审→开发→测试）
+  - `--skip-design`：仅做动线分析，跳设计/评审/开发/测试
+  - `--business-flow-design-only`：跳过分析，直接对已有报告做设计
+  - `--analysis-report`：配合 `--business-flow-design-only` 指定分析报告路径
+  - `--skip-su`：跳过 SU 页面发现阶段（已有 understanding.json 时）
+  - `--su-json-path`：已有 SU understanding.json 路径
+- ✅ 重构互斥校验：所有特殊模式（proposal-review / business-flow-analysis
+  / autonomous / loop / multi-goal）统一前置校验，任何 flag 顺序下互斥均生效
+
+##### 架构复用
+
+- Phase 0 SU 页面发现 → 复用 v2.9 SU BFS 遍历（understanding.json 的 ui.pages + navigation）
+- Phase 3 多角色评审 → 复用 v2.10 proposal-review 四角色评审闭环
+- Phase 5 UI/UX 测试 → 复用 v2.7 uiux_analyzer + visual_regression
+
+##### Manifest 同步
+
+- skill-manifest.yaml / skills-index.json / claude-code-skill.json 版本 2.9.2 → 2.11.0
+- 新增 capability：`business_flow_analysis` + `page_gap_design`
+- 新增 workflow：`business-flow-analysis-workflow`（6 步骤依赖图）
+
+##### 测试
+
+- ✅ 端到端冒烟测试全部通过（语法检查 / 互斥校验 4 组 / 路由分发 3 模式 / manifest 完整性 / prompt 模板）
+- ✅ v2.10 回归测试通过（重构互斥逻辑后 proposal-review / industry-research-only 行为无退化）
+
+## [2.10.0] - 2026-10-12
+
+### Added
+
+#### v2.10 — 方案撰写全流程（Proposal Review Workflow）
+
+在多角色体系之上新增"方案撰写全流程"——业界调研 → 方案撰写 → 四角色交叉评审
+（架构师 / 产品经理 / 测试专家 / 独立开发者）→ 共识收敛闭环 → 迭代修改，
+形成完整的**方案级质量门禁**。
+
+##### 四角色交叉评审（Phase 1-2）
+
+- ✅ 新增 5 个 prompt 模板：
+  - `docs/spec/role-prompts/industry-research-prompt.md`（业界调研专家：真实 WebSearch + 浏览器插件）
+  - `docs/spec/role-prompts/proposal-architect-review.md`（架构师视角：架构可行性 / 技术选型 / 可扩展性）
+  - `docs/spec/role-prompts/proposal-pm-review.md`（产品经理视角：用户价值 / 需求覆盖 / 商业可行性）
+  - `docs/spec/role-prompts/proposal-test-review.md`（测试专家视角：可测试性 / 验收标准 / 质量风险）
+  - `docs/spec/role-prompts/proposal-coder-review.md`（独立开发者视角：可实现性 / 代码复杂度 / Ponytail 合规）
+- ✅ 共识收敛机制：≥N 个角色（默认 2）同时提出的问题升级为共识问题，必须修复
+- ✅ 最多 3 轮迭代修改闭环
+
+##### CLI 集成
+
+- ✅ 新增 7 个 v2.10 CLI flags：
+  - `--proposal-review`：完整五阶段方案撰写全流程
+  - `--industry-research-only`：仅做业界调研
+  - `--proposal-review-only`：仅做方案评审（配合 `--proposal-doc`）
+  - `--proposal-doc`：方案评审目标文档路径
+  - `--proposal-max-iterations`：评审闭环最大迭代次数（默认 3）
+  - `--proposal-consensus-threshold`：共识问题判定阈值（默认 2）
+- ✅ 提示词层执行 + 脚本层最小拦截架构：工作流逻辑由宿主 LLM 执行，
+  Python 脚本仅做 CLI flag 拦截 + 互斥校验 + 输出工作流指令
+
+##### Manifest 同步
+
+- skill-manifest.yaml / skills-index.json / claude-code-skill.json 版本同步
+
 ## [2.9.2] - 2026-09-30
 
 ### Fixed

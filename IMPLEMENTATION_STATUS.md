@@ -1,8 +1,52 @@
 # Trae Multi-Agent Skill 实现状态
 ## 版本信息
-- **当前版本**: 2.9.2
-- **发布日期**: 2026-09-30
+- **当前版本**: 2.11.0
+- **发布日期**: 2026-10-12
 - **状态**: ✅ 已完成（所有计划功能 100% 实现）
+
+## v2.10.0 新增功能（方案撰写全流程 Proposal Review Workflow）
+
+- **状态**: ✅ 完整实现
+- **定位**: 四角色交叉评审 + 共识收敛闭环——形成方案级质量门禁
+- **新增 prompt 模板**（5 个）：
+  - `docs/spec/role-prompts/industry-research-prompt.md`（业界调研专家：真实 WebSearch + 浏览器插件深度阅读）
+  - `docs/spec/role-prompts/proposal-architect-review.md`（架构师视角：架构可行性 / 技术选型 / 可扩展性 / 安全性）
+  - `docs/spec/role-prompts/proposal-pm-review.md`（产品经理视角：用户价值 / 需求覆盖 / 商业可行性 / 产品集成）
+  - `docs/spec/role-prompts/proposal-test-review.md`（测试专家视角：可测试性 / 验收标准 / 质量风险）
+  - `docs/spec/role-prompts/proposal-coder-review.md`（独立开发者视角：可实现性 / 代码复杂度 / Ponytail 合规）
+- **共识收敛机制**: ≥N 个角色（默认 2）同时提出的问题升级为共识问题，必须修复；最多 3 轮迭代闭环
+- **CLI flags**（7 个）：
+  - `--proposal-review`（完整五阶段） / `--industry-research-only`（仅调研）
+  - `--proposal-review-only`（仅评审，需 `--proposal-doc`） / `--proposal-doc`（评审目标路径）
+  - `--proposal-max-iterations`（默认 3，上限 10） / `--proposal-consensus-threshold`（默认 2）
+- **scripts/facade.py**: 新增 `_handle_proposal_review_mode()` + 互斥校验（与 `--autonomous` / `--loop>1` / `--multi-goal` 互斥）
+- **架构**: 提示词层执行 + 脚本层最小拦截——工作流逻辑由宿主 LLM 执行，Python 仅做 flag 拦截和输出工作流指令
+
+## v2.11.0 新增功能（业务动线分析与页面设计闭环）
+
+- **状态**: ✅ 完整实现
+- **定位**: 在 v2.10 方案评审闭环基础上向上扩展——形成页面级业务质量闭环
+- **六阶段工作流**: Phase 0 SU 页面发现 → Phase 1 业务动线分析 → Phase 2 缺失页面设计 → Phase 3 多角色交叉评审 → Phase 4 执行开发 → Phase 5 UI/UX 视觉测试
+- **新增 prompt 模板**（2 个）：
+  - `docs/spec/role-prompts/business-flow-analysis.md`
+    - 5 Step 分析框架：页面全景盘点 → 流转路径梳理 → 断点检测 → 漏洞扫描 → 欠缺页面清单
+    - 5 类逻辑断点：BREAK-1 入口断裂 / BREAK-2 出口断裂 / BREAK-3 前置条件缺失 / BREAK-4 数据衔接断裂 / BREAK-5 业务闭环断裂
+    - 5 类业务线漏洞：VULN-1 数据泄漏 / VULN-2 状态不一致 / VULN-3 操作不可达 / VULN-4 边界缺失 / VULN-5 导航不一致
+    - 强制约束：每个分析必须有 SU 产物或代码证据
+  - `docs/spec/role-prompts/page-gap-design.md`
+    - GAP-DESIGN 9 段式：页面目标 → 用户旅程 → 信息架构 → 交互流程 → 数据模型 → 路由守卫 → **与现有页面衔接点**（★ 强制：精准到代码位置）→ 改动范围评估 → 验收标准
+    - Ponytail 约束：优先复用现有组件/API/类型
+- **CLI flags**（6 个）：
+  - `--business-flow-analysis`（完整六阶段） / `--skip-design`（仅分析）
+  - `--business-flow-design-only`（直接设计，需 `--analysis-report`） / `--analysis-report`（分析报告路径）
+  - `--skip-su`（跳过 SU 采集） / `--su-json-path`（已有 understanding.json 路径）
+- **scripts/facade.py**: 新增 `_handle_business_flow_analysis_mode()` + 重构互斥校验为统一前置检查
+  - 所有特殊模式（proposal-review / business-flow-analysis / autonomous / loop / multi-goal）统一校验
+  - 任何 flag 顺序下互斥均生效
+- **架构复用**: Phase 0 → v2.9 SU BFS 遍历 / Phase 3 → v2.10 proposal-review 闭环 / Phase 5 → v2.7 uiux_analyzer + visual_regression
+- **Manifest 同步**: skill-manifest.yaml / skills-index.json / claude-code-skill.json 版本 2.9.2 → 2.11.0
+  - 新增 capability：`business_flow_analysis` + `page_gap_design`
+  - 新增 workflow：`business-flow-analysis-workflow`
 
 ## v2.7.1 修订（AI 诚实化 + 真实语义匹配 + 双宿主同步 + v1 死代码清算）
 
