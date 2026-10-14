@@ -586,6 +586,50 @@ def parse_arguments():
         help="v2.11 已有 SU understanding.json 路径（配合 --skip-su 使用）",
     )
 
+    # v2.12 新增：浏览器端页面功能与视觉测试闭环 flags
+    parser.add_argument(
+        "--browser-test",
+        action="store_true",
+        default=False,
+        help="v2.12 浏览器测试闭环：代码/文档梳理→操作点细化→数据测试集→用例规划→多角色评审→浏览器执行→详细记录",
+    )
+    parser.add_argument(
+        "--browser-test-plan-only",
+        action="store_true",
+        default=False,
+        help="v2.12 仅做测试规划（操作点+数据集+用例），不评审不执行",
+    )
+    parser.add_argument(
+        "--browser-test-exec-only",
+        action="store_true",
+        default=False,
+        help="v2.12 跳过规划与评审，直接执行已有测试计划（需 --test-plan-dir）",
+    )
+    parser.add_argument(
+        "--test-plan-dir",
+        type=str,
+        default=None,
+        help="v2.12 已有测试计划目录（含 test-plan.md/test-datasets.json/test-cases.json/test-execution-plan.json）",
+    )
+    parser.add_argument(
+        "--target-url",
+        type=str,
+        default=None,
+        help="v2.12 被测系统 URL（执行阶段必填）",
+    )
+    parser.add_argument(
+        "--browser-hosts",
+        type=str,
+        default="auto",
+        help="v2.12 浏览器宿主清单，逗号分隔：agent-browser,trae-internal,chrome-devtools,auto（默认 auto 自动降级）",
+    )
+    parser.add_argument(
+        "--reuse-flow-analysis",
+        type=str,
+        default=None,
+        help="v2.12 复用 v2.11 业务动线分析报告路径（跳过 Step 1 流程梳理，做增量校验）",
+    )
+
     return parser.parse_args()
 
 

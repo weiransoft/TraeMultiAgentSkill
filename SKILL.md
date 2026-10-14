@@ -1,7 +1,7 @@
 ---
 name: multi-agent-team
 slug: multi-agent-team
-description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md），v2.9.2 修复 D1（understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致），v2.10 新增方案撰写全流程（业界调研→方案撰写→多角色交叉评审→共识收敛→方案修改闭环），v2.11 新增业务动线分析与页面设计闭环（SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 测试）。
+description: 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码走读审查和项目理解能力。支持中英文双语。v2.4 新增 Karpathy 四大核心原则，v2.5 新增 Cybernetics 工程控制论增强，v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.9 新增既有系统理解能力（黑盒 Web 系统反向理解：Playwright 登录 + BFS 遍历 + DB/Redis 只读内省 + 10 节理解文档），v2.9.1 新增 SU 专家详说阶段（SFD：五专家分节撰写并装配 SYSTEM_FUNCTION_DOC.md），v2.9.2 修复 D1（understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致），v2.10 新增方案撰写全流程（业界调研→方案撰写→多角色交叉评审→共识收敛→方案修改闭环），v2.11 新增业务动线分析与页面设计闭环（SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 测试），v2.12 新增浏览器端页面功能与视觉测试闭环（操作点细化→六类数据测试集→用例多角色评审→agent-browser/Trae内置浏览器/Chrome DevTools MCP 三宿主逐一执行→全程步骤级记录与阻碍闭环）。
 ---
 # Multi-Agent Team Dispatcher (AI-Enhanced)
 基于任务类型和上下文，自动调度到最合适的智能体角色（架构师、产品经理、测试专家、Solo Coder、UI 设计师）。
@@ -153,6 +153,156 @@ from trae_agent_dispatch_v2 import main_compat, dispatch_agent_v2
 ❌ 业务代码直接 import `dispatch.legacy`（内部实现层，可能被重构）
 ❌ 业务代码直接 import `dispatcher.goal_dispatcher`（内部实现层）
 ❌ 新代码使用 `trae_agent_dispatch.py`（v1 已弃用）
+
+## CLI 指令清单（v2.12 整理 · 与 scripts/cli/parser.py 逐项核对）
+
+> 统一入口：`python3 scripts/trae_agent_dispatch_v2.py <flags>`
+> 互斥总则（与 facade.py `_dispatch_through_v3` 前置校验逐项核对）：
+> 1. 三大专属模式族互斥：proposal-review（v2.10）/ business-flow-analysis（v2.11）/ browser-test（v2.12）任意组合互斥
+> 2. 三族各自与 `--autonomous` / `--loop > 1` / `--multi-goal` 互斥
+> 3. 族内互斥：proposal 三模式、business-flow 两模式、browser-test 三模式各只能选一个
+> 4. `--hot-reload` 与 `--no-hot-reload` argparse 级互斥
+
+### 1. 基础调度
+
+| Flag | 取值/默认 | 说明 |
+|------|----------|------|
+| `--task` | 字符串（非必填） | 任务描述 |
+| `--agent` | auto（默认）/ architect / product-manager / test-expert / solo-coder / ui-designer | 指定角色 |
+| `--project-root` | `.` | 项目根目录 |
+| `--task-file` | 路径 | 从文件读取任务 |
+| `--output` | 无 | 输出文件路径 |
+| `--verbose` | - | 详细输出 |
+| `--dry-run` | - | 仅模拟，不实际调度 |
+| `--use-v1` | - | 使用 v1 逻辑（弃用兼容） |
+| `--consensus` | false | 多角色共识汇总（true/false） |
+| `--explain` | false | 输出 AI 匹配解释（true/false） |
+| `--match-strategy` | auto（默认）/ exact / fuzzy / semantic | 角色匹配策略 |
+
+### 2. 项目与模式开关
+
+| Flag | 说明 |
+|------|------|
+| `--project-full-lifecycle` | 八阶段完整项目流程（需求→架构→UI→测试→任务→开发→测试→文档对照审查） |
+| `--loop-engineering` | Loop Engineering 五步闭环模式 |
+| `--loop-type` | design / coding（默认）/ testing |
+| `--loop-discovery` | auto（默认）/ manual / off |
+| `--loop-evaluator` | strict（默认）/ standard / off |
+| `--loop-human-checkpoint-every` | 人类检查点间隔轮数（0=关闭；默认 5） |
+| `--loop-max-iterations` | 最大迭代（默认 50） |
+| `--loop-max-tokens` | Token 预算（0=不限；默认 0） |
+| `--loop-sampling-read-ratio` | 抽样阅读比例（默认 0.1） |
+| `--loop-stop-when` | 自然语言停止条件 |
+
+### 3. Goal 编排（Phase 11-15）
+
+| Flag | 说明 |
+|------|------|
+| `--loop` | 循环次数（默认 1=不循环；>1 与特殊模式互斥） |
+| `--goal` / `--goal-desc` | 目标 ID（kebab-case）/ 描述 |
+| `--criteria` | 验收标准（可多次传入） |
+| `--convergence-window` | 收敛窗口（默认 3） |
+| `--multi-goal` | 以 root Goal 入口执行 DAG 编排 |
+| `--goal-parent` / `--goal-depends` | Goal 树父节点 / 依赖（可多次） |
+| `--goal-aggregation` | AND（默认）/ OR / MAJORITY |
+| `--goal-resume` / `--goal-resume-force` / `--goal-max-resume-count` | 续跑 / 强制续跑 / 续跑上限（默认 3） |
+| `--reuse-threshold` / `--disable-iteration-reuse` | 跨 Goal 复用阈值（默认 0.85）/ 禁用复用 |
+| `--max-concurrent` | DAG 并发 worker（默认 10） |
+| `--goal-report` | json / md 报告 |
+| `--goal-cancel` | 取消 root Goal 及子 Goal |
+| `--goal-graph` / `--goal-graph-format` / `--goal-graph-output` / `--goal-graph-desc-max` | DAG 可视化（mermaid 默认 / json / dot） |
+
+### 4. Autonomous 自主模式（Phase 18）
+
+| Flag | 说明 |
+|------|------|
+| `--autonomous` | Ralph 风格自主迭代（与特殊模式互斥） |
+| `--auto-max-iterations` / `--auto-max-tokens` | 迭代上限（默认 50）/ token 预算（默认 0=不限） |
+| `--auto-stop-when` | 自然语言停止条件 |
+| `--auto-test-command` | 测试命令（默认 unittest discover） |
+| `--auto-stage-order` | 阶段顺序 CSV（默认 plan,dev,verify,fix） |
+| `--auto-backoff-base` / `--auto-backoff-max` / `--auto-failure-abort` | 退避 1.0s / 上限 60.0s / 连续失败阈值 3 |
+| `--auto-resume` / `--auto-resume-latest` | 续跑指定 run / 最新可续 run |
+| `--auto-no-caffeinate` / `--auto-no-commit` | CI 禁用抑制 / 禁用自动提交 |
+| `--auto-confirm-mode` | smart（默认）/ whitelist-only / blacklist-only |
+| `--auto-run-dir` | run 状态目录（默认 .gnhf/runs） |
+| `--auto-git-author-name` / `--auto-git-author-email` | 自动提交作者信息 |
+| `--auto-security-analyzer` | builtin（默认）/ bandit / semgrep |
+| `--auto-notes-path` / `--auto-max-size-kb` / `--auto-trim-keep-last-n` | notes.md / 1024KB / 保留 20 段 |
+
+### 5. 插件热加载（Phase 17）
+
+| Flag | 说明 |
+|------|------|
+| `--hot-reload` / `--no-hot-reload` | 启用（默认）/ 禁用（二者互斥） |
+| `--hot-reload-dir` | drop-in 目录（相对路径、禁 `..`；默认 plugins_extra） |
+| `--hot-reload-interval` | 轮询秒数（默认 5.0，范围 [0.5, 60]） |
+
+### 6. 方案撰写全流程（v2.10）
+
+| Flag | 说明 |
+|------|------|
+| `--proposal-review` | 完整流程：调研→撰写→四角色评审→共识收敛→修改 |
+| `--industry-research-only` | 仅业界调研（Phase 0） |
+| `--proposal-review-only` + `--proposal-doc` | 仅评审已有方案文档 |
+| `--proposal-max-iterations` | 评审闭环上限（默认 3，范围 [1,10]） |
+| `--proposal-consensus-threshold` | 共识判定阈值（默认 2） |
+
+### 7. 业务动线分析与页面设计闭环（v2.11）
+
+| Flag | 说明 |
+|------|------|
+| `--business-flow-analysis` | 完整六阶段：SU→断点/漏洞分析→GAP 设计→评审→开发→UI/UX 测试 |
+| `--skip-design` | 仅分析，跳设计/评审/开发/测试 |
+| `--business-flow-design-only` + `--analysis-report` | 跳过分析，对已有报告做 GAP 设计 |
+| `--skip-su` + `--su-json-path` | 跳过 SU 采集，直接引用已有 understanding.json |
+
+### 8. 浏览器端测试闭环（v2.12）
+
+| Flag | 说明 |
+|------|------|
+| `--browser-test` | 完整四阶段：规划→四角色评审→三宿主执行→汇总门禁 |
+| `--browser-test-plan-only` | 仅规划（产出四件套） |
+| `--browser-test-exec-only` | 仅执行已有计划（必填 `--test-plan-dir` + `--target-url`） |
+| `--test-plan-dir` | 计划四件套目录 |
+| `--target-url` | 被测系统 URL（执行阶段必填） |
+| `--browser-hosts` | agent-browser / trae-internal / chrome-devtools / auto（默认 auto 降级） |
+| `--reuse-flow-analysis` | 复用 v2.11 动线报告做增量校验 |
+
+### 9. 记录器子命令（v2.12 · `scripts/browser_test_recorder.py --out <dir> <子命令>`）
+
+| 子命令 | 关键参数 | 说明 |
+|--------|---------|------|
+| `run` | `--run-id --url --hosts --env --note --plan-ref` | 初始化运行 |
+| `case` | `--case-id --action start/end [--title --priority --host --flows --datasets --status]` | 用例开始/收口（priority: P0/P1/P2） |
+| `step` | `--case-id --action-name --target [--dataset --duration-ms --status --path --note]` | 步骤记录（动作：navigate/click/fill/submit/upload/select/keypress/wait/screenshot/evaluate） |
+| `assert` | `--case-id [--seq] --kind --expected --actual [--pass]` | 断言（kind：url/dom/network/console/text/state） |
+| `error` | `--case-id --source --message [--detail --url --suspected-bug]` | 错误记录（source：console/network/bug） |
+| `shot` | `--case-id --path [--seq --label]` | 截图登记（文件必须真实存在） |
+| `blocker` | `--case-id --blocker-type --description [--resolved --resolution]` | 阻碍记录（selector_fix/data_prep/env_failure/host_downgrade/case_fix/other） |
+| `verify` | `--run-id [--case-id \| --all]` | schema 校验 |
+| `finalize` | `--run-id` | 一致性核对 + summary.json/md + P0 门禁 |
+
+### 典型组合示例
+
+```bash
+# 完整业务动线闭环（含 SU 采集）
+python3 scripts/trae_agent_dispatch_v2.py --task "梳理订单业务动线" --business-flow-analysis
+
+# 已有 SU 产物，仅做断点分析
+python3 scripts/trae_agent_dispatch_v2.py --task "分析页面断点" \
+    --business-flow-analysis --skip-design --skip-su \
+    --su-json-path project-understanding/understanding.json
+
+# 浏览器测试完整闭环（自动宿主降级）
+python3 scripts/trae_agent_dispatch_v2.py --task "测试登录与下单" \
+    --browser-test --target-url http://localhost:3000 --reuse-flow-analysis business-flow/analysis.md
+
+# 仅执行已评审的测试计划（指定 Chrome DevTools MCP）
+python3 scripts/trae_agent_dispatch_v2.py --task "执行测试计划" \
+    --browser-test-exec-only --test-plan-dir browser-test/plan \
+    --target-url http://localhost:3000 --browser-hosts chrome-devtools
+```
 
 ## Trae 宿主 LLM SubAgent 调度协议（v2.8.4 新增）
 
@@ -1271,6 +1421,101 @@ docs/
 └── project-understanding/  # 项目理解文档
 ```
 
+## 浏览器端页面功能与视觉测试闭环（v2.12 新增 — 操作点细化 → 数据测试集 → 用例评审 → 三宿主执行 → 全程记录）
+
+> **设计理念**: 页面做完了不等于能用——路由通不代表操作点通，接口 200 不代表用户看到的结果对。这个工作流从前后端代码与文档出发（可复用 v2.11 业务动线分析结果），把每条业务流程细化到**页面操作点**级别，制定**六类多样化数据测试集**，编写可断言的测试用例并经四角色评审，然后在真实浏览器中逐一执行——**每一步操作、每一个断言、每一条页面/后台错误全部留痕**，碰到阻碍先解决再推进。
+>
+> **三宿主**（auto 模式按序降级）：
+> - **agent-browser**：隔离会话、headless 批量、并行回归
+> - **Trae 内置浏览器**：零配置、IDE 内单流程快速验证
+> - **Chrome DevTools MCP**：网络面板深度检查、console 全量采集、性能 trace
+>
+> **v2.12 架构**：复用三大既有能力 + 新建 3 prompt + 1 确定性记录脚本
+> - **v2.11 business-flow**：FLOW/OP 清单直接复用为测试覆盖对象
+> - **v2.10 proposal-review**：共识收敛机制复用于测试用例四角色评审
+> - **v2.7 visual_regression / uiux_analyzer**：视觉基线对比与深度巡检衔接
+> - **新建**：browser-test-planner.md（规划方法论）、browser-test-review.md（测试评审）、browser-test-execution.md（执行+阻碍协议）、`scripts/browser_test_recorder.py`（schema 强制的记录器）
+
+### 四阶段工作流
+
+```
+Phase 1: 测试规划（Planner）
+    输入: 前后端代码 + 文档 +（可选）v2.11 动线分析结果
+    Step 1 功能与流程梳理（复用 FLOW-*/PAGE-*，做增量校验）
+    Step 2 操作点细化 OP-*（一次用户可感知动作 + 代码位置 + 可断言预期）
+    Step 3 六类数据测试集 DT-*（正向P/边界B/非法N/空E/权限A/时序T）
+    Step 4 测试用例 TC-*（P0 覆盖全部流程主路径）
+    Step 5 执行序 + 宿主分派 + 破坏性用例回滚方案
+    产出: test-plan.md / test-datasets.json / test-cases.json / test-execution-plan.json
+        ↓
+Phase 2: 测试用例多角色评审（复用 v2.10 共识收敛，最多 3 轮）
+    测试专家（一票否决：任一 FLOW 主路径无 P0 覆盖）
+    独立开发者（选择器真实性抽查 / 前置可构造性）
+    产品经理（业务真实性 / 用户视角断言）
+    架构师（环境依赖 / 数据隔离性 / 维护成本）
+    门禁: 共识问题清零 + BLOCKER 清零
+        ↓
+Phase 3: 浏览器逐一执行 + 全程记录（Executor）
+    recorder run → 逐用例 start → 每步 step/assert/error/shot → case end
+    阻碍协议（六类，先解决再推进）:
+      选择器失效→修选择器回写用例 / 数据缺失→补数据 / 环境故障→停止报告
+      宿主故障→降级切宿主 / 用例设计错误→以代码文档为准修正 / 疑似缺陷→不改断言，标记 bug
+    视觉基线用例 → scripts/visual_regression.py
+        ↓
+Phase 4: 汇总与闭环衔接
+    recorder finalize → summary.json + summary.md
+    门禁: P0 通过率 100%，否则整体 FAIL
+    疑似缺陷清单 → 修复环节；新断点 → 回填 v2.11 BREAK 清单
+```
+
+### CLI 使用方式
+
+```bash
+# 完整闭环（规划→评审→执行→记录）
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "测试订单全流程" --project-root /path/to/proj \
+    --browser-test --target-url http://localhost:3000 \
+    --reuse-flow-analysis docs/business-flow-report.md
+
+# 仅规划（产出四件套，不评审不执行）
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "梳理支付流程测试点" --browser-test-plan-only
+
+# 仅执行已有计划（需计划四件套目录 + 被测 URL）
+python3 scripts/trae_agent_dispatch_v2.py \
+    --task "执行回归" --browser-test-exec-only \
+    --test-plan-dir ./browser-test-plan --target-url http://localhost:3000 \
+    --browser-hosts chrome-devtools
+```
+
+### 记录器（确定性工具，纯标准库）
+
+```bash
+python3 scripts/browser_test_recorder.py --out browser-test-runs run --run-id r1 --url ...
+# 子命令: run / case / step / assert / error / shot / blocker / verify / finalize
+# schema 强制: fail 无原因拒绝、截图文件必须真实存在、finalize 做 summary-逐条一致性校验
+```
+
+### 产出物清单
+
+| 产物 | 阶段 | 说明 |
+|------|------|------|
+| `test-plan.md` | Phase 1 | 功能-页面对照表 + OP-* 操作点清单 |
+| `test-datasets.json` | Phase 1 | 六类数据测试集 |
+| `test-cases.json` | Phase 1 | TC-* 用例（关联 FLOW/OP/DT） |
+| `test-execution-plan.json` | Phase 1 | 执行序 + 宿主分派 + 破坏性标注 |
+| `browser-test-runs/{run_id}/` | Phase 3-4 | run-meta / cases/*.json / screenshots / summary.json / summary.md |
+
+### 绝对禁止（v2.12）
+
+- ❌ 凭空编造页面/路由/选择器（必须标注代码文件:行号证据）
+- ❌ 预期结果写成"页面正常""功能可用"等不可断言描述
+- ❌ 数据测试集只有正向数据（六类缺一必须书面说明理由）
+- ❌ P0 用例未覆盖全部流程主路径就提交评审 / 进入执行
+- ❌ 疑似产品缺陷被当作"用例问题"悄悄改断言放行
+- ❌ 环境故障（服务 5xx/连不上）谎报为用例 FAIL 或跳过硬跑
+- ❌ 跳步骤执行、无 expected/actual 对比的失败记录、失败无截图
+
 ## 故障排查
 
 ### 角色识别错误
@@ -1297,6 +1542,7 @@ Trae Multi-Agent Dispatcher 提供了：
 - ✅ 八阶段标准工作流程（v2.8 新增阶段 8：文档对照代码审查）
 - ✅ 方案撰写全流程（v2.10，业界调研→方案撰写→4 角色交叉评审→共识收敛→闭环修改）
 - ✅ 业务动线分析与页面设计闭环（v2.11，SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 视觉测试）
+- ✅ 浏览器端页面功能与视觉测试闭环（v2.12，操作点细化→六类数据测试集→用例四角色评审→三宿主浏览器执行→步骤级全程记录与阻碍闭环）
 - ✅ Karpathy 四大核心原则强制执行（v2.4）
 - ✅ Cybernetics 工程控制论三环控制（v2.5）
 - ✅ Ponytail 决策梯 + 16 条不可简化红线（v2.6）

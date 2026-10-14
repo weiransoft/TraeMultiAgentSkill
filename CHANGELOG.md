@@ -3,6 +3,83 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.12.0] - 2026-10-14
+
+### Added
+
+#### v2.12 — 浏览器端页面功能与视觉测试闭环
+
+在 v2.11 业务动线分析闭环基础上向下延伸——把每条业务流程细化到**页面操作点**级别，
+制定**六类多样化数据测试集**，测试用例经四角色评审后，在**真实浏览器**
+（三宿主自动降级）中逐一执行，每一步操作/断言/错误全程留痕，
+碰到阻碍先解决再推进，形成**操作点级浏览器测试质量闭环**。
+
+##### 测试规划方法论（Phase 1）
+
+- ✅ 新增 prompt：`docs/spec/role-prompts/browser-test-planner.md`
+  - 五步规划：功能流程梳理（复用 v2.11 FLOW/OP 清单做增量校验）→ 操作点细化 →
+    数据测试集 → 测试用例 → 执行序规划
+  - 操作点细化（OP-\*）：一次用户可感知动作 + 代码位置证据（文件:行号）+ 可断言预期结果
+  - 六类数据测试集（DT-\*）：正向(P) / 边界(B) / 非法(N) / 空(E) / 权限(A) / 时序(T)，
+    缺一类必须书面说明理由
+  - 测试用例（TC-\*）：P0 冒烟 / P1 核心 / P2 扩展，强制关联 FLOW/OP/DT 三类 ID
+  - 产出四件套：test-plan.md / test-datasets.json / test-cases.json / test-execution-plan.json
+
+##### 测试用例多角色评审（Phase 2，复用 v2.10 共识收敛）
+
+- ✅ 新增 prompt：`docs/spec/role-prompts/browser-test-review.md`
+  - 测试专家：覆盖完整性（一票否决：任一 FLOW 主路径无 P0 覆盖）
+  - 独立开发者：选择器真实性抽查 / 前置数据可构造性
+  - 产品经理：业务真实性 / 用户视角断言
+  - 架构师：环境依赖 / 数据隔离性 / 维护成本
+  - 门禁：共识问题清零 + BLOCKER 清零，最多 3 轮迭代
+
+##### 三宿主浏览器执行 + 步骤级全程记录（Phase 3）
+
+- ✅ 新增 prompt：`docs/spec/role-prompts/browser-test-execution.md`
+  - 三宿主：agent-browser / Trae 内置浏览器 / Chrome DevTools MCP
+    （auto 降级顺序：agent-browser → chrome-devtools → trae-internal）
+  - 六条铁律：每步留痕、失败必附 expected/actual 与截图、错误双通道采集
+    （console=页面 / network=后台）、疑似缺陷不改断言
+  - 阻碍协议（六类，先解决再推进）：selector_fix 修选择器回写用例 /
+    data_prep 补数据 / env_failure 即停报告 / host_downgrade 自动切宿主 /
+    case_fix 以代码文档为准修正 / suspected_bug 标记不阻断
+- ✅ 新增确定性记录器：`scripts/browser_test_recorder.py`（纯标准库）
+  - 9 个子命令：run / case / step / assert / error / shot / blocker / verify / finalize
+  - schema 强制：非法动作/断言类型/阻碍类型拒绝，fail 无原因拒绝，截图文件必须真实存在
+  - finalize：summary 数字与逐条 case 文件一致性核对 + P0 通过率 100% 门禁
+  - console/network 错误自动收录 suspected_bugs 清单（suspected-bug=true 强制标记）
+- ✅ 新增单元测试：`scripts/tests/test_browser_test_recorder.py`（20 用例全过）
+
+##### CLI 集成（scripts/facade.py + scripts/cli/parser.py）
+
+- ✅ 新增 7 个 v2.12 CLI flags：
+  - `--browser-test`：完整四阶段闭环（规划→评审→执行→汇总）
+  - `--browser-test-plan-only`：仅规划，产出四件套
+  - `--browser-test-exec-only`：仅执行已有计划（需 `--test-plan-dir` + `--target-url`）
+  - `--test-plan-dir`：测试计划四件套目录
+  - `--target-url`：被测系统 URL
+  - `--browser-hosts`：宿主清单（agent-browser / trae-internal / chrome-devtools / auto）
+  - `--reuse-flow-analysis`：复用 v2.11 业务动线分析报告（FLOW/OP 清单）
+- ✅ 互斥校验扩展：browser-test 系列与 proposal-review / business-flow-analysis /
+  autonomous / loop / multi-goal 互斥；三模式内部互斥；exec-only 缺参报错
+
+##### 架构复用
+
+- Step 1 流程梳理 → 复用 v2.11 业务动线分析结果（FLOW/OP 清单增量校验）
+- Phase 2 评审 → 复用 v2.10 共识收敛机制（四角色 + 最多 3 轮）
+- 视觉基线对比 → 复用 v2.7 visual_regression；疑似 UI/UX 问题 → v2.7 uiux_analyzer
+- 新发现断点 → 回填 v2.11 business-flow 报告 BREAK 清单（双向闭环）
+
+##### Manifest 同步
+
+- skill-manifest.yaml / skills-index.json / claude-code-skill.json 版本 2.11.0 → 2.12.0
+- 新增 ai_capabilities：`v2_12_browser_test_planning` / `v2_12_browser_test_execution` / `v2_12_test_recorder`
+- 新增 capability：`browser_test_planning` + `browser_test_execution`（完整 input/output schema）
+- 新增 workflow：`browser-test-workflow`（4 步骤依赖图）
+- SKILL.md 新增「浏览器端页面功能与视觉测试闭环」章节；
+  README.md 新增 v2.12 章节与版本历程行；MULTI_ROLE_PROMPTS_INDEX.md 新增 v2.12 三角色表
+
 ## [2.11.0] - 2026-10-12
 
 ### Added

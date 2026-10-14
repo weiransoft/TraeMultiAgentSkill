@@ -1,8 +1,38 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致；v2.10 新增方案撰写全流程——业界调研+四角色交叉评审+共识收敛闭环；v2.11 新增业务动线分析与页面设计闭环——SU 页面发现→5 类断点检测+5 类漏洞扫描→缺失页面 GAP-DESIGN 9 段式设计→多角色评审→执行开发→UI/UX 视觉测试。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致；v2.10 新增方案撰写全流程——业界调研+四角色交叉评审+共识收敛闭环；v2.11 新增业务动线分析与页面设计闭环——SU 页面发现→5 类断点检测+5 类漏洞扫描→缺失页面 GAP-DESIGN 9 段式设计→多角色评审→执行开发→UI/UX 视觉测试；v2.12 新增浏览器端页面功能与视觉测试闭环——操作点细化→六类数据测试集→用例四角色评审→三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）逐一执行→步骤级全程记录与阻碍闭环。
 
-## 🎉 2026 年 10 月最新更新 (v2.11)
+## 🎉 2026 年 10 月最新更新 (v2.12)
+
+> 在 v2.11 业务动线分析闭环基础上向下延伸——把每条业务流程细化到**页面操作点**，制定**六类多样化数据测试集**，测试用例经四角色评审后，在**真实浏览器**（三宿主自动降级）中逐一执行，每一步操作/断言/错误全程留痕，碰到阻碍先解决再推进。
+
+- ✅ **浏览器测试规划方法论 (v2.12)** - 操作点级细化 + 多样化数据
+  - 🎯 **操作点细化 (OP-\*)**：一次用户可感知动作 + 代码位置证据 + 可断言预期结果
+  - 🧪 **六类数据测试集 (DT-\*)**：正向(P) / 边界(B) / 非法(N) / 空(E) / 权限(A) / 时序(T)，缺一须书面说明理由
+  - 📝 **测试用例 (TC-\*)**：P0 冒烟 / P1 核心 / P2 扩展，关联 FLOW/OP/DT 三类 ID
+  - 🧭 **Prompt**: `docs/spec/role-prompts/browser-test-planner.md`
+
+- ✅ **测试用例四角色评审 (v2.12)** - 复用 v2.10 共识收敛机制
+  - 测试专家（一票否决：任一流程主路径无 P0 覆盖）/ 独立开发者（选择器真实性抽查）/ 产品经理（业务真实性）/ 架构师（环境依赖与数据隔离）
+  - 🧭 **Prompt**: `docs/spec/role-prompts/browser-test-review.md`
+
+- ✅ **三宿主浏览器执行 + 全程记录 (v2.12)**
+  - 🌐 **三宿主**: agent-browser / Trae 内置浏览器 / Chrome DevTools MCP（auto 按序自动降级）
+  - 🧾 **确定性记录器** `scripts/browser_test_recorder.py`：step/assert/error/shot 四类事件 schema 强制校验、finalize 一致性核对、P0 通过率门禁
+  - 🚧 **阻碍协议（六类）**：选择器失效→修选择器回写 / 数据缺失→补数据 / 环境故障→即停报告 / 宿主故障→自动降级 / 用例错误→走评审修正 / 疑似缺陷→标记 bug 不阻断
+  - 🧭 **Prompt**: `docs/spec/role-prompts/browser-test-execution.md`
+  - 📦 **产出**: `browser-test-runs/{run_id}/`（run-meta / cases / screenshots / summary.json / summary.md）
+
+- ✅ **CLI 集成 (v2.12)**
+  - 🚀 新增 7 个 flags：`--browser-test` / `--browser-test-plan-only` / `--browser-test-exec-only` / `--test-plan-dir` / `--target-url` / `--browser-hosts` / `--reuse-flow-analysis`
+  - 🛡️ 与 proposal-review / business-flow-analysis / autonomous / loop / multi-goal 互斥
+
+- ✅ **架构复用 (v2.12)**
+  - Step 1 流程梳理 → 复用 v2.11 业务动线分析结果（FLOW/OP 清单）
+  - Phase 2 评审 → 复用 v2.10 共识收敛机制
+  - 视觉基线 → 复用 v2.7 visual_regression；新断点回填 v2.11 BREAK 清单
+
+## 🎉 2026 年 10 月更新 (v2.11)
 
 > 在 v2.10 方案评审闭环基础上向上扩展——SU 页面全景盘点 → 5 类逻辑断点 + 5 类业务线漏洞检测 → 缺失页面 GAP-DESIGN 9 段式设计 → 多角色评审 → 执行开发 → UI/UX 视觉测试，形成完整页面级业务质量闭环
 
@@ -1634,6 +1664,7 @@ SOFTWARE.
 
 | 版本 | 日期 | 核心特性 |
 |------|------|---------|
+| v2.12 | 2026 年 10 月 | 浏览器端页面功能与视觉测试闭环：操作点细化 OP-*、六类数据测试集 DT-*、TC 用例四角色评审、三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）执行、browser_test_recorder.py 全程记录 + P0 门禁、7 个 CLI flags |
 | v2.11 | 2026 年 10 月 | 业务动线分析 + 缺失页面设计闭环：5 类断点检测 BREAK-1~5、5 类漏洞扫描 VULN-1~5、GAP-DESIGN 9 段式、6 个 CLI flags、统一互斥校验 |
 | v2.10 | 2026 年 10 月 | 方案撰写全流程（Proposal Review Workflow）：业界调研 + 四角色交叉评审 + 共识收敛闭环、5 个 prompt 模板、7 个 CLI flags |
 | v2.9.1 | 2026 年 9 月 | SU 专家详说阶段（SFD）：`--detailed-doc` / `--assemble`、五专家派发、`detailed_doc.py`（SU 单测 20 模块） |

@@ -41,6 +41,16 @@
 | 业务动线分析师 | [business-flow-analysis.md](business-flow-analysis.md) | 5 类逻辑断点(BREAK-1~5) + 5 类业务线漏洞(VULN-1~5) + 欠缺页面清单 | 每个分析必须有 SU 采集产物或代码证据 |
 | 页面设计员 | [page-gap-design.md](page-gap-design.md) | 缺失页面 GAP-DESIGN 9 段式详细设计 | 与现有页面衔接点必须精准到代码位置 |
 
+### v2.12 新增：浏览器端页面功能与视觉测试闭环
+
+| 角色 | Prompt 模板 | 关注点 | 强制要求 |
+|------|-------------|--------|---------|
+| 测试规划员（Planner） | [browser-test-planner.md](browser-test-planner.md) | 操作点细化(OP-*) + 六类数据测试集(DT-P/B/N/E/A/T) + 测试用例(TC-*) + 执行序 | 每个操作点必须有代码位置证据；六类数据集缺一须书面说明理由 |
+| 测试评审团（4 角色） | [browser-test-review.md](browser-test-review.md) | 测试专家/独立开发者/产品经理/架构师四视角交叉评审测试计划 | 任一 FLOW 主路径无 P0 覆盖 → 一票否决；共识问题清零才放行 |
+| 测试执行员（Executor） | [browser-test-execution.md](browser-test-execution.md) | 三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）逐一执行 + 步骤级记录 | 每步 recorder step/assert 留痕；阻碍六类先解决再推进；疑似缺陷不改断言 |
+
+确定性工具：`scripts/browser_test_recorder.py`（记录器，schema 强制校验 + finalize 一致性核对 + P0 通过率门禁）
+
 ## Ponytail 决策梯评审清单（v2.6 新增）
 
 独立开发者（solo_coder）的代码分析模板已包含 Ponytail 决策梯评审清单（第 6 节），涵盖：

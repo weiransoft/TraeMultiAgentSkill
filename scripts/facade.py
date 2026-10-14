@@ -100,6 +100,11 @@ def _dispatch_through_v3(args) -> int:
     bfa_design_only = getattr(args, "business_flow_design_only", False)
     bfa_flags_present = bfa_mode or bfa_design_only
 
+    bt_mode = getattr(args, "browser_test", False)
+    bt_plan_only = getattr(args, "browser_test_plan_only", False)
+    bt_exec_only = getattr(args, "browser_test_exec_only", False)
+    bt_flags_present = bt_mode or bt_plan_only or bt_exec_only
+
     autonomous_present = getattr(args, "autonomous", False)
     loop_present = args.loop and args.loop > 1
     multi_goal_present = bool(getattr(args, "multi_goal", None))
@@ -107,6 +112,16 @@ def _dispatch_through_v3(args) -> int:
     # proposal-review 与 business-flow-analysis 互斥
     if proposal_flags_present and bfa_flags_present:
         log("❌ --proposal-review 系列与 --business-flow-analysis 系列互斥，不能同时使用", "ERROR")
+        return 1
+
+    # v2.12：browser-test 系列与 proposal-review / business-flow-analysis 互斥
+    if bt_flags_present and (proposal_flags_present or bfa_flags_present):
+        log("❌ --browser-test 系列与 --proposal-review / --business-flow-analysis 系列互斥，不能同时使用", "ERROR")
+        return 1
+
+    # 特殊模式之间内部互斥（browser-test 三个子模式只能选一个）
+    if sum([bt_mode, bt_plan_only, bt_exec_only]) > 1:
+        log("❌ --browser-test / --browser-test-plan-only / --browser-test-exec-only 三者互斥，只能选一个", "ERROR")
         return 1
 
     # proposal-review 与 --autonomous / --loop / --multi-goal 互斥
@@ -127,6 +142,15 @@ def _dispatch_through_v3(args) -> int:
         if multi_goal_present:
             log("❌ --business-flow-analysis 与 --multi-goal 互斥", "ERROR"); return 1
 
+    # v2.12：browser-test 与 --autonomous / --loop / --multi-goal 互斥
+    if bt_flags_present:
+        if autonomous_present:
+            log("❌ --browser-test 系列与 --autonomous 互斥", "ERROR"); return 1
+        if loop_present:
+            log("❌ --browser-test 系列与 --loop 互斥", "ERROR"); return 1
+        if multi_goal_present:
+            log("❌ --browser-test 系列与 --multi-goal 互斥", "ERROR"); return 1
+
     # --- 路由分发 ---
 
     # v2.10：proposal-review 系列路由
@@ -137,6 +161,11 @@ def _dispatch_through_v3(args) -> int:
     # v2.11：business-flow-analysis 系列路由
     if bfa_flags_present:
         _handle_business_flow_analysis_mode(args, project_root, bfa_mode, bfa_design_only)
+        return 0
+
+    # v2.12：browser-test 系列路由
+    if bt_flags_present:
+        _handle_browser_test_mode(args, project_root, bt_mode, bt_plan_only, bt_exec_only)
         return 0
 
     # Phase 17 v3 §2.9：启动 hot reload watcher（如启用）
@@ -535,6 +564,129 @@ def _handle_business_flow_analysis_mode(
     log("   详细说明见 SKILL.md 「业务动线分析与页面设计闭环」章节", "INFO")
 
 
+# === v2.12：浏览器端页面功能与视觉测试闭环 ===
+
+
+def _handle_browser_test_mode(
+    args,
+    project_root: Path,
+    bt_mode: bool,
+    bt_plan_only: bool,
+    bt_exec_only: bool,
+) -> None:
+    """v2.12：处理 browser-test 系列 flag。
+
+    提示词层工作流——测试规划/评审/执行由宿主 LLM 驱动浏览器工具完成，
+    脚本层输出结构化工作流指令 + 提供 browser_test_recorder.py 确定性记录器。
+
+    三宿主：agent-browser / Trae 内置浏览器 / Chrome DevTools MCP，
+    auto 模式按 agent-browser → chrome-devtools → trae-internal 降级。
+
+    Args:
+        args: argparse.Namespace — CLI 解析结果
+        project_root: Path — 项目根目录
+        bt_mode: bool — 完整闭环（梳理→数据集→用例→评审→执行→记录）
+        bt_plan_only: bool — 仅规划（跳评审与执行）
+        bt_exec_only: bool — 仅执行已有计划（需 --test-plan-dir）
+    """
+    task_desc = args.task or "(未指定任务)"
+    target_url = getattr(args, "target_url", None)
+    hosts = getattr(args, "browser_hosts", "auto")
+    plan_dir = getattr(args, "test_plan_dir", None)
+    reuse_flow = getattr(args, "reuse_flow_analysis", None)
+
+    log("=" * 60, "INFO")
+    log("🌐 v2.12 浏览器端页面功能与视觉测试闭环已启动", "INFO")
+    log("=" * 60, "INFO")
+    log(f"📌 项目根目录: {project_root}", "INFO")
+    log(f"📌 任务描述: {task_desc}", "INFO")
+    log(f"📌 被测 URL: {target_url or '未指定（执行阶段必填）'}", "INFO")
+    log(f"📌 浏览器宿主: {hosts}（auto=agent-browser→chrome-devtools→trae-internal 降级）", "INFO")
+
+    if bt_exec_only:
+        # 仅执行：校验已有计划四件套
+        log("\n【模式】跳过规划与评审，直接执行已有测试计划", "INFO")
+        if not plan_dir:
+            log("❌ --browser-test-exec-only 必须配合 --test-plan-dir 指定计划目录", "ERROR")
+            return
+        pd = Path(plan_dir)
+        required = ["test-plan.md", "test-datasets.json", "test-cases.json",
+                    "test-execution-plan.json"]
+        missing = [f for f in required if not (pd / f).exists()]
+        if missing:
+            log(f"❌ 测试计划目录缺文件: {missing}（目录: {pd}）", "ERROR")
+            return
+        if not target_url:
+            log("❌ 执行模式必须提供 --target-url", "ERROR")
+            return
+        log(f"📖 计划目录校验通过: {pd}", "INFO")
+        log("📖 宿主 LLM 执行指令：", "INFO")
+        log("  按 docs/spec/role-prompts/browser-test-execution.md 执行：", "INFO")
+        log("    1. 环境预检（URL 可达 / 宿主探针 / 数据前置就绪）", "INFO")
+        log("    2. recorder run 初始化运行目录", "INFO")
+        log("    3. 按执行序逐用例执行，每步 recorder step/assert/error/shot", "INFO")
+        log("    4. 阻碍按六类协议处理（选择器/数据/环境/宿主/用例/疑似缺陷）", "INFO")
+        log("    5. recorder finalize 生成 summary.json + summary.md", "INFO")
+        log("    6. 视觉基线用例 → scripts/visual_regression.py 对比", "INFO")
+        log("", "INFO")
+        log("  记录器命令入口：python3 scripts/browser_test_recorder.py --help", "INFO")
+
+    elif bt_plan_only:
+        log("\n【模式】仅做测试规划（操作点 + 数据测试集 + 用例），不评审不执行", "INFO")
+        log("📖 宿主 LLM 执行指令：", "INFO")
+        log("  按 docs/spec/role-prompts/browser-test-planner.md 五步执行：", "INFO")
+        if reuse_flow:
+            log(f"  Step 1 — 复用业务动线分析结果做增量校验: {reuse_flow}", "INFO")
+        log("    Step 1 — 功能与流程梳理（复用 v2.11 结果或扫描前后端代码+文档）", "INFO")
+        log("    Step 2 — 操作点细化（OP-*：一次用户可感知动作 + 代码位置 + 可断言预期）", "INFO")
+        log("    Step 3 — 六类数据测试集（DT-P/B/N/E/A/T，缺一须书面说明理由）", "INFO")
+        log("    Step 4 — 测试用例 TC-*（P0 覆盖全部流程主路径）", "INFO")
+        log("    Step 5 — 执行序 + 三宿主分派 + 破坏性用例回滚方案", "INFO")
+        log("  产出: test-plan.md / test-datasets.json / test-cases.json / test-execution-plan.json", "INFO")
+
+    else:  # bt_mode 完整闭环
+        log("\n【模式】完整闭环：梳理→数据集→用例→评审→执行→详细记录", "INFO")
+        log("📖 宿主 LLM 执行指令：", "INFO")
+        log("", "INFO")
+        log("  Phase 1 — 测试规划", "INFO")
+        log("    Prompt: docs/spec/role-prompts/browser-test-planner.md", "INFO")
+        if reuse_flow:
+            log(f"    复用动线分析结果（增量校验）: {reuse_flow}", "INFO")
+        log("    产出四件套: test-plan.md + test-datasets.json + test-cases.json", "INFO")
+        log("              + test-execution-plan.json", "INFO")
+        log("", "INFO")
+        log("  Phase 2 — 测试用例多角色评审（复用 v2.10 共识收敛，最多 3 轮）", "INFO")
+        log("    Prompt: docs/spec/role-prompts/browser-test-review.md", "INFO")
+        log("    四角色: 测试专家(一票否决:P0 覆盖) / 独立开发者(选择器真实性抽查)", "INFO")
+        log("            / 产品经理(业务真实性) / 架构师(环境依赖与隔离性)", "INFO")
+        log("    门禁: 共识问题清零 + BLOCKER 清零 + 全部 FLOW 主路径 P0 覆盖", "INFO")
+        log("", "INFO")
+        log("  Phase 3 — 浏览器逐一执行 + 全程详细记录", "INFO")
+        log("    Prompt: docs/spec/role-prompts/browser-test-execution.md", "INFO")
+        log("    三宿主: agent-browser / Trae 内置浏览器 / Chrome DevTools MCP", "INFO")
+        log(f"    宿主策略: {hosts}", "INFO")
+        log("    每步记录: recorder step/assert/error/shot（schema 强制校验）", "INFO")
+        log("    阻碍协议: 六类阻碍先解决再推进；环境故障即停并报告", "INFO")
+        log("    记录器: python3 scripts/browser_test_recorder.py", "INFO")
+        log("", "INFO")
+        log("  Phase 4 — 汇总与闭环衔接", "INFO")
+        log("    recorder finalize → summary.json + summary.md（P0 通过率门禁）", "INFO")
+        log("    视觉基线 → scripts/visual_regression.py", "INFO")
+        log("    疑似 UI/UX 问题 → scripts/uiux_analyzer.py 深度巡检（v2.7）", "INFO")
+        log("    新发现操作断点 → 回填 v2.11 business-flow 报告 BREAK 清单", "INFO")
+        log("", "INFO")
+        log("  ⚠️ 强制约束清单（v2.12 绝对禁止）：", "WARNING")
+        log("    ❌ 凭空编造页面/路由/选择器（必须有代码位置证据）", "WARNING")
+        log("    ❌ 数据测试集只有正向数据（六类缺一须书面说明）", "WARNING")
+        log("    ❌ P0 未覆盖全部流程主路径就进入评审", "WARNING")
+        log("    ❌ 疑似产品缺陷被当作'用例问题'悄悄改断言放行", "WARNING")
+        log("    ❌ 跳步骤执行 / 断言失败无 expected-actual 对比 / 失败无截图", "WARNING")
+
+    log("", "INFO")
+    log("✅ 工作流指令已输出，宿主 LLM 请按以上指令执行。", "SUCCESS")
+    log("   详细说明见 SKILL.md 「浏览器端页面功能与视觉测试闭环」章节", "INFO")
+
+
 __all__ = [
     "main_compat",
     "_dispatch_through_v3",
@@ -557,4 +709,6 @@ __all__ = [
     "_handle_proposal_review_mode",
     # v2.11 新增：业务动线分析与页面设计闭环
     "_handle_business_flow_analysis_mode",
+    # v2.12 新增：浏览器端页面功能与视觉测试闭环
+    "_handle_browser_test_mode",
 ]
