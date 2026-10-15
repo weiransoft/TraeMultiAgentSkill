@@ -1,8 +1,37 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致；v2.10 新增方案撰写全流程——业界调研+四角色交叉评审+共识收敛闭环；v2.11 新增业务动线分析与页面设计闭环——SU 页面发现→5 类断点检测+5 类漏洞扫描→缺失页面 GAP-DESIGN 9 段式设计→多角色评审→执行开发→UI/UX 视觉测试；v2.12 新增浏览器端页面功能与视觉测试闭环——操作点细化→六类数据测试集→用例四角色评审→三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）逐一执行→步骤级全程记录与阻碍闭环。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致；v2.10 新增方案撰写全流程——业界调研+四角色交叉评审+共识收敛闭环；v2.11 新增业务动线分析与页面设计闭环——SU 页面发现→5 类断点检测+5 类漏洞扫描→缺失页面 GAP-DESIGN 9 段式设计→多角色评审→执行开发→UI/UX 视觉测试；v2.12 新增浏览器端页面功能与视觉测试闭环——操作点细化→六类数据测试集→用例四角色评审→三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）逐一执行→步骤级全程记录与阻碍闭环；v2.13 数据校验闭环——DC 数据契约（表单→API→DB→回读全链路映射）→操作前后 DB 只读快照→行级 diff 严格对照→DR 五类业务数据规则求值→data_gate 数据门禁。
 
-## 🎉 2026 年 10 月最新更新 (v2.12)
+## 🎉 2026 年 10 月最新更新 (v2.13)
+
+> 在 v2.12 浏览器测试闭环之上向下扎到**数据层**——接口 200、页面提示"成功"不等于数据真的落对了库。DC 数据契约 + DB 前后只读快照行级 diff + DR 业务规则求值，数据一致性结论只能由确定性脚本落盘。
+
+- ✅ **DC 数据契约（表单→API→DB→回读全链路映射）**
+  - 每条字段映射带**代码位置证据**（文件:行号）；任何变换（哈希/脱敏/大小写/拆分/精度）必须显式声明 transform 并给证据，校验器按声明值严格对照
+  - DB 预期：期望表 / 行 match 谓词 / 列值 / 关联行 / 状态迁移；快照查询清单 `db-checks.json`（纯只读 SELECT）
+  - 📝 **产出**: `test-data-contracts.json` + `db-checks.json` + `data-rules.json`
+  - 🧭 **Prompt**: `docs/spec/role-prompts/browser-test-planner.md` Step 3.5
+
+- ✅ **DB 快照采集与行级 diff（严格一致性对照）**
+  - `db_probe.py`：复用 `su/db_guard.ReadOnlyGuard` 唯一语句通道（严格只读，多语句/写语句直接拒绝）+ 连接级只读加固
+  - 主键对齐行级 diff（added/removed/changed + 列级新旧值）；**未声明 transform 的字段差异一律判不一致**
+  - 🧾 **子命令**: `browser_test_recorder.py db-snapshot` / `dc-check`
+
+- ✅ **DR 业务数据规则求值（五类）**
+  - UNIQ 唯一性 / INV 不变式 / CONS 守恒 / SM 状态机 / REF 引用完整；受限表达式白名单文法（自研解析器，非 eval）
+  - 🧾 **子命令**: `browser_test_recorder.py rule`（对落库快照确定性求值）
+
+- ✅ **data_gate 数据门禁（finalize）**
+  - dc/rule 断言失败、声明的 DB 校验缺失（case end 直接拒绝收尾）、数据通道阻断（env_failure 诚实降级 BLOCKED）→ 整体 gate=FAIL
+  - summary 数据维度：DC 覆盖率 / 数据断言通过率 / env_failure 次数
+
+- ✅ **诚实降级（沿用红线）**
+  - 驱动缺失 / 连接失败 → `env_failure`，数据断言 BLOCKED 而非谎报 FAIL/PASS；**严禁**用写 SQL 修数据"让测试通过"
+
+- ✅ **架构复用 (v2.13)**
+  - 只读安全面 → 复用 `su/db_guard.ReadOnlyGuard`（v2.9）；ID 族 → FLOW/OP/DT/TC 之下扩 DC/DR 两级
+
+### 🎉 2026 年 10 月更新 (v2.12)
 
 > 在 v2.11 业务动线分析闭环基础上向下延伸——把每条业务流程细化到**页面操作点**，制定**六类多样化数据测试集**，测试用例经四角色评审后，在**真实浏览器**（三宿主自动降级）中逐一执行，每一步操作/断言/错误全程留痕，碰到阻碍先解决再推进。
 
@@ -1664,6 +1693,7 @@ SOFTWARE.
 
 | 版本 | 日期 | 核心特性 |
 |------|------|---------|
+| v2.13 | 2026 年 10 月 | 数据校验闭环：DC 数据契约（表单→API→DB→回读）、DB 前后只读快照 + 行级 diff 严格对照、DR 五类业务数据规则求值（受限表达式非 eval）、data_gate 数据门禁、data_test/ 确定性内核（data_rules.py + db_probe.py，复用 ReadOnlyGuard 严格只读） |
 | v2.12 | 2026 年 10 月 | 浏览器端页面功能与视觉测试闭环：操作点细化 OP-*、六类数据测试集 DT-*、TC 用例四角色评审、三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）执行、browser_test_recorder.py 全程记录 + P0 门禁、7 个 CLI flags |
 | v2.11 | 2026 年 10 月 | 业务动线分析 + 缺失页面设计闭环：5 类断点检测 BREAK-1~5、5 类漏洞扫描 VULN-1~5、GAP-DESIGN 9 段式、6 个 CLI flags、统一互斥校验 |
 | v2.10 | 2026 年 10 月 | 方案撰写全流程（Proposal Review Workflow）：业界调研 + 四角色交叉评审 + 共识收敛闭环、5 个 prompt 模板、7 个 CLI flags |

@@ -1,12 +1,17 @@
 name: multi-agent-team
-version: 2.12.0
+version: 2.13.0
 description: |
-  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说 + v2.10 方案撰写全流程 + v2.11 业务动线分析与页面设计闭环 + v2.12 浏览器端页面功能与视觉测试闭环）
+  Trae 多智能体协作技能（AI 增强版 + 长程 Agent 支持 + Karpathy 原则 + Cybernetics 工程控制论 + Ponytail 决策梯 + Autonomous 自主编排 + UI/UX 巡检与视觉回归 + SU 既有系统理解 + SFD 专家详说 + v2.10 方案撰写全流程 + v2.11 业务动线分析与页面设计闭环 + v2.12 浏览器端页面功能与视觉测试闭环 + v2.13 数据校验闭环）
   
   基于双层动态上下文管理架构和大模型 AI 助手能力，实现智能体之间的高效协作。
   支持产品、架构、开发、测试等多种角色的智能调度和工作流编排。
   
   核心特性：
+  - v2.13 数据校验闭环：DC 数据契约（表单→API→DB→回读全链路映射）→ DB 前后快照 → 行级 diff 对照 → DR 业务规则求值 → data_gate 数据门禁
+  - v2.13 五类业务数据规则：唯一性(UNIQ) / 不变式(INV) / 守恒(CONS) / 状态机(SM) / 引用完整(REF)
+  - v2.13 严格一致性测试：测试数据集（DT-*）× DB 落库预期（db_expectation）× 快照 diff 逐项吻合，禁止人工口算数据结论
+  - v2.13 确定性内核 scripts/data_test/：data_rules.py（受限表达式求值器 + 行级快照 diff）+ db_probe.py（只读快照引擎，复用 su/db_guard ReadOnlyGuard）
+  - v2.13 记录器扩展：browser_test_recorder.py 新增 db-snapshot / dc-check / rule 子命令 + --db-config 连接配置 + 数据门禁（声明必执行，禁止静默跳过）
   - v2.12 浏览器测试闭环：操作点细化→六类数据测试集→用例四角色评审→三宿主浏览器执行→步骤级全程记录
   - v2.12 三宿主支持：agent-browser / Trae 内置浏览器 / Chrome DevTools MCP（auto 模式按序自动降级）
   - v2.12 六类数据测试集：正向(P) / 边界(B) / 非法(N) / 空(E) / 权限(A) / 时序(T)
@@ -71,6 +76,11 @@ ai_capabilities:
   v2_12_browser_test_planning: true  # 宿主 LLM 提示词层（操作点细化 + 六类数据测试集 + 用例规划）
   v2_12_browser_test_execution: true # 宿主 LLM 提示词层（三宿主执行 + 步骤级记录 + 阻碍闭环）
   v2_12_test_recorder: true      # 脚本层（记录器 schema 校验 + 一致性核对 + 门禁）
+  v2_13_data_contract_planning: true # 宿主 LLM 提示词层（DC 数据契约 + db_expectation 设计）
+  v2_13_snapshot_diff: true        # 脚本层（data_rules.py 行级快照 diff + DC 预期匹配）
+  v2_13_rule_engine: true          # 脚本层（data_rules.py 五类规则 + 受限表达式求值）
+  v2_13_readonly_db_probe: true    # 脚本层（db_probe.py 只读快照，复用 su ReadOnlyGuard）
+  v2_13_data_gate: true            # 脚本层（dc-check/rule 断言 + data_gate 数据门禁）
 
 capabilities:
   - name: product-manager
@@ -733,6 +743,63 @@ capabilities:
             type: object
           description: 疑似产品缺陷清单（复现步骤+错误+代码位置）
 
+  - name: data_consistency_verification
+    description: |
+      v2.13 数据校验闭环能力：在 v2.12 浏览器测试闭环之上，对页面输入输出与
+      DB 落库数据做严格一致性校验，深入业务流程验证测试数据集与 DB 预期逐项吻合。
+
+      核心能力：
+      - DC-* 数据契约：表单字段→API 字段→DB 列→回读展示 全链路映射，
+        transform 显式声明且带代码证据（未声明变换一律视为不一致）
+      - DR-* 五类业务数据规则：唯一性(UNIQ) / 不变式(INV) / 守恒(CONS) /
+        状态机(SM) / 引用完整(REF)；受限表达式求值器（白名单文法，非 eval）
+      - DB 前后快照：db_probe.py 只读引擎（复用 su/db_guard ReadOnlyGuard，
+        仅 SELECT/SHOW/EXPLAIN；连接级只读加固；失败诚实降级 env_failure）
+      - 行级快照 diff：主键对齐的 added/removed/changed + 列级新旧值 + 聚合对照
+      - 数据门禁（data_gate）：声明的 DB 校验必须执行（缺失即拒绝收尾）、
+        断言失败计入 P0 门禁、dc_fail/rule_fail>0 → 整体 gate=FAIL
+
+      确定性内核：scripts/data_test/data_rules.py（diff + 规则求值）
+                 scripts/data_test/db_probe.py（只读快照引擎）
+      记录器扩展：scripts/browser_test_recorder.py（db-snapshot / dc-check / rule
+                 + run --db-config + case --db-check-before/after/--dcs）
+      设计文档：docs/dev/DATA_CONSISTENCY_TESTING.md
+
+    input_schema:
+      type: object
+      properties:
+        db_config:
+          type: string
+          description: DB 连接配置 JSON（engine=sqlite/mysql/postgres + 连接参数）
+        data_contracts:
+          type: string
+          description: test-data-contracts.json 路径（DC-* 数据契约清单）
+        data_rules:
+          type: string
+          description: data-rules.json 路径（DR-* 业务数据规则声明）
+        db_checks:
+          type: string
+          description: db-checks.json 路径（只读快照查询清单，参数化占位符）
+    output_schema:
+      type: object
+      properties:
+        data_gate:
+          type: string
+          enum: [PASS, FAIL]
+          description: 数据门禁（dc/rule 断言全过 + 声明校验零缺失才 PASS）
+        dc_total:
+          type: integer
+          description: DC 契约校验执行数
+        dc_pass:
+          type: integer
+          description: DC 契约校验通过数
+        rules_total:
+          type: integer
+          description: DR 规则求值执行数
+        rules_pass:
+          type: integer
+          description: DR 规则求值通过数
+
 dependencies: []
 
 ai_integration:
@@ -924,12 +991,13 @@ workflows:
           + visual_regression.py 像素级视觉回归。
 
   - workflow_id: browser-test-workflow
-    name: 浏览器端页面功能与视觉测试闭环（v2.12 新增）
+    name: 浏览器端页面功能与视觉测试闭环（v2.12 新增，v2.13 数据校验增强）
     description: |
-      测试规划（操作点+六类数据集+用例）→ 测试用例四角色评审 →
-      三宿主浏览器逐一执行（全程步骤级记录）→ 汇总门禁与闭环衔接。
+      测试规划（操作点+六类数据集+数据契约 DC+用例）→ 测试用例四角色评审 →
+      三宿主浏览器逐一执行（全程步骤级记录）→ DB 前后快照与数据对照 →
+      汇总门禁与闭环衔接。
       复用 v2.11 动线分析结果、v2.10 共识收敛机制、v2.7 视觉回归工具。
-    version: "2.12"
+    version: "2.13"
     steps:
       - step_id: test-planning
         name: 测试规划（操作点 + 六类数据测试集 + 用例）
@@ -937,10 +1005,14 @@ workflows:
         action: plan_browser_tests
         description: |
           五步：功能流程梳理（复用 v2.11 FLOW/OP 或扫描代码）→ 操作点细化(OP-*)
-          → 六类数据测试集(DT-P/B/N/E/A/T) → 测试用例(TC-*，P0 覆盖全部主路径)
+          → 六类数据测试集(DT-P/B/N/E/A/T；v2.13 写操作数据组必带 db_expectation)
+          → 数据契约设计（v2.13 Step 3.5：DC-* 全链路字段映射 + DB 预期 + 快照查询；
+            Step 3.6：DR-* 五类业务数据规则声明）
+          → 测试用例(TC-*，P0 覆盖全部主路径；写操作用例必填 DC-*)
           → 执行序 + 三宿主分派 + 破坏性回滚方案。
-          产出四件套: test-plan.md / test-datasets.json / test-cases.json
-          / test-execution-plan.json。
+          产出七件套: test-plan.md / test-datasets.json / test-cases.json /
+          test-execution-plan.json / test-data-contracts.json /
+          db-checks.json / data-rules.json（后三件 v2.13）。
 
       - step_id: test-review
         name: 测试用例多角色评审（复用 v2.10 共识收敛）
@@ -951,6 +1023,9 @@ workflows:
         description: |
           测试专家（一票否决：任一 FLOW 主路径无 P0 覆盖）/ 独立开发者
           （选择器真实性抽查）/ 产品经理（业务真实性）/ 架构师（环境与隔离）。
+          v2.13 追加评审项：写操作 OP 无 DC 契约判 BLOCKER；DC 字段映射无代码
+          证据判 BLOCKER；db-checks.json 出现非只读语句判 BLOCKER；
+          DB 预期凭猜测填写（无 DDL/服务层代码/需求文档出处）判 BLOCKER。
           共识问题清零 + BLOCKER 清零才放行。
 
       - step_id: browser-execution
@@ -961,6 +1036,11 @@ workflows:
         description: |
           三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP，
           auto 按序降级）。每用例 recorder start→step/assert/error/shot→end。
+          v2.13 数据层：挂 DC 的用例 recorder case --db-check-before/--after 声明
+          → db-snapshot --phase before（操作前基线）→ 浏览器动作
+          → db-snapshot --phase after → dc-check（行级 diff 对照 DC 预期）
+          → rule（DR-* 规则求值）。数据通道严格只读（ReadOnlyGuard）；
+          DB 故障数据断言 BLOCKED 不谎报。
           阻碍协议六类先解决再推进；环境故障即停并报告；
           疑似缺陷不改断言，标记 suspected_bug 继续推进。
 
@@ -971,9 +1051,12 @@ workflows:
         depends_on: [browser-execution]
         description: |
           recorder finalize → summary.json + summary.md（一致性校验 +
-          P0 通过率 100% 门禁）。视觉基线 → visual_regression.py（v2.7）；
+          P0 通过率 100% 门禁 + v2.13 data_gate 数据门禁：dc/rule 断言失败、
+          声明的 DB 校验缺失、env_failure 阻断均计入 FAIL）。
+          视觉基线 → visual_regression.py（v2.7）；
           疑似 UI/UX 问题 → uiux_analyzer.py（v2.7）；
-          新断点回填 v2.11 business-flow 报告 BREAK 清单。
+          新断点回填 v2.11 business-flow 报告 BREAK 清单；
+          DC 覆盖率与数据断言通过率写入 summary 数据维度（v2.13）。
 
 context_management:
   type: dual-layer
@@ -1047,6 +1130,18 @@ metadata:
   documentation: https://github.com/weiransoft/zeroclaw/tree/main/.trae/skills/trae-multi-agent
   
   version_history:
+    - version: 2.13.0
+      date: "2026-10-15"
+      changes:
+        - 新增数据校验闭环（DATA_CONSISTENCY_TESTING，v2.13）：DC 数据契约（表单→API→DB→回读全链路字段映射，transform 显式声明+代码证据）→ DB 前后快照 → 行级 diff 对照 → DR 业务规则求值 → data_gate 数据门禁
+        - 新增确定性内核 scripts/data_test/：data_rules.py（受限表达式求值器——自研 tokenizer + 递归下降解析器，非 eval，白名单文法；UNIQ/INV/CONS/SM/REF 五类规则；主键对齐行级快照 diff）+ db_probe.py（只读快照引擎，复用 su/db_guard ReadOnlyGuard 唯一执行通道 + 连接级只读加固 + 诚实降级）
+        - browser_test_recorder.py 扩展：db-snapshot / dc-check / rule 三子命令 + run --db-config（连接配置，engine=sqlite/mysql/postgres）+ case --db-check-before/--db-check-after/--dcs；新增 dc/rule 断言类型；finalize 增加 data_gate 数据门禁（dc_fail/rule_fail>0 或数据校验缺失/阻断 → 整体 FAIL）
+        - 数据校验不允许静默跳过：用例声明 --db-check-* 却未落盘快照 → case end 拒绝收尾；声明 DC 的用例未跑 dc-check → finalize 校验报 problems
+        - prompt 细化：browser-test-planner.md 新增 Step 3.5 数据契约设计（DC-*）/ Step 3.6 业务数据规则声明（DR-*）+ DT 数据组 db_expectation 强制；browser-test-execution.md 新增 DB 数据层预检 / 单用例循环数据步骤 / 数据不一致与 DB 通道故障两类阻碍处理 / 数据门禁收尾
+        - 设计文档 docs/dev/DATA_CONSISTENCY_TESTING.md：三层架构 / DC-*/DR-* ID 规范 / 快照与 diff schema / 只读安全面 / 门禁与降级语义 / 端到端验证结论
+        - 端到端测试 tests/test_v213_data_consistency.py：11 用例全绿（diff/规则内核 8 项 + 真实 SQLite 全链路 4 场景，含 FAIL 传导与 v2.12 纯 UI 回归）
+        - 复用关系：su/db_guard ReadOnlyGuard（安全面零复制）+ browser_test_recorder 闭环骨架 + v2.12 七类记录 schema，不引入新依赖
+
     - version: 2.12.0
       date: "2026-10-14"
       changes:

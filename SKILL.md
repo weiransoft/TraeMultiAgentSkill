@@ -1421,20 +1421,23 @@ docs/
 └── project-understanding/  # 项目理解文档
 ```
 
-## 浏览器端页面功能与视觉测试闭环（v2.12 新增 — 操作点细化 → 数据测试集 → 用例评审 → 三宿主执行 → 全程记录）
+## 浏览器端页面功能与视觉测试闭环（v2.12 新增，v2.13 数据校验增强 — 操作点细化 → 数据测试集 → 数据契约 → 用例评审 → 三宿主执行 → DB 一致性对照 → 全程记录）
 
 > **设计理念**: 页面做完了不等于能用——路由通不代表操作点通，接口 200 不代表用户看到的结果对。这个工作流从前后端代码与文档出发（可复用 v2.11 业务动线分析结果），把每条业务流程细化到**页面操作点**级别，制定**六类多样化数据测试集**，编写可断言的测试用例并经四角色评审，然后在真实浏览器中逐一执行——**每一步操作、每一个断言、每一条页面/后台错误全部留痕**，碰到阻碍先解决再推进。
+>
+> **v2.13 数据校验增强**: 接口 200、页面提示"成功"都不等于**数据真的落对了库**。v2.13 在闭环中叠加数据层严格校验：为每条写操作设计 **DC-\* 数据契约**（表单字段→API 字段→DB 列→回读展示的全链路映射，任何变换必须显式声明并附代码证据）；执行时采集**操作前后 DB 只读快照**，做**行级 diff** 逐项对照 DC 预期；再用 **DR-\* 业务数据规则**（唯一性/不变式/守恒/状态机/引用完整）对落库数据求值。数据一致性结论**只能由确定性脚本落盘**（`db-snapshot` → `dc-check` / `rule`），finalize 增加 **data_gate 数据门禁**——声明的校验缺失或数据断言失败，整体判 FAIL。
 >
 > **三宿主**（auto 模式按序降级）：
 > - **agent-browser**：隔离会话、headless 批量、并行回归
 > - **Trae 内置浏览器**：零配置、IDE 内单流程快速验证
 > - **Chrome DevTools MCP**：网络面板深度检查、console 全量采集、性能 trace
 >
-> **v2.12 架构**：复用三大既有能力 + 新建 3 prompt + 1 确定性记录脚本
+> **架构**：复用三大既有能力 + 新建 3 prompt + 确定性记录/校验脚本
 > - **v2.11 business-flow**：FLOW/OP 清单直接复用为测试覆盖对象
 > - **v2.10 proposal-review**：共识收敛机制复用于测试用例四角色评审
 > - **v2.7 visual_regression / uiux_analyzer**：视觉基线对比与深度巡检衔接
-> - **新建**：browser-test-planner.md（规划方法论）、browser-test-review.md（测试评审）、browser-test-execution.md（执行+阻碍协议）、`scripts/browser_test_recorder.py`（schema 强制的记录器）
+> - **su/db_guard ReadOnlyGuard（v2.9）**：v2.13 DB 快照唯一语句通道（安全面零复制，严格只读）
+> - **新建**：browser-test-planner.md（规划方法论）、browser-test-review.md（测试评审）、browser-test-execution.md（执行+阻碍协议）、`scripts/browser_test_recorder.py`（schema 强制的记录器）、`scripts/data_test/`（v2.13 确定性内核：data_rules.py 规则求值+行级 diff、db_probe.py 只读快照引擎）
 
 ### 四阶段工作流
 
@@ -1443,28 +1446,46 @@ Phase 1: 测试规划（Planner）
     输入: 前后端代码 + 文档 +（可选）v2.11 动线分析结果
     Step 1 功能与流程梳理（复用 FLOW-*/PAGE-*，做增量校验）
     Step 2 操作点细化 OP-*（一次用户可感知动作 + 代码位置 + 可断言预期）
-    Step 3 六类数据测试集 DT-*（正向P/边界B/非法N/空E/权限A/时序T）
-    Step 4 测试用例 TC-*（P0 覆盖全部流程主路径）
+    Step 3 六类数据测试集 DT-*（正向P/边界B/非法N/空E/权限A/时序T；
+           v2.13：写操作数据组必带 db_expectation——期望落库的表/行/列值/关联行/状态迁移）
+    Step 3.5 数据契约设计 DC-*（v2.13：表单→API→DB→回读 全链路字段映射，
+           transform 显式声明+代码证据；DB 预期；快照查询清单 db-checks.json）
+    Step 3.6 业务数据规则 DR-*（v2.13：UNIQ/INV/CONS/SM/REF 五类，
+           受限表达式声明，data-rules.json）
+    Step 4 测试用例 TC-*（P0 覆盖全部流程主路径；写操作用例必填 DC-*）
     Step 5 执行序 + 宿主分派 + 破坏性用例回滚方案
     产出: test-plan.md / test-datasets.json / test-cases.json / test-execution-plan.json
+          + test-data-contracts.json / db-checks.json / data-rules.json（v2.13 三件套）
         ↓
 Phase 2: 测试用例多角色评审（复用 v2.10 共识收敛，最多 3 轮）
     测试专家（一票否决：任一 FLOW 主路径无 P0 覆盖）
     独立开发者（选择器真实性抽查 / 前置可构造性）
     产品经理（业务真实性 / 用户视角断言）
     架构师（环境依赖 / 数据隔离性 / 维护成本）
+    v2.13 追加 BLOCKER 项：写操作 OP 无 DC 契约 / 字段映射无代码证据 /
+    db-checks.json 含非只读语句 / DB 预期凭猜测填写
     门禁: 共识问题清零 + BLOCKER 清零
         ↓
 Phase 3: 浏览器逐一执行 + 全程记录（Executor）
     recorder run → 逐用例 start → 每步 step/assert/error/shot → case end
-    阻碍协议（六类，先解决再推进）:
+    v2.13 数据层（挂 DC 的用例）：
+      case 声明 --db-check-before/--db-check-after/--dcs
+      → db-snapshot --phase before（操作前基线，只读采集）
+      → 浏览器动作 → db-snapshot --phase after（同清单同参数）
+      → dc-check（before/after 行级 diff 对照 DC 预期，确定性生成数据断言）
+      → rule（data-rules.json DR-* 求值，确定性生成规则断言）
+    阻碍协议（六类+数据两类，先解决再推进）:
       选择器失效→修选择器回写用例 / 数据缺失→补数据 / 环境故障→停止报告
       宿主故障→降级切宿主 / 用例设计错误→以代码文档为准修正 / 疑似缺陷→不改断言，标记 bug
+      数据不一致→三查（DC 预期错/transform 未声明/真实缺陷），绝不改 DB 预期放行
+      DB 通道故障→功能继续、数据断言 BLOCKED(env_failure) 并报告
     视觉基线用例 → scripts/visual_regression.py
         ↓
 Phase 4: 汇总与闭环衔接
     recorder finalize → summary.json + summary.md
-    门禁: P0 通过率 100%，否则整体 FAIL
+    门禁: P0 通过率 100%；v2.13 data_gate——dc/rule 断言失败、声明的 DB 校验
+          缺失、数据通道阻断均计入整体 FAIL
+    DC 覆盖率与数据断言通过率写入 summary 数据维度
     疑似缺陷清单 → 修复环节；新断点 → 回填 v2.11 BREAK 清单
 ```
 
@@ -1493,7 +1514,9 @@ python3 scripts/trae_agent_dispatch_v2.py \
 ```bash
 python3 scripts/browser_test_recorder.py --out browser-test-runs run --run-id r1 --url ...
 # 子命令: run / case / step / assert / error / shot / blocker / verify / finalize
+#         + db-snapshot / dc-check / rule（v2.13 数据校验）
 # schema 强制: fail 无原因拒绝、截图文件必须真实存在、finalize 做 summary-逐条一致性校验
+# v2.13: run --db-config 启用数据层；声明的 DB 校验缺失 → case end 拒绝收尾、finalize 报 problems
 ```
 
 ### 产出物清单
@@ -1504,7 +1527,10 @@ python3 scripts/browser_test_recorder.py --out browser-test-runs run --run-id r1
 | `test-datasets.json` | Phase 1 | 六类数据测试集 |
 | `test-cases.json` | Phase 1 | TC-* 用例（关联 FLOW/OP/DT） |
 | `test-execution-plan.json` | Phase 1 | 执行序 + 宿主分派 + 破坏性标注 |
-| `browser-test-runs/{run_id}/` | Phase 3-4 | run-meta / cases/*.json / screenshots / summary.json / summary.md |
+| `test-data-contracts.json` | Phase 1 | DC-* 数据契约（v2.13） |
+| `db-checks.json` | Phase 1 | 只读快照查询清单（v2.13） |
+| `data-rules.json` | Phase 1 | DR-* 业务数据规则（v2.13） |
+| `browser-test-runs/{run_id}/` | Phase 3-4 | run-meta / cases/*.json / screenshots / db-snapshots/*.json（v2.13）/ summary.json / summary.md |
 
 ### 绝对禁止（v2.12）
 
@@ -1515,6 +1541,10 @@ python3 scripts/browser_test_recorder.py --out browser-test-runs run --run-id r1
 - ❌ 疑似产品缺陷被当作"用例问题"悄悄改断言放行
 - ❌ 环境故障（服务 5xx/连不上）谎报为用例 FAIL 或跳过硬跑
 - ❌ 跳步骤执行、无 expected/actual 对比的失败记录、失败无截图
+- ❌ 数据一致性结论人工口算（必须经 db-snapshot → dc-check / rule 确定性落盘）（v2.13）
+- ❌ 用写 SQL 修数据"让测试通过"（数据通道严格只读，校验器直接拒绝）（v2.13）
+- ❌ 声明 DC 的用例不跑数据对照、DB 通道故障谎报 PASS 或静默跳过（v2.13）
+- ❌ 字段映射的 transform 无代码证据就默认"应该一致"；DB 预期凭猜测填写（v2.13）
 
 ## 故障排查
 
@@ -1543,6 +1573,7 @@ Trae Multi-Agent Dispatcher 提供了：
 - ✅ 方案撰写全流程（v2.10，业界调研→方案撰写→4 角色交叉评审→共识收敛→闭环修改）
 - ✅ 业务动线分析与页面设计闭环（v2.11，SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 视觉测试）
 - ✅ 浏览器端页面功能与视觉测试闭环（v2.12，操作点细化→六类数据测试集→用例四角色评审→三宿主浏览器执行→步骤级全程记录与阻碍闭环）
+- ✅ 数据校验闭环（v2.13，DC 数据契约→DB 前后只读快照→行级 diff 对照→DR 五类业务规则求值→data_gate 数据门禁）
 - ✅ Karpathy 四大核心原则强制执行（v2.4）
 - ✅ Cybernetics 工程控制论三环控制（v2.5）
 - ✅ Ponytail 决策梯 + 16 条不可简化红线（v2.6）

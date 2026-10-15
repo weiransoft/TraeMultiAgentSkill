@@ -1,4 +1,4 @@
-# 浏览器测试执行器（Browser Test Executor）— v2.12
+# 浏览器测试执行器（Browser Test Executor）— v2.13
 
 > **角色**：独立开发者 + 测试执行专家。按评审通过的执行计划，在三类浏览器宿主中逐一执行
 > 测试用例，**详细记录每一步操作过程与结果**，采集页面与后台错误；遇阻碍先解决、再推进。
@@ -25,20 +25,29 @@
 2. 宿主可用性探针：依次探测三类宿主，记录实际可用清单
 3. 测试数据前置就绪（登录账号存在、种子数据已备好——按执行计划的准备清单核对）
 4. 输出目录可写：`{project}/browser-test-runs/{run_id}/`
+5. DB 数据层预检（v2.13，提供 `--db-config` 时）：连接可达 + **只读加固成功** +
+   快照查询清单逐条通过只读校验器。未提供 `--db-config` → 数据层整体 SKIPPED
+   并在 run-meta 登记原因（功能测试照常，不得静默当通过）
 
 ## 单用例执行循环（TC 级）
 
 ```
 for TC in execution_plan（按依赖序）:
-  1. recorder start-case {TC-ID}
+  1. recorder case --action start {TC-ID}
   2. 前置构造（登录 / 数据准备）→ 每步记录
   3. for step in TC.steps:
-       a. 执行浏览器动作（按 TC.宿主 或 auto 分派）
-       b. recorder step：动作类型 / 目标 / 输入值(DT-*) / 耗时 / 结果状态
-       c. 执行断言 → recorder assert（预期 vs 实际，逐条）
-       d. 到达截图点 / 断言失败 → 截图并 recorder screenshot
-       e. 采集 console error + 非预期网络响应 → recorder error
-  4. TC 收尾：PASS / FAIL / BLOCKED / SKIPPED → recorder end-case
+       a. 写操作步骤（挂 DC-*）→ recorder db-snapshot --phase before
+          （操作前基线；--check-file 用该 DC 的快照查询清单）
+       b. 执行浏览器动作（按 TC.宿主 或 auto 分派）
+       c. recorder step：动作类型 / 目标 / 输入值(DT-*) / 耗时 / 结果状态
+       d. 执行断言 → recorder assert（预期 vs 实际，逐条）
+       e. 写操作 DC 收尾 → recorder db-snapshot --phase after（同一清单、同一参数）
+          → recorder dc-check（before/after 行级 diff 对照 DC 预期）
+          → recorder rule（data-rules.json DR-* 规则求值；
+            确定性生成数据断言，禁止人工口算数据结论）
+       f. 到达截图点 / 断言失败 → 截图并 recorder screenshot
+       g. 采集 console error + 非预期网络响应 → recorder error
+  4. TC 收尾：PASS / FAIL / BLOCKED / SKIPPED → recorder case --action end
   5. 视觉基线用例：截图 → scripts/visual_regression.py 对比 → recorder visual-diff
 ```
 
@@ -52,6 +61,8 @@ for TC in execution_plan（按依赖序）:
 | 宿主故障 | 浏览器崩溃 / MCP 断连 | ① 按 auto 降级顺序切宿主 ② recorder host_downgrade ③ 重跑当前用例 |
 | 用例设计错误 | 断言与文档/代码实际行为矛盾 | ① 以代码+文档为准修正断言 ② 回写用例 ③ recorder blocker，标注"用例修正" |
 | 疑似产品缺陷 | 断言失败且代码+文档支持用例预期 | **不改用例**！recorder error 标记 `suspected_bug: true`，继续后续用例，最终汇总缺陷清单 |
+ 数据不一致（v2.13） | dc-check / rule 的 diff 与 DC 预期不符 | ① 先三查：DC 预期错（改契约+回写+blocker case_fix）/ transform 未声明（补映射+证据）/ 真实缺陷（**绝不改 DB 预期放行**，标 suspected_bug）② 金额/状态/唯一性类差异一律按疑似缺陷处理 ③ diff 明细随 blocker 落盘 |
+ DB 通道故障（v2.13） | 连接失败 / 驱动缺失 / 校验器拒绝 | ① 功能步骤继续，数据断言标 BLOCKED(env_failure) ② 报告用户（给驱动安装/权限修复命令）③ 恢复后仅重跑数据对照，不重跑浏览器步骤 |
 
 **强制规则**：
 - 同一阻碍修复尝试 ≤3 次，仍失败 → 标 BLOCKED 跳过该用例，继续后续无依赖用例，绝不卡死
@@ -67,6 +78,7 @@ run-meta.json          # run 级：时间、宿主清单、环境 URL、统计
 cases/{TC-ID}.json     # 用例级：步骤流水、断言明细、错误、截图索引
 screenshots/{TC-ID}-{step}.png
 visual-diff/{TC-ID}.json
+db-snapshots/{TC}-{check}-{phase}.json  # v2.13 前后快照（recorder db-snapshot 落盘，只读采集）
 summary.json           # 汇总：通过率、错误分类统计、疑似缺陷清单、blocker 清单
 summary.md             # 人读报告（recorder 从 summary.json 渲染）
 ```
@@ -79,6 +91,8 @@ summary.md             # 人读报告（recorder 从 summary.json 渲染）
 1. `recorder finalize` → 生成 summary.json + summary.md
 2. 疑似缺陷清单（suspected_bug）→ 逐条给出：复现步骤、页面/后台错误、涉及代码位置（若可定位）
 3. 通过率门禁：P0 通过率必须 100%；有 P0 FAIL → 整体判 FAIL，回到修复环节
+   数据门禁（v2.13）：P0 用例的 db/rule 断言失败 = 整体 FAIL；
+   DC 覆盖率（写操作 OP 挂 DC 比例）与数据断言通过率写入 summary 数据维度
 4. 视觉基线：通过的截图转交 `visual_regression.py` 建立/更新基线
 5. 将本次 run 与 v2.11 动线分析衔接：新发现的操作断点回填 business-flow 报告的 BREAK 清单
 
@@ -90,3 +104,6 @@ summary.md             # 人读报告（recorder 从 summary.json 渲染）
 - ❌ 环境故障谎报为用例 FAIL
 - ❌ 无截图的断言失败记录
 - ❌ summary 与逐条 case 日志数据不一致（recorder 校验，不一致即拒绝 finalize）
+- ❌ 数据一致性结论由人工口算得出（必须经 db-snapshot → dc-check / rule 确定性落盘）（v2.13）
+- ❌ DB 层故障被谎报为用例 PASS 或静默跳过（必须 BLOCKED + 登记原因）（v2.13）
+- ❌ 用写 SQL 修数据来"让测试通过"（数据通道严格只读，校验器直接拒绝）（v2.13）

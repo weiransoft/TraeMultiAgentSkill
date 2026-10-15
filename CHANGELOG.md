@@ -3,6 +3,61 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.13.0] - 2026-10-15
+
+### Added
+
+#### v2.13 — 数据校验闭环（DC 数据契约 → DB 快照对照 → 业务规则求值 → 数据门禁）
+
+在 v2.12 浏览器测试闭环之上向下扎到**数据层**——接口 200、页面提示"成功"不等于数据真的
+落对了库。为每条写操作设计 DC-* 数据契约（表单→API→DB→回读全链路字段映射），执行时采集
+操作前后 DB 只读快照做行级 diff 逐项对照预期，再以 DR-* 五类业务数据规则对落库数据求值，
+数据结论只能由确定性脚本落盘，finalize 增加 data_gate 数据门禁。
+
+##### 确定性内核 `scripts/data_test/`
+
+- ✅ 新增 `data_rules.py`：受限表达式求值器（自研 tokenizer + 递归下降解析器，**非 eval**，
+  白名单文法：字段引用/字面量/比较/四则/`len()`/聚合 `count/sum/min/max/exists`）；
+  五类业务数据规则（UNIQ 唯一性 / INV 不变式 / CONS 守恒 / SM 状态机 / REF 引用完整）；
+  主键对齐的**行级快照 diff**（added/removed/changed + 列级新旧值）与 DC 预期匹配（match 谓词、
+  行数/关联行/状态迁移、未声明 transform 一律判不一致）
+- ✅ 新增 `db_probe.py`：只读快照引擎——复用 `su/db_guard.ReadOnlyGuard` 作为唯一语句通道
+  （仅 SELECT/SHOW/EXPLAIN、多语句拒绝、参数化传参）+ 连接级只读加固；
+  驱动缺失/连接失败**诚实降级** `env_failure`（数据断言 BLOCKED 而非谎报 FAIL/PASS）
+
+##### 记录器扩展（browser_test_recorder.py）
+
+- ✅ 新增子命令：`db-snapshot`（只读快照采集并登记落盘）/ `dc-check`（before/after 行级 diff
+  对照 DC 预期，确定性生成数据断言）/ `rule`（DR-* 规则求值，确定性生成规则断言）
+- ✅ `run --db-config` 启用数据层（engine=sqlite/mysql/postgres）；`case` 新增
+  `--db-check-before/--db-check-after/--dcs` 声明；断言类型新增 dc / rule
+- ✅ **数据校验不允许静默跳过**：声明 `--db-check-*` 未落盘快照 → `case end` 拒绝收尾；
+  声明 DC 未跑 `dc-check` → finalize 校验报 problems
+- ✅ finalize 新增 **data_gate 数据门禁**：dc_fail / rule_fail > 0、声明校验缺失、
+  数据通道阻断（env_failure）→ 整体 gate=FAIL；DC 覆盖率与数据断言通过率写入 summary 数据维度
+
+##### prompt 细化（docs/spec/role-prompts/）
+
+- ✅ `browser-test-planner.md`：Step 3 DT 数据组新增 `db_expectation`（期望表/行/列值/关联行/
+  状态迁移，写操作必填）；新增 Step 3.5 数据契约设计（DC-* 全链路映射 + transform 证据 +
+  快照查询清单）与 Step 3.6 业务数据规则声明（DR-* 五类）；产出物扩为七件套
+- ✅ `browser-test-execution.md`：DB 数据层预检、单用例循环新增数据步骤（before 快照→动作→
+  after 快照→dc-check→rule）、数据不一致三查协议（DC 预期错 / transform 未声明 / 真实缺陷，
+  绝不改 DB 预期放行）、DB 通道故障阻碍处理（功能继续、数据断言 BLOCKED）
+- ✅ 设计文档 `docs/dev/DATA_CONSISTENCY_TESTING.md`：三层架构 / DC-*、DR-* ID 规范 /
+  快照与 diff schema / 只读安全面 / 门禁与降级语义 / 端到端验证结论
+
+### Tests
+
+- ✅ `tests/test_v213_data_consistency.py`：11 用例全绿——diff 与规则内核 8 项 +
+  真实 SQLite 全链路 4 场景（前后快照 diff 落 PASS / 注入列值偏差落 FAIL 且传导 gate /
+  env_failure 诚实降级 / v2.12 纯 UI 回归零破坏）
+
+### Changed
+
+- skill-manifest.yaml / skills-index.json / claude-code-skill.json 版本 2.12.0 → 2.13.0；
+  SKILL.md 浏览器测试闭环章节升级（Step 3.5/3.6、Phase 3 数据层、data_gate、绝对禁止 +4 条）
+
 ## [2.12.0] - 2026-10-14
 
 ### Added

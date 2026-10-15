@@ -16,15 +16,20 @@
   4. assert  —— 给最近一条步骤追加断言明细（expected vs actual）
   5. error   —— 记录页面错误（console）/ 后台错误（网络）/ 疑似缺陷
   6. shot    —— 登记截图（校验文件存在后写索引）
-  7. blocker —— 记录阻碍及解决过程（选择器修复/数据补造/宿主降级等）
-  8. verify  —— 校验单个用例文件与目录结构的 schema 合规性
-  9. finalize—— 全量一致性校验（summary 与逐条 case 必须吻合）
+  7. blocker     —— 记录阻碍及解决过程（选择器修复/数据补造/宿主降级等）
+  8. db-snapshot —— 执行只读 DB 快照清单并登记进用例（v2.13）
+  9. rule        —— 声明式业务规则确定性求值并转断言落盘（v2.13）
+  10. dc-check   —— before/after 快照 diff 与 DC 契约预期对照（v2.13）
+  11. verify     —— 校验单个用例文件与目录结构的 schema 合规性
+  12. finalize   —— 全量一致性校验（summary 与逐条 case 必须吻合）
                  → 生成 summary.json + summary.md（通过率门禁）
 
 设计原则:
   - 失败安全: 记录器自身的单次调用失败不影响测试执行主流程
   - schema 强制: 任何缺必填字段的写入直接报错退出（非零码），杜绝残缺记录
   - 幂等安全: 同一 run_id 重复 run 仅补写缺失的 meta，不清空已有记录
+  - 数据结论确定性（v2.13）: DB 快照/规则判定/契约对照全部由
+    scripts/data_test 确定性内核计算，宿主 LLM 不口算任何数据结论
 """
 from __future__ import annotations
 
@@ -53,6 +58,26 @@ VALID_HOSTS = {"agent-browser", "trae-internal", "chrome-devtools", "auto"}
 # 阻碍类型合法值（与执行协议表格对齐）
 VALID_BLOCKER_TYPES = {"selector_fix", "data_prep", "env_failure",
                        "host_downgrade", "case_fix", "other"}
+# 数据断言类型合法值（v2.13：与 UI 六类断言分域，数据结论永不混入口算断言）
+VALID_DATA_KINDS = {"db_count", "db_value", "db_diff", "dc_contract", "data_rule"}
+
+# v2.13 确定性数据内核（受限表达式求值 / 快照 diff / 规则求值 / 只读 DB 快照）；
+# 导入失败视为安装缺陷直接崩溃——数据门禁不允许静默降级为"无数据校验"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from data_test.data_rules import (  # noqa: E402
+    RuleEvalError,
+    diff_matches_expectation,
+    diff_snapshots,
+    evaluate_rules,
+)
+from data_test.db_probe import (  # noqa: E402
+    DbProbeConfig,
+    DbProbeDegraded,
+    DbProbeError,
+    DbProber,
+    load_plan_file,
+    run_snapshot_plan,
+)
 
 
 def _now_iso() -> str:
@@ -109,10 +134,20 @@ def cmd_run(args: argparse.Namespace) -> int:
             _fail(f"非法宿主: {h}（合法: {sorted(VALID_HOSTS)}）")
     if meta_path.exists():
         meta = _load_json(meta_path)
+        # v2.13 幂等补齐：v2.12 老 run 目录续跑数据用例时补新字段与新子目录
+        changed = False
+        if "db_snapshots" not in meta:
+            meta["db_snapshots"] = {}
+            meta["db_config"] = args.db_config or ""
+            meta["db_checks"] = args.db_checks or ""
+            changed = True
+        if changed:
+            _dump_json(meta_path, meta)
+        (run_dir / "db-snapshots").mkdir(parents=True, exist_ok=True)
         print(json.dumps({"status": "exists", "run_dir": str(run_dir),
                           "run_id": meta.get("run_id")}, ensure_ascii=False))
         return 0
-    for sub in ("cases", "screenshots", "visual-diff"):
+    for sub in ("cases", "screenshots", "visual-diff", "db-snapshots"):
         (run_dir / sub).mkdir(parents=True, exist_ok=True)
     meta = {
         "run_id": args.run_id,
@@ -122,6 +157,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         "env": args.env,
         "note": args.note or "",
         "plan_ref": args.plan_ref or "",
+        # v2.13 数据校验溯源：快照文件 -> 产生它的清单/配置（run 级全局）
+        "db_snapshots": {},
+        "db_config": args.db_config or "",
+        "db_checks": args.db_checks or "",
         "cases": {},  # TC-ID -> {status, steps, assertions_total, assertions_failed, errors}
     }
     for h in meta["hosts"]:
@@ -158,6 +197,10 @@ def cmd_case(args: argparse.Namespace) -> int:
             "host": args.host,
             "linked_flows": [s for s in (args.flows or "").split(",") if s],
             "linked_datasets": [s for s in (args.datasets or "").split(",") if s],
+            # v2.13：关联的 DC 数据契约 ID 与 before/after 快照清单文件
+            "linked_dc_ids": [s for s in (args.dcs or "").split(",") if s],
+            "db_check_before": args.db_check_before or "",
+            "db_check_after": args.db_check_after or "",
             "status": "running",
             "started_at": _now_iso(),
             "ended_at": None,
@@ -188,14 +231,28 @@ def cmd_case(args: argparse.Namespace) -> int:
     case["status"] = args.status
     case["ended_at"] = _now_iso()
     _dump_json(case_path, case)
+    # v2.13 数据校验未执行闸：声明了快照清单却从未落任何快照 -> 拒绝结束
+    if (case.get("db_check_before") or case.get("db_check_after")) \
+            and not _snapshot_files(run_dir, args.case_id):
+        _fail("用例 {0} 声明了 --db-check-before/--db-check-after "
+              "但无任何 db-snapshot 记录——数据校验不允许静默跳过".format(args.case_id))
     a_total = sum(len(s["assertions"]) for s in case["steps"])
     a_failed = sum(1 for s in case["steps"] for a in s["assertions"] if not a["pass"])
+    # v2.13：数据断言单独计数（kind in VALID_DATA_KINDS），finalize 数据门禁输入
+    d_total = sum(1 for s in case["steps"] for a in s["assertions"]
+                  if a["kind"] in VALID_DATA_KINDS)
+    d_failed = sum(1 for s in case["steps"] for a in s["assertions"]
+                   if a["kind"] in VALID_DATA_KINDS and not a["pass"])
+    snap_files = _snapshot_files(run_dir, args.case_id)
     meta["cases"][args.case_id] = {
         "status": args.status,
         "priority": case["priority"],
         "steps": len(case["steps"]),
         "assertions_total": a_total,
         "assertions_failed": a_failed,
+        "data_assertions_total": d_total,
+        "data_assertions_failed": d_failed,
+        "db_snapshots": len(snap_files),
         "errors": len(case["errors"]),
         "blockers": len(case["blockers"]),
     }
@@ -273,8 +330,8 @@ def cmd_assert(args: argparse.Namespace) -> int:
         "pass": (args.passed == "true"),
         "kind": args.kind,
     }
-    if args.kind not in {"url", "dom", "network", "console", "text", "state"}:
-        _fail(f"非法断言类型: {args.kind}")
+    if args.kind not in {"url", "dom", "network", "console", "text", "state"} | VALID_DATA_KINDS:
+        _fail(f"非法断言类型: {args.kind}（UI 六类 + v2.13 数据五类 {sorted(VALID_DATA_KINDS)}）")
     case["steps"][idx]["assertions"].append(assertion)
     if not assertion["pass"]:
         case["steps"][idx]["status"] = "fail"
@@ -362,6 +419,284 @@ def cmd_blocker(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# v2.13 数据校验子命令：db-snapshot / rule / dc-check
+# ---------------------------------------------------------------------------
+
+def _snapshot_files(run_dir: Path, case_id: str) -> List[Path]:
+    """列出某用例已落盘的全部快照文件（case 数据闸与 finalize 计数的输入）。"""
+    return sorted((run_dir / "db-snapshots").glob(f"{case_id}__*.json"))
+
+
+def _resolve_db_config(args: argparse.Namespace, run_dir: Path):
+    """解析本次快照用的 DB 配置：--db-config 优先，缺省回退 run-meta.db_config。
+
+    返回 (config, source_label) 元组——source_label 写进 run 级索引做全链路溯源。
+    """
+    cfg_path = getattr(args, "db_config", "") or ""
+    source = "cli"
+    if not cfg_path:
+        meta = _load_json(run_dir / "run-meta.json")
+        cfg_path = meta.get("db_config") or ""
+        source = "run-meta"
+    if not cfg_path:
+        _fail("db-snapshot 需要 --db-config（或 run 时已登记 --db-config）")
+    try:
+        cfg = DbProbeConfig.load(cfg_path)
+    except DbProbeError as exc:
+        _fail(str(exc))
+        raise  # _fail 已退出；raise 仅为静态分析收口
+    return cfg, source
+
+
+def cmd_db_snapshot(args: argparse.Namespace) -> int:
+    """执行只读 DB 快照清单并把快照文件登记进用例与 run-meta。
+
+    诚实降级：驱动缺失（DbProbeDegraded）→ 自动写 env_failure 阻碍、退出码 0，
+    让宿主 LLM 把数据步骤标 BLOCKED 而不是误报数据 FAIL；
+    配置/清单/执行错误（DbProbeError）→ 非零退出，宿主必须先修复再跑。
+
+    快照文件名：{case_id}__{check_id}__{phase}.json（phase = before/after）。
+    """
+    run_dir, case_path, case = _case_context(args)
+    try:
+        plans = load_plan_file(args.check_file)
+    except DbProbeError as exc:
+        _fail(str(exc))
+        return 1
+    cfg, cfg_source = _resolve_db_config(args, run_dir)
+    # 参数注入映射（{{order_id}} 占位替换）——先校验 JSON 合法再建连接
+    try:
+        param_map = json.loads(args.params) if args.params else {}
+    except json.JSONDecodeError as exc:
+        _fail(f"--params 不是合法 JSON: {exc}")
+        return 1
+    if not isinstance(param_map, dict):
+        _fail("--params 必须是 JSON 对象")
+    snap_dir = run_dir / "db-snapshots"
+    written: List[Dict[str, Any]] = []
+    try:
+        with DbProber(cfg) as prober:
+            for plan in plans:
+                one = dict(plan)
+                one["phase"] = args.phase
+                # 参数注入：清单里声明为 {{name}} 的占位由 --params 真实值替换，
+                # 未提供的占位立即报错（防止把 {{name}} 字面量查进快照）
+                if param_map:
+                    one["queries"] = [
+                        {**q, "sql": _inject_params(q.get("sql", ""), param_map,
+                                                    args.case_id)}
+                        for q in plan.get("queries", [])]
+                snapshot = run_snapshot_plan(prober, one)
+                snap_path = snap_dir / "{0}__{1}__{2}.json".format(
+                    args.case_id, snapshot["check_id"], args.phase)
+                _dump_json(snap_path, snapshot)
+                written.append({"check_id": snapshot["check_id"],
+                                "phase": args.phase,
+                                "file": snap_path.name,
+                                "query_count": len(snapshot["snapshots"])})
+    except DbProbeDegraded as exc:
+        # 诚实降级：记录 env_failure 阻碍，数据结论以 BLOCKED 呈现（退出码 0）
+        case["blockers"].append({
+            "type": "env_failure", "step_seq": len(case["steps"]),
+            "description": "DB 快照引擎降级：{0}".format(exc),
+            "resolved": False, "resolution": "", "ts": _now_iso()})
+        _dump_json(case_path, case)
+        print(json.dumps({"status": "degraded", "reason": str(exc),
+                          "hint": "宿主应把数据步骤标 BLOCKED(env_failure)"},
+                         ensure_ascii=False))
+        return 0
+    except DbProbeError as exc:
+        _fail(str(exc))
+        return 1
+    # 登记关联：用例级（同 check_id+phase 重写时替换旧项，快照可修正重跑）
+    links = case.setdefault("db_snapshot_files", [])
+    for w in written:
+        dup = [x for x in links
+               if x["check_id"] == w["check_id"] and x["phase"] == w["phase"]]
+        for d in dup:
+            links.remove(d)
+        links.append(w)
+    _dump_json(case_path, case)
+    # run 级索引：快照文件 → 产生它的配置/清单（数据结论的全链路溯源）
+    meta_path = run_dir / "run-meta.json"
+    meta = _load_json(meta_path)
+    idx = meta.setdefault("db_snapshots", {})
+    for w in written:
+        idx[w["file"]] = {"case_id": args.case_id, "check_id": w["check_id"],
+                          "phase": w["phase"], "config": cfg_source,
+                          "plan": args.check_file, "ts": _now_iso()}
+    _dump_json(meta_path, meta)
+    print(json.dumps({"status": "snapshots_recorded", "case_id": args.case_id,
+                      "phase": args.phase, "written": written}, ensure_ascii=False))
+    return 0
+
+
+def _inject_params(sql: str, param_map: Dict[str, Any], case_id: str) -> str:
+    """把 SQL 中的 {{name}} 占位替换为 --params 提供的值文本。
+
+    值必须是 JSON 标量；字符串加单引号（内部单引号翻倍转义），数字/布尔/None
+    直写。防注入：替换结果复查，含分号/注释符/花括号残留直接拒绝。
+    这是声明式清单的参数化旁路（主通道仍是 run_query 的 params 绑定）。
+    """
+    import re as _re
+
+    def repl(m):
+        name = m.group(1)
+        if name not in param_map:
+            _fail("用例 {0} 快照 SQL 占位 {1} 未在 --params 提供".format(case_id, name))
+        val = param_map[name]
+        if isinstance(val, bool):
+            text = "1" if val else "0"
+        elif val is None:
+            text = "NULL"
+        elif isinstance(val, (int, float)):
+            text = str(val)
+        elif isinstance(val, str):
+            text = "'" + val.replace("'", "''") + "'"
+        else:
+            _fail("--params.{0} 只允许 JSON 标量（字符串/数字/布尔/null）".format(name))
+        if any(tok in text for tok in ("{{", "}}", "--", "/*")) or ";" in text:
+            _fail("--params.{0} 的值含 SQL 注入面字符，已拒绝".format(name))
+        return text
+
+    return _re.sub(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}", repl, sql)
+
+
+def _load_snapshots_for_rule(run_dir: Path, case_id: str) -> Dict[str, Dict[str, Any]]:
+    """加载用例全部快照文件 → {label: rows 结构} 合并视图（rule 子命令上下文）。
+
+    合并语义：快照内 snapshots[label] 直接取 run_query 行结构；同时为每个
+    label 生成 {phase}__{label} 键——before/after 同名 label 并存时（如 SM
+    规则需要两份同名状态快照）用带前缀键显式区分。
+    """
+    merged: Dict[str, Dict[str, Any]] = {}
+    for snap_file in _snapshot_files(run_dir, case_id):
+        snap = _load_json(snap_file)
+        phase = snap.get("phase", "")
+        for label, payload in snap.get("snapshots", {}).items():
+            merged[label] = payload
+            merged["{0}__{1}".format(phase, label)] = payload
+    return merged
+
+
+def cmd_rule(args: argparse.Namespace) -> int:
+    """业务规则求值：逐条确定性判定，每条转 data_rule 断言挂到目标步骤。
+
+    求值上下文 = 该用例全部快照合并视图（见 _load_snapshots_for_rule）；
+    结论同时写 case["rule_verdicts"]（finalize 数据门禁的输入）。
+    """
+    run_dir, case_path, case = _case_context(args)
+    rules_raw = _load_json(Path(args.rules))
+    rules = rules_raw.get("rules") if isinstance(rules_raw, dict) else rules_raw
+    if not isinstance(rules, list) or not rules:
+        _fail("规则文件 {0} 必须含非空 rules 数组".format(args.rules))
+    idx = (args.seq - 1) if args.seq else len(case["steps"]) - 1
+    if not (0 <= idx < len(case["steps"])):
+        _fail("规则断言目标步骤不存在: seq={0}".format(args.seq))
+    snapshots = _load_snapshots_for_rule(run_dir, args.case_id)
+    if not snapshots:
+        _fail("用例 {0} 无任何快照文件——rule 必须在 db-snapshot 之后执行".format(
+            args.case_id))
+    try:
+        verdicts = evaluate_rules(rules, snapshots)
+    except RuleEvalError as exc:
+        _fail("规则求值失败：{0}".format(exc))
+        return 1
+    step = case["steps"][idx]
+    verdict_list = case.setdefault("rule_verdicts", [])
+    passed = failed = 0
+    for v in verdicts:
+        step["assertions"].append({"expected": v["expected"],
+                                   "actual": v["actual"],
+                                   "pass": v["pass"], "kind": "data_rule",
+                                   "evidence": v["rule_id"]})
+        verdict_list.append(v)
+        if v["pass"]:
+            passed += 1
+        else:
+            failed += 1
+    if failed:
+        step["status"] = "fail"
+    _dump_json(case_path, case)
+    print(json.dumps({"status": "rules_evaluated", "case_id": args.case_id,
+                      "total": len(verdicts), "passed": passed, "failed": failed},
+                     ensure_ascii=False))
+    return 0
+
+
+def cmd_dc_check(args: argparse.Namespace) -> int:
+    """DC 契约对照：before/after 同名查询快照做行级 diff，与预期逐项核对。
+
+    快照配对：before/after 各取对应 phase 快照中 label=--before-label
+    （缺省取 before 的第一个 label）的查询结果；缺一侧即 FAIL 并带明细。
+    判定由 data_test.diff_snapshots + diff_matches_expectation 确定性完成，
+    结论以 dc_contract 断言落盘（evidence=契约 ID）。
+    """
+    run_dir, case_path, case = _case_context(args)
+    # 解析预期：--expectation 内联优先，否则回退用例 dc_contracts 同 ID 条目
+    expectation: Dict[str, Any] = {}
+    if args.expectation:
+        try:
+            expectation = json.loads(args.expectation)
+        except json.JSONDecodeError as exc:
+            _fail("--expectation 不是合法 JSON: {0}".format(exc))
+        if not isinstance(expectation, dict):
+            _fail("--expectation 必须是 JSON 对象")
+    else:
+        for dcc in case.get("dc_contracts", []):
+            if dcc.get("contract_id") == args.contract_id:
+                expectation = dcc.get("expectation") or {}
+                break
+        if not expectation:
+            _fail("用例无 DC 契约 {0}（且 --expectation 未提供）".format(args.contract_id))
+    idx = (args.seq - 1) if args.seq else len(case["steps"]) - 1
+    if not (0 <= idx < len(case["steps"])):
+        _fail("DC 断言目标步骤不存在: seq={0}".format(args.seq))
+    # 快照收集：phase -> label -> rows
+    phase_rows: Dict[str, Dict[str, List[Dict[str, Any]]]] = {"before": {}, "after": {}}
+    for snap_file in _snapshot_files(run_dir, args.case_id):
+        snap = _load_json(snap_file)
+        phase = snap.get("phase")
+        if phase not in phase_rows:
+            continue
+        for label, payload in snap.get("snapshots", {}).items():
+            phase_rows[phase][label] = payload.get("rows", [])
+    key_cols = [s.strip() for s in (args.key_columns or "").split(",") if s.strip()]
+    label = args.before_label or next(iter(phase_rows["before"]), "")
+    b_rows = phase_rows["before"].get(label)
+    a_rows = phase_rows["after"].get(label)
+    diff_out: Dict[str, Any] = {}
+    if b_rows is None or a_rows is None:
+        ok = False
+        detail = "缺少 phase={0} 快照（需要 label={1}，先跑 db-snapshot）".format(
+            "before" if b_rows is None else "after", label or "<空>")
+    else:
+        diff_out = diff_snapshots(b_rows, a_rows, key_cols)
+        ok, detail = diff_matches_expectation(diff_out, expectation)
+    step = case["steps"][idx]
+    step["assertions"].append({"expected": json.dumps(expectation, ensure_ascii=False),
+                               "actual": detail, "pass": ok,
+                               "kind": "dc_contract", "evidence": args.contract_id})
+    if not ok:
+        step["status"] = "fail"
+    # 契约结论登记（finalize 数据门禁输入；同 ID 重写时替换旧结论）
+    dcs = case.setdefault("dc_contracts", [])
+    dcs[:] = [d for d in dcs if d.get("contract_id") != args.contract_id]
+    dcs.append({"contract_id": args.contract_id, "expectation": expectation,
+                "result": "pass" if ok else "fail",
+                "diff_summary": {k: (len(v) if isinstance(v, list) else v)
+                                 for k, v in diff_out.items()
+                                 if k in ("added", "removed", "changed",
+                                          "before_count", "after_count")},
+                "ts": _now_iso()})
+    _dump_json(case_path, case)
+    print(json.dumps({"status": "dc_checked", "case_id": args.case_id,
+                      "contract_id": args.contract_id, "pass": ok,
+                      "detail": detail}, ensure_ascii=False))
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # verify 子命令：单用例 schema 校验
 # ---------------------------------------------------------------------------
 
@@ -394,6 +729,20 @@ def _validate_case(case: Dict[str, Any]) -> List[str]:
                 problems.append(f"step#{seq} 判 fail 但无失败断言/错误依据")
         if st.get("action") == "screenshot" and not st.get("screenshot"):
             problems.append(f"step#{seq} screenshot 动作为空路径")
+    # v2.13：dc_contracts 结构校验（每项必须 contract_id + expectation 对象）
+    for dcc in case.get("dc_contracts", []):
+        if not dcc.get("contract_id"):
+            problems.append("dc_contracts 存在缺 contract_id 的条目")
+        if not isinstance(dcc.get("expectation"), dict):
+            problems.append("dc_contracts[{0}] expectation 必须是对象".format(
+                dcc.get("contract_id")))
+    # v2.13：数据类断言必须携带 evidence 溯源（快照文件名或规则 ID），
+    # 否则无法复核——数据结论的可审计性是闭环成立的前提
+    for st in case.get("steps", []):
+        for a in st.get("assertions", []):
+            if a.get("kind") in VALID_DATA_KINDS and not a.get("evidence"):
+                problems.append("step#{0} 数据断言 kind={1} 缺 evidence 溯源".format(
+                    st.get("seq"), a.get("kind")))
     # FAIL 用例必须有原因
     if case.get("status") == "fail" and not case.get("errors") and not case.get("blockers"):
         problems.append("用例判 fail 但无 error/blocker 记录")
@@ -451,6 +800,12 @@ def cmd_finalize(args: argparse.Namespace) -> int:
         "steps_total": 0, "assertions_total": 0, "assertions_failed": 0,
         "console_errors": 0, "network_errors": 0, "suspected_bugs": 0,
         "blockers": 0, "blockers_unresolved": 0, "screenshots": 0,
+        # v2.13 数据校验统计（data_gate 的输入）
+        "data_snapshots": 0, "data_assertions_total": 0, "data_assertions_failed": 0,
+        "dc_total": 0, "dc_pass": 0,
+        "rules_total": 0, "rules_pass": 0,
+        # 唯一快照文件名收集用 set（finalize 末尾转计数，保证 summary.json 可序列化）
+        "data_snapshot_files": set(),
     }
     p0 = {"total": 0, "fail": 0, "blocked": 0}
     bug_list: List[Dict[str, Any]] = []
@@ -478,6 +833,23 @@ def cmd_finalize(args: argparse.Namespace) -> int:
         stats["assertions_total"] += a_total
         stats["assertions_failed"] += a_fail
         stats["screenshots"] += len(case.get("screenshots", []))
+        # v2.13 数据计数：用例关联快照文件 + 全局唯一快照集 + 数据断言/DC/规则统计
+        case_snaps = _snapshot_files(run_dir, cid)
+        stats["data_snapshots"] += len(case_snaps)
+        stats["data_snapshot_files"].update(d.name for d in case_snaps)
+        for d_assert in (a for s in case["steps"] for a in s["assertions"]
+                         if a["kind"] in VALID_DATA_KINDS):
+            stats["data_assertions_total"] += 1
+            if not d_assert["pass"]:
+                stats["data_assertions_failed"] += 1
+        for dcc in case.get("dc_contracts", []):
+            stats["dc_total"] += 1
+            if dcc.get("result") == "pass":
+                stats["dc_pass"] += 1
+        for rv in case.get("rule_verdicts", []):
+            stats["rules_total"] += 1
+            if rv.get("pass"):
+                stats["rules_pass"] += 1
         for err in case.get("errors", []):
             if err["source"] == "console":
                 stats["console_errors"] += 1
@@ -499,15 +871,40 @@ def cmd_finalize(args: argparse.Namespace) -> int:
                 p0["blocked"] += 1
     if inconsistent:
         _fail(f"一致性失败（run-meta 快照与用例文件不符）: {inconsistent}")
+    # v2.13 数据门禁：启用数据校验（有快照）时——
+    #   任何数据断言失败 / DC 契约未全部通过 / 业务规则未全部通过 -> gate=FAIL；
+    # 未启用（老 run 或纯 UI 测试）时数据门禁视为 PASS（不惩罚无数据场景）
+    stats["data_snapshot_files"] = len(stats["data_snapshot_files"])
+    data_enabled = stats["data_snapshot_files"] > 0
+    data_gate = "PASS"
+    data_gate_reasons: List[str] = []
+    if data_enabled:
+        if stats["data_assertions_failed"] > 0:
+            data_gate = "FAIL"
+            data_gate_reasons.append("数据断言失败 {0} 条".format(
+                stats["data_assertions_failed"]))
+        if stats["dc_total"] and stats["dc_pass"] != stats["dc_total"]:
+            data_gate = "FAIL"
+            data_gate_reasons.append("DC 契约 {0}/{1} 通过".format(
+                stats["dc_pass"], stats["dc_total"]))
+        if stats["rules_total"] and stats["rules_pass"] != stats["rules_total"]:
+            data_gate = "FAIL"
+            data_gate_reasons.append("业务规则 {0}/{1} 通过".format(
+                stats["rules_pass"], stats["rules_total"]))
+    else:
+        data_gate_reasons.append("本 run 未启用 DB 数据校验")
     gate = "PASS" if (stats["fail"] == 0 and stats["blocked"] == 0
                       and p0["fail"] == 0 and p0["blocked"] == 0
-                      and p0["total"] > 0) else "FAIL"
+                      and p0["total"] > 0 and data_gate == "PASS") else "FAIL"
     summary = {
         "run_id": meta["run_id"],
         "finalized_at": _now_iso(),
         "target_url": meta.get("target_url", ""),
         "hosts": meta.get("hosts", []),
         "gate": gate,
+        "data_gate": data_gate,
+        "data_gate_reasons": data_gate_reasons,
+        "db_snapshots": meta.get("db_snapshots", {}),
         "p0": p0,
         "stats": stats,
         "suspected_bugs": bug_list,
@@ -517,6 +914,7 @@ def cmd_finalize(args: argparse.Namespace) -> int:
     _dump_json(run_dir / "summary.json", summary)
     (run_dir / "summary.md").write_text(_render_summary_md(summary), encoding="utf-8")
     print(json.dumps({"status": "finalized", "gate": gate,
+                      "data_gate": data_gate,
                       "summary": str(run_dir / "summary.json")}, ensure_ascii=False))
     return 0 if gate == "PASS" else 1
 
@@ -540,6 +938,17 @@ def _render_summary_md(s: Dict[str, Any]) -> str:
         f"- **疑似产品缺陷**: {st['suspected_bugs']} 条",
         f"- **阻碍**: {st['blockers']} 条（未解决 {st['blockers_unresolved']}）",
         f"- **截图**: {st['screenshots']} 张",
+        # v2.13 数据校验统计段（始终渲染，未启用时明确说明）
+        "- **数据校验门禁**: {0}（{1}）".format(
+            "✅ PASS" if s.get("data_gate") == "PASS" else "❌ FAIL",
+            "；".join(s.get("data_gate_reasons", []))),
+        "- **DB 快照**: {0} 次 / {1} 个唯一快照文件".format(
+            st.get("data_snapshots", 0), st.get("data_snapshot_files", 0)),
+        "- **数据断言**: {0} 条（失败 {1}）".format(
+            st.get("data_assertions_total", 0), st.get("data_assertions_failed", 0)),
+        "- **DC 契约**: {0}/{1} 通过；**业务规则**: {2}/{3} 通过".format(
+            st.get("dc_pass", 0), st.get("dc_total", 0),
+            st.get("rules_pass", 0), st.get("rules_total", 0)),
         "",
         "## 用例结果",
         "",
@@ -569,7 +978,8 @@ def build_parser() -> argparse.ArgumentParser:
     """构建子命令解析器（run/case/step/assert/error/shot/blocker/verify/finalize）"""
     p = argparse.ArgumentParser(
         prog="browser_test_recorder.py",
-        description="v2.12 浏览器测试执行记录器：步骤/断言/错误/阻碍/schema 校验/汇总报告")
+        description="v2.12/v2.13 浏览器测试执行记录器：步骤/断言/错误/阻碍/"
+                    "DB 快照/业务规则/DC 契约对照/schema 校验/汇总报告")
     p.add_argument("--out", default="browser-test-runs", help="运行产物根目录")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -581,6 +991,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--env", default="", help="环境描述（如 staging/本地 docker）")
     sp.add_argument("--note", default="")
     sp.add_argument("--plan-ref", default="", help="测试计划文件路径（溯源）")
+    sp.add_argument("--db-config", dest="db_config", default="",
+                    help="v2.13：DB 连接配置 JSON（只读快照数据源，run 级溯源）")
+    sp.add_argument("--db-checks", dest="db_checks", default="",
+                    help="v2.13：DC 契约文件路径（planner 产出的 data-contracts.json）")
 
     sp = sub.add_parser("case", help="开始/结束用例")
     sp.add_argument("--run-id", required=True)
@@ -593,6 +1007,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--datasets", default="", help="关联 DT ID（逗号分隔）")
     sp.add_argument("--status", default="pass",
                     help="end 时的最终状态 pass/fail/blocked/skipped")
+    sp.add_argument("--dcs", default="", help="v2.13：关联 DC 契约 ID（逗号分隔）")
+    sp.add_argument("--db-check-before", dest="db_check_before", default="",
+                    help="v2.13：操作前快照清单文件（启用则该用例必须走数据校验）")
+    sp.add_argument("--db-check-after", dest="db_check_after", default="",
+                    help="v2.13：操作后快照清单文件")
 
     sp = sub.add_parser("step", help="追加步骤记录")
     sp.add_argument("--run-id", required=True)
@@ -648,6 +1067,35 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--case-id", default="", help="单用例（与 --all 二选一）")
     sp.add_argument("--all", action="store_true", help="校验全部用例")
 
+    sp = sub.add_parser("db-snapshot", help="v2.12/v2.13：执行只读 DB 快照清单并登记")
+    sp.add_argument("--run-id", required=True)
+    sp.add_argument("--case-id", required=True)
+    sp.add_argument("--check-file", required=True,
+                    help="快照清单 JSON（单对象或数组，见 db_probe.run_snapshot_plan）")
+    sp.add_argument("--phase", required=True, choices=["before", "after"],
+                    help="操作前/操作后（finalize 按 phase 配对做 diff）")
+    sp.add_argument("--db-config", dest="db_config", default="",
+                    help="DB 连接配置（缺省回退 run-meta.db_config）")
+    sp.add_argument("--params", default="",
+                    help="参数注入 JSON 对象（替换清单 SQL 中的双花括号占位）")
+
+    sp = sub.add_parser("rule", help="v2.13：声明式业务规则确定性求值并转断言")
+    sp.add_argument("--run-id", required=True)
+    sp.add_argument("--case-id", required=True)
+    sp.add_argument("--rules", required=True, help="规则文件 JSON（rules 数组）")
+    sp.add_argument("--seq", type=int, default=0, help="断言挂到步骤序号（0=最近一条）")
+
+    sp = sub.add_parser("dc-check", help="v2.13：before/after 快照 diff 对照 DC 契约")
+    sp.add_argument("--run-id", required=True)
+    sp.add_argument("--case-id", required=True)
+    sp.add_argument("--contract-id", required=True, help="DC 契约 ID")
+    sp.add_argument("--expectation", default="",
+                    help="内联预期 JSON（缺省读用例 dc_contracts 中同 ID 条目）")
+    sp.add_argument("--key-columns", default="", help="行主键列（逗号分隔）")
+    sp.add_argument("--before-label", default="",
+                    help="before 快照查询 label（缺省用 before 的第一个 label）")
+    sp.add_argument("--seq", type=int, default=0, help="断言挂到步骤序号（0=最近一条）")
+
     sp = sub.add_parser("finalize", help="一致性校验 + 生成汇总报告")
     sp.add_argument("--run-id", required=True)
     return p
@@ -660,6 +1108,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "run": cmd_run, "case": cmd_case, "step": cmd_step,
         "assert": cmd_assert, "error": cmd_error, "shot": cmd_shot,
         "blocker": cmd_blocker, "verify": cmd_verify, "finalize": cmd_finalize,
+        "db-snapshot": cmd_db_snapshot, "rule": cmd_rule, "dc-check": cmd_dc_check,
     }
     return handlers[args.cmd](args)
 

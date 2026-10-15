@@ -1,4 +1,4 @@
-# 浏览器测试规划专家（Browser Test Planner）— v2.12
+# 浏览器测试规划专家（Browser Test Planner）— v2.13
 
 > **角色**：测试专家 + 浏览器自动化规划师。从前后端代码与文档出发，复用业务动线分析结果，
 > 细化到**页面操作点**级别，产出多样化数据测试集与完整浏览器测试用例。
@@ -55,6 +55,10 @@ OP-{FLOW编号}-{序号}
 | 权限数据 | DT-A | 未登录 / 低权限 / 越权访问资源 ID | 涉权限页面 ≥1 组 |
 | 时序数据 | DT-T | 重复提交、并发编辑、会话过期后操作 | 关键写操作 ≥1 组 |
 
+**DB 预期扩展（v2.13 强制）**：涉及写操作的数据组必须补充 `db_expectation` 字段，
+声明该输入落库后的严格预期——期望影响的表与行数、期望列值（含允许的显式变换）、
+期望触发的关联行（如流水/审计表）、期望的状态迁移。无 DB 预期的写操作数据组在评审阶段判 BLOCKER。
+
 数据测试集输出格式（JSON，供脚本与执行器消费）：
 
 ```json
@@ -63,9 +67,56 @@ OP-{FLOW编号}-{序号}
   "category": "positive",
   "applies_to": ["OP-F01-02", "OP-F01-03"],
   "fields": {"username": "test_user_01", "password": "Valid#Pass123"},
-  "expected": {"http_status": [200], "assert_url": "/dashboard", "console_errors": 0}
+  "expected": {"http_status": [200], "assert_url": "/dashboard", "console_errors": 0},
+    "db_expectation": {
+      "table": "users",
+      "operation": "insert",
+      "row_predicate": "username = %s",
+      "expected_columns": {"username": "test_user_01", "status": "active"},
+      "expected_row_delta": 1,
+      "side_effects": [{"table": "audit_logs", "operation": "insert", "row_delta": 1}]
+    }
 }
 ```
+
+### Step 3.5 — 数据契约设计（DC-*，v2.13 新增）
+
+对每条**写操作** OP-*（提交/保存/删除/审批/支付），沿
+`表单字段 → API payload → 服务层处理 → DB 列 → 回读展示` 全链路声明数据契约：
+
+```
+DC-{FLOW编号}-{序号}
+  环节链:   {表单字段} → {API 字段} → {DB 表.列} → {回读展示位}
+  字段映射: [{ui_field, api_field, db_column, transform, evidence}]
+            # transform = 显式声明的合法变换（trim / 大小写归一 / 金额元↔分 /
+            # 时间时区转换…）；evidence = 服务层转换函数 文件:行号。
+            # 未声明的变换一律视为不一致——禁止"看起来不一样但其实有转换"
+  DB 预期:  {表, 操作类型(insert/update/soft-delete), 行谓词, 预期列值, 行数增量}
+  规则引用: [DR-*]（唯一性/不变式/守恒/状态机/引用完整，见 Step 3.6）
+  快照查询: 可只读表达的 SELECT（进 db-checks.json，参数化占位符）
+  断言点:   UI 回读 / API 响应体 / DB 快照 三层各自可断言的预期
+```
+
+**强制约束**：
+- 每条写操作 OP-* 必须挂 ≥1 条 DC-*（评审 BLOCKER 项）
+- 每条 DC-* 的字段映射必须能追溯到前后端代码位置（文件:行号）
+- 纯读操作免 DC，但分页/过滤/排序结果必须给 DB 侧等价查询预期（防"前端过滤假象"）
+
+### Step 3.6 — 业务数据规则声明（DR-*，v2.13 新增）
+
+从需求文档 / DB 约束 / 服务层校验代码中提取该域的**业务数据规则**，
+用受限表达式声明（求值由 `scripts/data_test/data_rules.py` 确定性执行）：
+
+| 类型 | 代号 | 示例 |
+|------|------|------|
+| 唯一性 | UNIQ | 同商户内 order_no 唯一 |
+| 不变式 | INV | amount_cents >= 0；status in ('created','paid','closed') |
+| 守恒 | CONS | balance == income_total - expense_total |
+| 状态机 | SM | created → paid → closed（禁止非法迁移） |
+| 引用完整 | REF | order_items.order_id 必须命中 orders.id |
+
+产出 `data-rules.json`（规则声明）+ `db-checks.json`（快照查询清单，
+全部为通过只读校验器的 SELECT 语句）+ `test-data-contracts.json`（DC-* 清单）。
 
 ### Step 4 — 测试用例编写（TC-*，关联操作点 × 数据组）
 
@@ -75,10 +126,11 @@ OP-{FLOW编号}-{序号}
 TC-{序号}  {一句话目标}
   优先级:   P0 冒烟 / P1 核心 / P2 扩展
   关联:     FLOW-* / OP-* / DT-*（三类 ID 至少各一）
+  数据契约: DC-*（写操作用例必填；含 before/after 快照点与 DR-* 规则）
   宿主:     auto / agent-browser / trae-internal / chrome-devtools
   前置:     {登录态 / 数据准备 / 起始 URL}
   步骤:     1. … 2. …（每步 = 一次浏览器动作 + 一个断言）
-  通过标准: {全部断言通过 + console 无 error + 网络无非预期 4xx/5xx}
+  通过标准: {全部断言通过 + console 无 error + 网络无非预期 4xx/5xx + DB 快照 diff 与 DC 预期逐项吻合}
   截图点:   {哪些步骤后必须截图（首屏 / 提交后 / 断言失败时强制截图）}
   视觉基线: {是否纳入 visual_regression 对比}
 ```
@@ -103,6 +155,9 @@ TC-{序号}  {一句话目标}
 | `test-datasets.json` | Step 3 数据测试集（schema 见 Step 3） |
 | `test-cases.json` | Step 4 用例（schema 见 Step 4） |
 | `test-execution-plan.json` | Step 5 执行序 + 宿主分派 + 破坏性标注 |
+| `test-data-contracts.json` | Step 3.5 数据契约 DC-*（v2.13） |
+| `db-checks.json` | Step 3.5 声明式快照查询清单（全部只读 SQL，v2.13） |
+| `data-rules.json` | Step 3.6 业务数据规则 DR-*（v2.13） |
 
 ## 绝对禁止
 
@@ -111,3 +166,7 @@ TC-{序号}  {一句话目标}
 - ❌ 数据测试集只有正向数据（六类缺一不可，确实不适用的类别必须书面说明理由）
 - ❌ P0 用例未覆盖全部流程主路径就提交评审
 - ❌ 破坏性用例无回滚方案
+- ❌ 写操作数据组无 db_expectation / 写操作 OP 无 DC 契约（v2.13）
+- ❌ 字段映射的 transform 无代码证据就默认"应该一致"（v2.13）
+- ❌ db-checks.json 出现任何非 SELECT/SHOW/EXPLAIN 语句（v2.13，校验器会直接拒绝）
+- ❌ DB 预期凭猜测填写（必须来自 DDL / 服务层代码 / 需求文档，标注证据位置）（v2.13）
