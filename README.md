@@ -1,8 +1,31 @@
 # Trae Multi-Agent Skill
 
-🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致；v2.10 新增方案撰写全流程——业界调研+四角色交叉评审+共识收敛闭环；v2.11 新增业务动线分析与页面设计闭环——SU 页面发现→5 类断点检测+5 类漏洞扫描→缺失页面 GAP-DESIGN 9 段式设计→多角色评审→执行开发→UI/UX 视觉测试；v2.12 新增浏览器端页面功能与视觉测试闭环——操作点细化→六类数据测试集→用例四角色评审→三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）逐一执行→步骤级全程记录与阻碍闭环；v2.13 数据校验闭环——DC 数据契约（表单→API→DB→回读全链路映射）→操作前后 DB 只读快照→行级 diff 严格对照→DR 五类业务数据规则求值→data_gate 数据门禁。
+🎭 基于任务类型动态调度到合适的智能体角色（架构师、产品经理、测试专家、独立开发者、UI 设计师）。支持多智能体协作、共识机制、完整项目生命周期管理、规范驱动开发、代码地图生成、项目理解能力和 UI 设计能力。支持中英文双语。v2.6 新增 Ponytail 决策梯（少写多余代码）、Autonomous 自主迭代模式、Dynamic Workflows 6 大模式、插件热加载，v2.7 新增 UI/UX 巡检分析与视觉回归测试脚本，v2.7.1 修订 AI 诚实降级、真实语义匹配、双宿主清单同步与 v1 死代码清算，v2.8 新增八阶段工作流+文档对照代码审查（六大维度 D1-D6），v2.8.1 八阶段整体构建为一个 Loop（WorkflowLoopController + RollbackStrategy 回退策略），v2.9 新增既有系统理解能力（SU）——黑盒 Web 系统全只读反向理解，v2.9.1 新增 SU 第三阶段"专家详说"（SFD）——五专家分节撰写并装配《系统功能详说文档》；v2.9.2 修复 D1：understanding.json 的 meta.run_status 渲染收口即终态，与 run_meta 一致；v2.10 新增方案撰写全流程——业界调研+四角色交叉评审+共识收敛闭环；v2.11 新增业务动线分析与页面设计闭环——SU 页面发现→5 类断点检测+5 类漏洞扫描→缺失页面 GAP-DESIGN 9 段式设计→多角色评审→执行开发→UI/UX 视觉测试；v2.12 新增浏览器端页面功能与视觉测试闭环——操作点细化→六类数据测试集→用例四角色评审→三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）逐一执行→步骤级全程记录与阻碍闭环；v2.13 数据校验闭环——DC 数据契约（表单→API→DB→回读全链路映射）→操作前后 DB 只读快照→行级 diff 严格对照→DR 五类业务数据规则求值→data_gate 数据门禁；v2.14 功能覆盖驱动测试与缺陷台账——FUNC-* 每页功能清单（kind 五类 + 文件:行号证据）→finalize 现算覆盖矩阵 feature_gate（interactive/form 未覆盖即 FAIL + SHA256 清单锚定）→跨 run 缺陷台账（信号→工单→修复→回归→close/reopen 状态机 + 登记闸）。
 
-## 🎉 2026 年 10 月最新更新 (v2.13)
+## 🎉 2026 年 10 月最新更新 (v2.14)
+
+> 在 v2.13 数据校验闭环之上补齐**覆盖盲区**——用例全过不等于功能都测到了：没为某个按钮写用例，永远不会失败。FUNC-* 每页功能清单做分母、finalize 现算覆盖矩阵把关，同时把「疑似缺陷」升级为跨 run 有状态、有回归证据的缺陷工单。
+
+- ✅ **FUNC-* 每页功能清单（覆盖矩阵的分母）**
+  - 每页功能项五类 kind：interactive（按钮/开关/拖拽）/ form（表单提交）/ display（数据展示）/ nav（导航跳转）/ branch（条件分支）
+  - 每项 evidence 强制 `文件:行号`；**interactive/form 禁止豁免**，display/nav 豁免须书面 waive_reason
+  - 📝 **产出**: `page-feature-inventory.json`；🧭 **Prompt**: browser-test-planner.md Step 2.5
+
+- ✅ **feature_gate 覆盖矩阵门禁（finalize 现算）**
+  - FUNC × PASS 断言关联矩阵由 finalize 从执行记录现算（不信任自报）；interactive/form 任一未覆盖 → 整体 FAIL
+  - 清单原件 SHA256 锚定写入 run 元数据，执行期篡改清单「移动球门」→ 直接 FAIL
+  - 用例与步骤 `--funcs FUNC-01-01,...` 归因；summary.md 渲染覆盖矩阵 + 缺口清单（含归属页面与 kind）
+
+- ✅ **跨 run 缺陷台账（defects.json 全局工单）**
+  - 信号-工单模型：`error --suspected-bug` 是执行期信号；`defect add` 是正式工单，bug_ref 强制关联真实信号 error_seq
+  - 状态机：open →（update --commit 登记修复）→ fixed →（回归 run 关联用例全 PASS）→ closed；closed→regressed→open（reopen 强制 reason）
+  - 缺陷登记闸：suspected_bug 信号漏登工单 → finalize gate=FAIL；DEF-NNN 防已删条目 ID 复用
+  - 🧾 **子命令**: `browser_test_recorder.py defect add/update/close/reopen/audit/list`；🧭 **Prompt**: browser-test-execution.md「疑似缺陷登记闭环」
+
+- ✅ **测试与回归 (v2.14)**
+  - `tests/test_v214_feature_coverage.py` 19 用例（清单 schema 7 + 覆盖门禁 3 + 台账状态机 7 + 纯 UI 回归 1）；三版全量回归 50 passed
+
+### 🎉 2026 年 10 月更新 (v2.13)
 
 > 在 v2.12 浏览器测试闭环之上向下扎到**数据层**——接口 200、页面提示"成功"不等于数据真的落对了库。DC 数据契约 + DB 前后只读快照行级 diff + DR 业务规则求值，数据一致性结论只能由确定性脚本落盘。
 
@@ -1693,6 +1716,7 @@ SOFTWARE.
 
 | 版本 | 日期 | 核心特性 |
 |------|------|---------|
+| v2.14 | 2026 年 10 月 | 功能覆盖驱动测试与缺陷台账：FUNC-* 每页功能清单（kind 五类 + 文件:行号证据、interactive/form 禁豁免）、finalize 现算覆盖矩阵 feature_gate + SHA256 清单锚定、跨 run 缺陷台账 defect 状态机（信号→工单→修复→回归→close/reopen）+ 登记闸、case/step --funcs 归因 |
 | v2.13 | 2026 年 10 月 | 数据校验闭环：DC 数据契约（表单→API→DB→回读）、DB 前后只读快照 + 行级 diff 严格对照、DR 五类业务数据规则求值（受限表达式非 eval）、data_gate 数据门禁、data_test/ 确定性内核（data_rules.py + db_probe.py，复用 ReadOnlyGuard 严格只读） |
 | v2.12 | 2026 年 10 月 | 浏览器端页面功能与视觉测试闭环：操作点细化 OP-*、六类数据测试集 DT-*、TC 用例四角色评审、三宿主（agent-browser / Trae 内置浏览器 / Chrome DevTools MCP）执行、browser_test_recorder.py 全程记录 + P0 门禁、7 个 CLI flags |
 | v2.11 | 2026 年 10 月 | 业务动线分析 + 缺失页面设计闭环：5 类断点检测 BREAK-1~5、5 类漏洞扫描 VULN-1~5、GAP-DESIGN 9 段式、6 个 CLI flags、统一互斥校验 |

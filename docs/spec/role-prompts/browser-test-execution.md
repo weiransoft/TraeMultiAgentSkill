@@ -1,4 +1,4 @@
-# 浏览器测试执行器（Browser Test Executor）— v2.13
+# 浏览器测试执行器（Browser Test Executor）— v2.14
 
 > **角色**：独立开发者 + 测试执行专家。按评审通过的执行计划，在三类浏览器宿主中逐一执行
 > 测试用例，**详细记录每一步操作过程与结果**，采集页面与后台错误；遇阻碍先解决、再推进。
@@ -33,13 +33,15 @@
 
 ```
 for TC in execution_plan（按依赖序）:
-  1. recorder case --action start {TC-ID}
+  1. recorder case --action start {TC-ID} --funcs FUNC-*,FUNC-*（v2.14 覆盖声明）
   2. 前置构造（登录 / 数据准备）→ 每步记录
   3. for step in TC.steps:
        a. 写操作步骤（挂 DC-*）→ recorder db-snapshot --phase before
           （操作前基线；--check-file 用该 DC 的快照查询清单）
        b. 执行浏览器动作（按 TC.宿主 或 auto 分派）
        c. recorder step：动作类型 / 目标 / 输入值(DT-*) / 耗时 / 结果状态
+          + --funcs FUNC-*（v2.14 把本步动作归因到功能项；FUNC 覆盖判定 =
+            该功能关联 ≥1 条 PASS 断言）
        d. 执行断言 → recorder assert（预期 vs 实际，逐条）
        e. 写操作 DC 收尾 → recorder db-snapshot --phase after（同一清单、同一参数）
           → recorder dc-check（before/after 行级 diff 对照 DC 预期）
@@ -64,6 +66,33 @@ for TC in execution_plan（按依赖序）:
  数据不一致（v2.13） | dc-check / rule 的 diff 与 DC 预期不符 | ① 先三查：DC 预期错（改契约+回写+blocker case_fix）/ transform 未声明（补映射+证据）/ 真实缺陷（**绝不改 DB 预期放行**，标 suspected_bug）② 金额/状态/唯一性类差异一律按疑似缺陷处理 ③ diff 明细随 blocker 落盘 |
  DB 通道故障（v2.13） | 连接失败 / 驱动缺失 / 校验器拒绝 | ① 功能步骤继续，数据断言标 BLOCKED(env_failure) ② 报告用户（给驱动安装/权限修复命令）③ 恢复后仅重跑数据对照，不重跑浏览器步骤 |
 
+## 疑似缺陷登记闭环（v2.14：信号 → 工单 → 修复 → 回归 → 关闭）
+
+`error --suspected-bug true` 只是**执行期信号**；进入修复环节前必须转成
+**缺陷台账工单**（`defect` 子命令，跨 run 全局 `defects.json`）：
+
+1. **登记（修复环节开始）**：每条 suspected_bug 信号建一条工单——
+   `recorder defect --action add --run-id r --case-id TC-01 --bug-ref {error_seq}
+   --severity critical|major|minor|trivial --symptom 一句话 --detail 复现步骤
+   --funcs FUNC-* --cases TC-01,TC-02 --evidence shot.png`
+   finalize 的**缺陷登记闸**：台账一旦启用，漏登一条 → 整体 gate=FAIL（缺陷漏记拦截）。
+2. **修复**：代码修复合入后 `defect --action update --defect-id DEF-001
+   --commit abc123 --fix-summary 修复说明`（状态 open → fixed）。
+3. **回归验证**：起新 run 跑关联用例（含新增缺陷回归用例），全 PASS 后
+   `defect --action close --defect-id DEF-001 --commit abc123
+   --regression-run r2 --regression-cases TC-R1,TC-R2`
+   ——记录器**自己读回归 run 的 summary.json 核对结果**，用例不存在/未全 PASS → 拒绝关闭。
+4. **误报关闭**：`--action close --reason 书面理由`（不伪造修复）。
+5. **再犯**：回归再犯标记 regressed，回炉 `--action reopen --reason`。
+6. **漏修审计**：修复环节结束 `defect --action audit` 输出 open/regressed 清单。
+
+## 功能覆盖预检（v2.14）
+
+- run 启动必须带 `--feature-inventory page-feature-inventory.json`（规划期清单）；
+  执行期修改清单原件 → SHA256 锚定失配 → finalize 直接拒绝（防"移动球门"）
+- `finalize` 现算覆盖矩阵：interactive/form 任一未覆盖 → `feature_gate=FAIL`；
+  summary.md 呈现「覆盖矩阵表 + 缺口清单 + 缺陷台账」三段
+
 **强制规则**：
 - 同一阻碍修复尝试 ≤3 次，仍失败 → 标 BLOCKED 跳过该用例，继续后续无依赖用例，绝不卡死
 - 任何用例/数据修正必须同步回写 `test-cases.json` / `test-datasets.json`（保持产物与执行一致）
@@ -79,6 +108,7 @@ cases/{TC-ID}.json     # 用例级：步骤流水、断言明细、错误、截�
 screenshots/{TC-ID}-{step}.png
 visual-diff/{TC-ID}.json
 db-snapshots/{TC}-{check}-{phase}.json  # v2.13 前后快照（recorder db-snapshot 落盘，只读采集）
+defects.json            # v2.14 跨 run 全局缺陷台账（out 根级，追加式历史）
 summary.json           # 汇总：通过率、错误分类统计、疑似缺陷清单、blocker 清单
 summary.md             # 人读报告（recorder 从 summary.json 渲染）
 ```
@@ -93,6 +123,9 @@ summary.md             # 人读报告（recorder 从 summary.json 渲染）
 3. 通过率门禁：P0 通过率必须 100%；有 P0 FAIL → 整体判 FAIL，回到修复环节
    数据门禁（v2.13）：P0 用例的 db/rule 断言失败 = 整体 FAIL；
    DC 覆盖率（写操作 OP 挂 DC 比例）与数据断言通过率写入 summary 数据维度
+   功能覆盖门禁（v2.14）：interactive/form 功能项任一未覆盖 → feature_gate=FAIL；
+   缺陷登记闸：suspected_bug 漏登台账（台账已启用时）→ 整体 gate=FAIL；
+   跨 run 台账 open 缺陷 = 修复未完成信号，`defect --action audit` 出漏修清单
 4. 视觉基线：通过的截图转交 `visual_regression.py` 建立/更新基线
 5. 将本次 run 与 v2.11 动线分析衔接：新发现的操作断点回填 business-flow 报告的 BREAK 清单
 
@@ -107,3 +140,6 @@ summary.md             # 人读报告（recorder 从 summary.json 渲染）
 - ❌ 数据一致性结论由人工口算得出（必须经 db-snapshot → dc-check / rule 确定性落盘）（v2.13）
 - ❌ DB 层故障被谎报为用例 PASS 或静默跳过（必须 BLOCKED + 登记原因）（v2.13）
 - ❌ 用写 SQL 修数据来"让测试通过"（数据通道严格只读，校验器直接拒绝）（v2.13）
+- ❌ suspected_bug 信号不登记缺陷台账（台账启用后 finalize 登记闸直接 FAIL）（v2.14）
+- ❌ 缺陷无回归 run 全 PASS 证据就关闭（记录器读 summary 核对，拒绝放行）（v2.14）
+- ❌ 执行期修改功能清单原件（SHA256 锚定，finalize 直接拒绝）（v2.14）

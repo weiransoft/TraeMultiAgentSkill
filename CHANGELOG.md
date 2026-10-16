@@ -3,6 +3,56 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.14.0] - 2026-10-16
+
+### Added
+
+#### v2.14 — 功能覆盖驱动测试与缺陷台账（FUNC 清单 → 覆盖矩阵门禁 → 缺陷工单状态机）
+
+- **FUNC-\* 每页功能清单**：规划期产出 `page-feature-inventory.json`，逐页列全功能项；
+  kind 五类（interactive/form/display/nav/branch）各有覆盖要求；每项 evidence 强制 `文件:行号`；
+  interactive/form **禁止豁免**，display/nav 豁免须书面 waive_reason
+  （planner prompt 新增 Step 2.5 + FUNC 覆盖完备性数量要求）
+- **feature_gate 覆盖矩阵门禁**：finalize 从执行记录**现算** FUNC × PASS 断言关联矩阵
+  （不信任自报）；interactive/form 任一未覆盖 → 整体 gate=FAIL；清单原件 SHA256 锚定写入
+  run 元数据，执行期篡改清单即 FAIL（防"移动球门"）；summary.md 渲染覆盖矩阵、
+  waived 溯源与缺口清单（归属页面 + kind）
+- **跨 run 缺陷台账（defects.json 全局工单）**：`defect` 子命令
+  add/update/close/reopen/audit/list；信号-工单模型——`error --suspected-bug` 为执行期信号，
+  `defect add` 为正式工单且 bug_ref 强制关联真实信号 error_seq；
+  状态机 open →（update --commit 登记修复 commit+摘要）→ fixed →
+  （回归 run 关联用例全 PASS 核对）→ closed；closed→regressed→open（reopen 强制 reason 并清
+  fix/regression）；DEF-NNN 扫描台账条目 + history add 记录防 ID 复用
+- **缺陷登记闸**：台账启用后，任何 suspected_bug 信号未登记 DEF-\* 工单 → finalize gate=FAIL
+- **记录器扩展**：`run --feature-inventory`、`case/step --funcs` 功能归因、
+  finalize 增 feature_coverage / defect_gate 段落
+- **prompt 细化**：browser-test-planner.md（Step 2.5 功能清单 + kind 覆盖要求表 + JSON 示例 +
+  禁止项 +3）；browser-test-execution.md（--funcs 归因 + 疑似缺陷登记闭环六步 +
+  功能覆盖预检 + 门禁与禁止项）；browser-test-review.md（FUNC 覆盖完备性与清单真实性
+  评审项、一票否决扩展为 FLOW 主路径 + interactive/form 功能项双维度、SHA256 冻结入门禁）
+- **端到端测试** `tests/test_v214_feature_coverage.py`：19 用例全绿
+  （清单 schema 7 + 覆盖门禁 3 + 台账状态机 7 + v2.12/v2.13 纯 UI 回归 1）；三版全量回归 50 passed
+
+### Fixed
+
+- recorder：FUNC evidence 正则双反斜杠（`:\\d+$`）永假导致全部功能项误判格式错误 → 修正为 `:\d+$`
+- recorder：`_next_defect_id` 只扫台账条目，已删条目 ID 会被复用 → 追加扫描 history 中 add 记录的 defect_id
+- recorder：`defect update --commit` 未实现 open|regressed → fixed 转移（设计有、实现丢失）→ 按设计补齐，
+  `--commit` 参数补 dest 绑定；状态机补 `regressed→open` 回炉通道
+- recorder：`case --action start` 未落盘 priority，导致回归 run P0 判定失真 → start 块记录 priority（缺省 P2）
+- recorder：`run` 子命令 `--db-checks` / `--feature-inventory` help 文案交叉错乱 → 修正
+- 文档-实现漂移：planner prompt 引用路径 `scripts/data/data_rules.py` → `scripts/data_test/data_rules.py`；
+  execution prompt 循环体命令名对齐实现（`case --action start/end`、`dc-check`、`rule`）与快照产物路径；
+  execution.md 表格行缺 `| ` 前缀；DATA_CONSISTENCY_TESTING.md 同类命令名同步
+
+### Changed
+
+- browser-test-workflow 升级 2.14：规划六步（含 Step 2.5 功能清单）、评审追加 FUNC BLOCKER、
+  执行追加 --funcs 归因与缺陷登记闭环、收尾四门禁（P0 + data_gate + feature_gate + 登记闸）
+- skill-manifest.yaml / skills-index.json / claude-code-skill.json 版本 2.13.0 → 2.14.0；
+  ai_capabilities 新增 v2_14_feature_inventory / v2_14_coverage_gate / v2_14_defect_ledger；
+  capabilities 新增 feature_coverage_and_defect_ledger
+
 ## [2.13.0] - 2026-10-15
 
 ### Added

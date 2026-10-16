@@ -154,7 +154,7 @@ from trae_agent_dispatch_v2 import main_compat, dispatch_agent_v2
 ❌ 业务代码直接 import `dispatcher.goal_dispatcher`（内部实现层）
 ❌ 新代码使用 `trae_agent_dispatch.py`（v1 已弃用）
 
-## CLI 指令清单（v2.12 整理 · 与 scripts/cli/parser.py 逐项核对）
+## CLI 指令清单（v2.14 整理 · 与 scripts/cli/parser.py 及 scripts/browser_test_recorder.py 逐项核对）
 
 > 统一入口：`python3 scripts/trae_agent_dispatch_v2.py <flags>`
 > 互斥总则（与 facade.py `_dispatch_through_v3` 前置校验逐项核对）：
@@ -257,31 +257,45 @@ from trae_agent_dispatch_v2 import main_compat, dispatch_agent_v2
 | `--business-flow-design-only` + `--analysis-report` | 跳过分析，对已有报告做 GAP 设计 |
 | `--skip-su` + `--su-json-path` | 跳过 SU 采集，直接引用已有 understanding.json |
 
-### 8. 浏览器端测试闭环（v2.12）
+### 8. 浏览器端测试闭环（v2.12，v2.13/v2.14 增强在记录器层）
 
 | Flag | 说明 |
 |------|------|
 | `--browser-test` | 完整四阶段：规划→四角色评审→三宿主执行→汇总门禁 |
-| `--browser-test-plan-only` | 仅规划（产出四件套） |
+| `--browser-test-plan-only` | 仅规划（产出八件套：含 FUNC 清单/DC 契约/数据规则） |
 | `--browser-test-exec-only` | 仅执行已有计划（必填 `--test-plan-dir` + `--target-url`） |
 | `--test-plan-dir` | 计划四件套目录 |
 | `--target-url` | 被测系统 URL（执行阶段必填） |
 | `--browser-hosts` | agent-browser / trae-internal / chrome-devtools / auto（默认 auto 降级） |
 | `--reuse-flow-analysis` | 复用 v2.11 动线报告做增量校验 |
 
-### 9. 记录器子命令（v2.12 · `scripts/browser_test_recorder.py --out <dir> <子命令>`）
+### 9. 记录器子命令（v2.12/v2.13/v2.14 · `scripts/browser_test_recorder.py --out <dir> <子命令>`）
 
 | 子命令 | 关键参数 | 说明 |
 |--------|---------|------|
-| `run` | `--run-id --url --hosts --env --note --plan-ref` | 初始化运行 |
-| `case` | `--case-id --action start/end [--title --priority --host --flows --datasets --status]` | 用例开始/收口（priority: P0/P1/P2） |
-| `step` | `--case-id --action-name --target [--dataset --duration-ms --status --path --note]` | 步骤记录（动作：navigate/click/fill/submit/upload/select/keypress/wait/screenshot/evaluate） |
-| `assert` | `--case-id [--seq] --kind --expected --actual [--pass]` | 断言（kind：url/dom/network/console/text/state） |
-| `error` | `--case-id --source --message [--detail --url --suspected-bug]` | 错误记录（source：console/network/bug） |
+| `run` | `--run-id [--url --hosts --env --note --plan-ref]`；v2.13 `--db-config --db-checks`；v2.14 `--feature-inventory` | 初始化运行（`--db-config` 启用数据层、`--feature-inventory` 启用功能覆盖门禁） |
+| `case` | `--case-id --action start/end [--title --priority --host --flows --datasets --status]`；v2.13 `--dcs --db-check-before --db-check-after`；v2.14 `--funcs` | 用例开始/收口（priority: P0/P1/P2；`--funcs` 关联 FUNC-* 归因） |
+| `step` | `--case-id --action-name --target [--dataset --funcs --duration-ms --status --path --note]` | 步骤记录（动作：navigate/click/fill/submit/upload/select/keypress/wait/screenshot/evaluate；`--funcs` 步骤级归因） |
+| `assert` | `--case-id [--seq] --kind --expected --actual [--pass]` | 断言（kind：url/dom/network/console/text/state/dc/rule，后两类 v2.13） |
+| `error` | `--case-id --source --message [--detail --url --suspected-bug]` | 错误记录（source：console/network/bug；`--suspected-bug true` 发缺陷信号，v2.14 须后续 `defect add` 登记） |
 | `shot` | `--case-id --path [--seq --label]` | 截图登记（文件必须真实存在） |
 | `blocker` | `--case-id --blocker-type --description [--resolved --resolution]` | 阻碍记录（selector_fix/data_prep/env_failure/host_downgrade/case_fix/other） |
 | `verify` | `--run-id [--case-id \| --all]` | schema 校验 |
-| `finalize` | `--run-id` | 一致性核对 + summary.json/md + P0 门禁 |
+| `db-snapshot` | `--case-id --check-file --phase before/after [--db-config --params]` | v2.13：只读快照采集（ReadOnlyGuard 唯一通道） |
+| `dc-check` | `--case-id --contract-id [--expectation --key-columns --before-label --seq]` | v2.13：before/after 快照行级 diff 对照 DC 契约，确定性生成数据断言 |
+| `rule` | `--case-id --rules [--seq]` | v2.13：DR-* 五类业务规则（UNIQ/INV/CONS/SM/REF）受限表达式求值转断言 |
+| `finalize` | `--run-id` | 一致性核对 + summary.json/md + 四门禁（P0 / data_gate / feature_gate / 缺陷登记闸） |
+| `defect` | `--action add/update/close/reopen/audit/list [--defect-id --run-id --case-id --bug-ref --symptom --detail --funcs --cases --severity --evidence --commit --fix-summary --regression-run --regression-cases --reason]` | v2.14：跨 run 缺陷台账（`{out}/defects.json` 全局）；add 强制 bug_ref 关联信号；update --commit 即 open\|regressed→fixed；close 需回归 run 全 PASS（误报关闭需 --reason）；reopen 强制 --reason |
+
+### 10. 配套确定性工具（脚本层）
+
+| 工具 | 用法 | 说明 |
+|------|------|------|
+| `scripts/system_understanding.py` | `--out <dir> --system-id <id>` + 模式 flag | SU 采集；`--detailed-doc` 五专家详说素材包、`--assemble` 装配 SYSTEM_FUNCTION_DOC.md、`--render-only` 重渲染 |
+| `scripts/uiux_analyzer.py` | `--report <json> [--fail-on-high]` | v2.7：UI/UX 巡检报告门禁（可访问性/交互/布局/UX 反模式） |
+| `scripts/visual_regression.py` | `compare --current --baseline-dir --test-id [--step --output --update-baseline]` / `audit --current [--output]` | v2.7：像素级视觉回归对比 / 无基线红色错误巡检 |
+| `scripts/doc_code_consistency_checker.py` | 见 `--help` | v2.8：文档对照代码审查（D1-D6 六维度） |
+| `scripts/sync_manifests.py` | 直接运行 | 三份清单（skill-manifest.yaml / skills-index.json / claude-code-skill.json）一致性校验 |
 
 ### 典型组合示例
 
@@ -302,6 +316,18 @@ python3 scripts/trae_agent_dispatch_v2.py --task "测试登录与下单" \
 python3 scripts/trae_agent_dispatch_v2.py --task "执行测试计划" \
     --browser-test-exec-only --test-plan-dir browser-test/plan \
     --target-url http://localhost:3000 --browser-hosts chrome-devtools
+
+# v2.14 缺陷登记闭环（执行期发现疑似缺陷 → 工单 → 修复 → 回归关闭）
+R="python3 scripts/browser_test_recorder.py --out browser-test-runs"
+$R error --run-id r1 --case-id TC-01 --source console \
+    --message "提交后列表未刷新" --suspected-bug true
+$R defect --action add --run-id r1 --case-id TC-01 --bug-ref 1 \
+    --symptom "提交后列表未刷新" --funcs FUNC-02-01 --cases TC-01 --severity major \
+    --evidence browser-test-runs/r1/screenshots/TC-01-03.png
+# ...修复代码后...
+$R defect --action update --defect-id DEF-001 --commit a1b2c3d --fix-summary "列表刷新缺 SSE 订阅"
+$R defect --action close --defect-id DEF-001 --regression-run r2 \
+    --regression-cases TC-01   # r2 中 TC-01 必须 PASS，否则拒绝关闭
 ```
 
 ## Trae 宿主 LLM SubAgent 调度协议（v2.8.4 新增）
@@ -1421,11 +1447,13 @@ docs/
 └── project-understanding/  # 项目理解文档
 ```
 
-## 浏览器端页面功能与视觉测试闭环（v2.12 新增，v2.13 数据校验增强 — 操作点细化 → 数据测试集 → 数据契约 → 用例评审 → 三宿主执行 → DB 一致性对照 → 全程记录）
+## 浏览器端页面功能与视觉测试闭环（v2.12 新增，v2.13 数据校验 + v2.14 功能覆盖/缺陷台账增强 — 操作点细化 → 每页功能清单 → 数据测试集 → 数据契约 → 用例评审 → 三宿主执行 → DB 一致性对照 → 覆盖门禁与缺陷闭环）
 
 > **设计理念**: 页面做完了不等于能用——路由通不代表操作点通，接口 200 不代表用户看到的结果对。这个工作流从前后端代码与文档出发（可复用 v2.11 业务动线分析结果），把每条业务流程细化到**页面操作点**级别，制定**六类多样化数据测试集**，编写可断言的测试用例并经四角色评审，然后在真实浏览器中逐一执行——**每一步操作、每一个断言、每一条页面/后台错误全部留痕**，碰到阻碍先解决再推进。
 >
 > **v2.13 数据校验增强**: 接口 200、页面提示"成功"都不等于**数据真的落对了库**。v2.13 在闭环中叠加数据层严格校验：为每条写操作设计 **DC-\* 数据契约**（表单字段→API 字段→DB 列→回读展示的全链路映射，任何变换必须显式声明并附代码证据）；执行时采集**操作前后 DB 只读快照**，做**行级 diff** 逐项对照 DC 预期；再用 **DR-\* 业务数据规则**（唯一性/不变式/守恒/状态机/引用完整）对落库数据求值。数据一致性结论**只能由确定性脚本落盘**（`db-snapshot` → `dc-check` / `rule`），finalize 增加 **data_gate 数据门禁**——声明的校验缺失或数据断言失败，整体判 FAIL。
+>
+> **v2.14 功能覆盖与缺陷台账增强**: "用例都过了"不等于"页面功能都测到了"——没为某个按钮写用例，就永远不会有失败来暴露它。v2.14 以**每页功能清单**为分母做覆盖门禁：规划期产出 **FUNC-\* 功能清单**（每页功能项，kind=interactive/form/display/nav/branch 五类，每项必须有 `文件:行号` 代码证据；interactive/form 类**禁止豁免**，display/nav 豁免须书面 waive_reason）；执行期用例与步骤用 `--funcs` 归因；finalize **现算覆盖矩阵**（FUNC × PASS 断言关联），interactive/form 任一未覆盖 → 整体 **feature_gate=FAIL**，清单原件 SHA256 锚定防执行期篡改。同时把"疑似缺陷"从一次性标记升级为**跨 run 缺陷台账**（defects.json）：执行期 `error --suspected-bug` 是信号，`defect add` 是正式工单（bug_ref 强制关联信号），修复后 `defect update --commit` 转移 fixed，**回归 run 关联用例全 PASS 才允许 close**，再犯 reopen——漏登工单则 finalize 登记闸 FAIL。
 >
 > **三宿主**（auto 模式按序降级）：
 > - **agent-browser**：隔离会话、headless 批量、并行回归
@@ -1437,7 +1465,7 @@ docs/
 > - **v2.10 proposal-review**：共识收敛机制复用于测试用例四角色评审
 > - **v2.7 visual_regression / uiux_analyzer**：视觉基线对比与深度巡检衔接
 > - **su/db_guard ReadOnlyGuard（v2.9）**：v2.13 DB 快照唯一语句通道（安全面零复制，严格只读）
-> - **新建**：browser-test-planner.md（规划方法论）、browser-test-review.md（测试评审）、browser-test-execution.md（执行+阻碍协议）、`scripts/browser_test_recorder.py`（schema 强制的记录器）、`scripts/data_test/`（v2.13 确定性内核：data_rules.py 规则求值+行级 diff、db_probe.py 只读快照引擎）
+> - **新建**：browser-test-planner.md（规划方法论）、browser-test-review.md（测试评审）、browser-test-execution.md（执行+阻碍协议）、`scripts/browser_test_recorder.py`（schema 强制的记录器，v2.14 扩展 defect 台账与 feature_gate）、`scripts/data_test/`（v2.13 确定性内核：data_rules.py 规则求值+行级 diff、db_probe.py 只读快照引擎）
 
 ### 四阶段工作流
 
@@ -1446,15 +1474,19 @@ Phase 1: 测试规划（Planner）
     输入: 前后端代码 + 文档 +（可选）v2.11 动线分析结果
     Step 1 功能与流程梳理（复用 FLOW-*/PAGE-*，做增量校验）
     Step 2 操作点细化 OP-*（一次用户可感知动作 + 代码位置 + 可断言预期）
+    Step 2.5 每页功能清单 FUNC-*（v2.14：kind 五类 + evidence 文件:行号；
+           interactive/form 禁止豁免，display/nav 豁免须 waive_reason）
     Step 3 六类数据测试集 DT-*（正向P/边界B/非法N/空E/权限A/时序T；
            v2.13：写操作数据组必带 db_expectation——期望落库的表/行/列值/关联行/状态迁移）
     Step 3.5 数据契约设计 DC-*（v2.13：表单→API→DB→回读 全链路字段映射，
            transform 显式声明+代码证据；DB 预期；快照查询清单 db-checks.json）
     Step 3.6 业务数据规则 DR-*（v2.13：UNIQ/INV/CONS/SM/REF 五类，
            受限表达式声明，data-rules.json）
-    Step 4 测试用例 TC-*（P0 覆盖全部流程主路径；写操作用例必填 DC-*）
+    Step 4 测试用例 TC-*（P0 覆盖全部流程主路径；写操作用例必填 DC-*；
+           用例关联 FUNC-*，interactive/form 功能项 100% P0 覆盖——v2.14）
     Step 5 执行序 + 宿主分派 + 破坏性用例回滚方案
     产出: test-plan.md / test-datasets.json / test-cases.json / test-execution-plan.json
+          + page-feature-inventory.json（v2.14）
           + test-data-contracts.json / db-checks.json / data-rules.json（v2.13 三件套）
         ↓
 Phase 2: 测试用例多角色评审（复用 v2.10 共识收敛，最多 3 轮）
@@ -1464,6 +1496,8 @@ Phase 2: 测试用例多角色评审（复用 v2.10 共识收敛，最多 3 轮�
     架构师（环境依赖 / 数据隔离性 / 维护成本）
     v2.13 追加 BLOCKER 项：写操作 OP 无 DC 契约 / 字段映射无代码证据 /
     db-checks.json 含非只读语句 / DB 预期凭猜测填写
+    v2.14 追加 BLOCKER 项：FUNC 清单漏页漏项 / interactive-form 功能项无 P0 覆盖 /
+    豁免无证据或无理由；清单 SHA256 写入评审记录冻结
     门禁: 共识问题清零 + BLOCKER 清零
         ↓
 Phase 3: 浏览器逐一执行 + 全程记录（Executor）
@@ -1476,17 +1510,22 @@ Phase 3: 浏览器逐一执行 + 全程记录（Executor）
       → rule（data-rules.json DR-* 求值，确定性生成规则断言）
     阻碍协议（六类+数据两类，先解决再推进）:
       选择器失效→修选择器回写用例 / 数据缺失→补数据 / 环境故障→停止报告
-      宿主故障→降级切宿主 / 用例设计错误→以代码文档为准修正 / 疑似缺陷→不改断言，标记 bug
+      宿主故障→降级切宿主 / 用例设计错误→以代码文档为准修正 / 疑似缺陷→不改断言，
+        error --suspected-bug 发信号 + defect add 登记工单（v2.14）
       数据不一致→三查（DC 预期错/transform 未声明/真实缺陷），绝不改 DB 预期放行
       DB 通道故障→功能继续、数据断言 BLOCKED(env_failure) 并报告
+    v2.14 功能归因：case/step --funcs FUNC-01-01,... 关联功能项
     视觉基线用例 → scripts/visual_regression.py
         ↓
 Phase 4: 汇总与闭环衔接
     recorder finalize → summary.json + summary.md
     门禁: P0 通过率 100%；v2.13 data_gate——dc/rule 断言失败、声明的 DB 校验
-          缺失、数据通道阻断均计入整体 FAIL
+          缺失、数据通道阻断均计入整体 FAIL；v2.14 feature_gate——interactive/form
+          功能项未覆盖 / 清单被篡改 / suspected_bug 漏登工单 → 整体 FAIL
     DC 覆盖率与数据断言通过率写入 summary 数据维度
-    疑似缺陷清单 → 修复环节；新断点 → 回填 v2.11 BREAK 清单
+    FUNC 覆盖矩阵 + 缺陷台账状态写入 summary 功能/缺陷维度（v2.14）
+    缺陷工单 → 修复 → defect update --commit → 回归 run → close；
+    新断点 → 回填 v2.11 BREAK 清单
 ```
 
 ### CLI 使用方式
@@ -1515,8 +1554,11 @@ python3 scripts/trae_agent_dispatch_v2.py \
 python3 scripts/browser_test_recorder.py --out browser-test-runs run --run-id r1 --url ...
 # 子命令: run / case / step / assert / error / shot / blocker / verify / finalize
 #         + db-snapshot / dc-check / rule（v2.13 数据校验）
+#         + defect add/update/close/reopen/audit/list（v2.14 缺陷台账）
 # schema 强制: fail 无原因拒绝、截图文件必须真实存在、finalize 做 summary-逐条一致性校验
 # v2.13: run --db-config 启用数据层；声明的 DB 校验缺失 → case end 拒绝收尾、finalize 报 problems
+# v2.14: run --feature-inventory 启用功能覆盖门禁；case/step --funcs 归因；
+#        defect 台账跨 run 全局（defects.json），漏登 suspected_bug → finalize FAIL
 ```
 
 ### 产出物清单
@@ -1527,12 +1569,14 @@ python3 scripts/browser_test_recorder.py --out browser-test-runs run --run-id r1
 | `test-datasets.json` | Phase 1 | 六类数据测试集 |
 | `test-cases.json` | Phase 1 | TC-* 用例（关联 FLOW/OP/DT） |
 | `test-execution-plan.json` | Phase 1 | 执行序 + 宿主分派 + 破坏性标注 |
+| `page-feature-inventory.json` | Phase 1 | FUNC-* 每页功能清单（v2.14） |
 | `test-data-contracts.json` | Phase 1 | DC-* 数据契约（v2.13） |
 | `db-checks.json` | Phase 1 | 只读快照查询清单（v2.13） |
 | `data-rules.json` | Phase 1 | DR-* 业务数据规则（v2.13） |
 | `browser-test-runs/{run_id}/` | Phase 3-4 | run-meta / cases/*.json / screenshots / db-snapshots/*.json（v2.13）/ summary.json / summary.md |
+| `browser-test-runs/defects.json` | Phase 3-4 | 跨 run 缺陷台账 DEF-*（v2.14） |
 
-### 绝对禁止（v2.12）
+### 绝对禁止（v2.12/v2.13/v2.14）
 
 - ❌ 凭空编造页面/路由/选择器（必须标注代码文件:行号证据）
 - ❌ 预期结果写成"页面正常""功能可用"等不可断言描述
@@ -1545,6 +1589,9 @@ python3 scripts/browser_test_recorder.py --out browser-test-runs run --run-id r1
 - ❌ 用写 SQL 修数据"让测试通过"（数据通道严格只读，校验器直接拒绝）（v2.13）
 - ❌ 声明 DC 的用例不跑数据对照、DB 通道故障谎报 PASS 或静默跳过（v2.13）
 - ❌ 字段映射的 transform 无代码证据就默认"应该一致"；DB 预期凭猜测填写（v2.13）
+- ❌ 功能清单漏列页面交互/表单项，或 interactive/form 功能项无 P0 用例覆盖（v2.14）
+- ❌ 执行期篡改功能清单原件"移动球门"（SHA256 锚定，篡改即 FAIL）（v2.14）
+- ❌ suspected_bug 不登记 DEF-* 工单、无回归 run 全 PASS 证据就 close 缺陷（v2.14）
 
 ## 故障排查
 
@@ -1574,6 +1621,7 @@ Trae Multi-Agent Dispatcher 提供了：
 - ✅ 业务动线分析与页面设计闭环（v2.11，SU 页面发现→断点检测→漏洞扫描→缺失页面设计→proposal-review 评审→开发→UI/UX 视觉测试）
 - ✅ 浏览器端页面功能与视觉测试闭环（v2.12，操作点细化→六类数据测试集→用例四角色评审→三宿主浏览器执行→步骤级全程记录与阻碍闭环）
 - ✅ 数据校验闭环（v2.13，DC 数据契约→DB 前后只读快照→行级 diff 对照→DR 五类业务规则求值→data_gate 数据门禁）
+- ✅ 功能覆盖驱动测试与缺陷台账（v2.14，FUNC-* 每页功能清单→覆盖矩阵 feature_gate→SHA256 清单锚定→跨 run 缺陷工单状态机与登记闸）
 - ✅ Karpathy 四大核心原则强制执行（v2.4）
 - ✅ Cybernetics 工程控制论三环控制（v2.5）
 - ✅ Ponytail 决策梯 + 16 条不可简化红线（v2.6）

@@ -44,6 +44,59 @@ OP-{FLOW编号}-{序号}
 - 每个操作点必须标注代码位置（文件:行号），可追溯
 - 每个操作点的"预期结果"必须是**可断言的**（禁止"页面正常显示"这类模糊描述）
 
+### Step 2.5 — 每页功能清单（FUNC-*，v2.14 新增）
+
+Step 1 的页面清单 + Step 2 的操作点按**页面聚合**，生成 `page-feature-inventory.json`：
+页面上每一项用户可感知的功能（按钮/表单/列表/弹窗/标签页/图表/筛选器/开关/上传/导航入口/
+分支跳转/空态渲染）逐项登记，作为覆盖对象与 finalize 门禁的唯一依据。
+
+```
+FUNC-{页面序号}-{功能序号}
+  页面:     {PAGE-*（路由路径 + 组件文件）}
+  kind:     {interactive | form | display | nav | branch}
+  描述:     {一句话：这个功能项让用户做什么 / 展示什么}
+  分支:     [{正常流}, {校验失败流}, {权限/空态/异常流}]
+  代码证据: [{文件:行号}]（强制——组件属性 onClick/href/columns 所在行，可追溯）
+  豁免:     {可选：display / nav 且无关联流程时，必须书面 waive_reason}
+```
+
+**功能类型与覆盖要求**：
+
+| kind | 判定方法（读代码） | 覆盖要求 |
+|------|-------------------|---------|
+| interactive | 有事件处理但无表单提交的控件（开关/拖拽/标签页/折叠） | **必须覆盖**：全分支用例 |
+| form | 含数据提交的表单/弹窗/上传（关联写操作 DC） | **必须覆盖**：正向+非法+空数据 + DC 对照 |
+| display | 只读渲染（列表/分页/图表/空态） | 尽量覆盖；豁免需书面理由 |
+| nav | 路由跳转入口（按钮/链接/面包屑） | 尽量覆盖；被流程用例经过即算覆盖 |
+| branch | 条件分支渲染（权限/状态码/角色） | 尽量覆盖；豁免需书面理由 |
+
+**强制约束**：
+- **每页全部功能项必须入清单**——禁止只列"重要功能"（finalize 覆盖矩阵以清单全量为分母，漏列=漏测）
+- **interactive / form 禁止豁免**（门禁覆盖对象不得口头放行）；display / nav / branch 豁免必须书面 `waive_reason`
+- 功能清单是**规划期契约**：run 启动时脚本 SHA256 锚定，执行期修改原件 → finalize 直接拒绝
+- 流程分支测试 = `branch` 功能项的每个分支 × 数据测试集（六类）至少各 1 个用例
+
+输出格式（JSON，schema 校验强制）：
+
+```json
+{
+  "generated_at": "2026-10-16T10:00:00+08:00",
+  "source": {"analysis": "v2.11 Phase1 报告或代码扫描", "flow_report": "business-flow-report.md"},
+  "pages": [
+    {"page_id": "PAGE-01", "path": "/orders", "name": "订单列表", "funcs": [
+      {"id": "FUNC-01-01", "kind": "form", "desc": "新建订单弹窗",
+       "branches": ["提交成功", "校验失败"],
+       "evidence": ["src/pages/orders.tsx:20"]},
+      {"id": "FUNC-01-02", "kind": "display", "desc": "列表分页",
+       "branches": ["翻页", "空态"], "evidence": ["src/pages/orders.tsx:30"]},
+      {"id": "FUNC-01-03", "kind": "nav", "desc": "顶部导航入口",
+       "branches": ["跳转"], "evidence": ["src/components/nav.tsx:10"],
+       "waived": true, "waive_reason": "跳转行为已由 FLOW-02 主路径用例覆盖"}
+    ]}
+  ]
+}
+```
+
 ### Step 3 — 多样化数据测试集设计（六类，每类至少 1 组）
 
 | 类别 | 代号 | 内容 | 最少数量 |
@@ -125,7 +178,7 @@ DC-{FLOW编号}-{序号}
 ```
 TC-{序号}  {一句话目标}
   优先级:   P0 冒烟 / P1 核心 / P2 扩展
-  关联:     FLOW-* / OP-* / DT-*（三类 ID 至少各一）
+  关联:     FLOW-* / OP-* / DT-*（三类 ID 至少各一）+ FUNC-*（v2.14 覆盖判定，可多个）
   数据契约: DC-*（写操作用例必填；含 before/after 快照点与 DR-* 规则）
   宿主:     auto / agent-browser / trae-internal / chrome-devtools
   前置:     {登录态 / 数据准备 / 起始 URL}
@@ -136,6 +189,10 @@ TC-{序号}  {一句话目标}
 ```
 
 **数量要求**：P0 覆盖所有流程主路径；每条 FLOW 至少 1 条 P0 + 1 条异常路径 P1。
+**FUNC 覆盖完备性（v2.14 强制）**：用例集对功能清单的覆盖必须满足——
+interactive / form 功能项 **100% 被 P0 用例覆盖**（全分支）；
+branch 功能项每个分支各有 ≥1 个数据组用例；display / nav 未覆盖项必须在清单内书面豁免。
+未满足以上任一条件，规划阶段即判 BLOCKER，不得进入评审。
 
 ### Step 5 — 执行序与宿主分派规划
 
@@ -152,6 +209,7 @@ TC-{序号}  {一句话目标}
 | 文件 | 内容 |
 |------|------|
 | `test-plan.md` | Step 1-2 功能-页面对照表 + 操作点清单 |
+| `page-feature-inventory.json` | Step 2.5 每页功能清单 FUNC-*（v2.14，覆盖矩阵与门禁分母） |
 | `test-datasets.json` | Step 3 数据测试集（schema 见 Step 3） |
 | `test-cases.json` | Step 4 用例（schema 见 Step 4） |
 | `test-execution-plan.json` | Step 5 执行序 + 宿主分派 + 破坏性标注 |
@@ -170,3 +228,6 @@ TC-{序号}  {一句话目标}
 - ❌ 字段映射的 transform 无代码证据就默认"应该一致"（v2.13）
 - ❌ db-checks.json 出现任何非 SELECT/SHOW/EXPLAIN 语句（v2.13，校验器会直接拒绝）
 - ❌ DB 预期凭猜测填写（必须来自 DDL / 服务层代码 / 需求文档，标注证据位置）（v2.13）
+- ❌ 功能清单只列"重要功能"而漏列页面其余功能项（清单是全量覆盖的分母，漏列=漏测）（v2.14）
+- ❌ interactive / form 功能项未获 P0 用例覆盖就进入评审或执行（v2.14）
+- ❌ 功能项无代码证据（文件:行号）；豁免无书面 waive_reason（v2.14）
