@@ -17,7 +17,7 @@
   <circle cx="700" cy="60" r="190" fill="#34d399" opacity="0.05"/>
   <circle cx="40" cy="960" r="150" fill="#34d399" opacity="0.04"/>
 
-  <text x="50" y="78" fill="#34d399" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 2/5 · v2.11</text>
+  <text x="50" y="78" fill="#34d399" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 3/6 · v2.11</text>
   <text x="50" y="146" fill="#f1f5f9" font-size="42" font-weight="700">业务动线分析</text>
   <text x="50" y="196" fill="#94a3b8" font-size="21">页面都在线上，流程却走不通——</text>
   <text x="50" y="228" fill="#94a3b8" font-size="21">断点不报错，只是用户默默流失</text>

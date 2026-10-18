@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 1000" font-family="'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1420"/>
+      <stop offset="1" stop-color="#151d33"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4ade80"/>
+      <stop offset="1" stop-color="#2dd4bf"/>
+    </linearGradient>
+  </defs>
+  <rect width="750" height="1000" fill="url(#bg)"/>
+  <rect x="26" y="26" width="698" height="948" fill="none" stroke="#4ade80" stroke-opacity="0.18" stroke-width="1.5" rx="16"/>
+
+  <!-- 顶部 -->
+  <text x="50" y="80" fill="#4ade80" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 1/6 · v2.9</text>
+  <text x="50" y="134" fill="#ffffff" font-size="40" font-weight="800">没有文档、看不懂代码，</text>
+  <text x="50" y="184" fill="#ffffff" font-size="40" font-weight="800">怎么接手一个黑盒系统？</text>
+
+  <!-- 左侧：只读遍历流 -->
+  <text x="50" y="244" fill="#94a3b8" font-size="15" font-weight="600" letter-spacing="1">Playwright 自动登录 · 图式 BFS 只读遍历</text>
+  <rect x="50" y="262" width="120" height="54" rx="10" fill="#4ade80" fill-opacity="0.12" stroke="#4ade80" stroke-width="1.2"/>
+  <text x="110" y="295" fill="#4ade80" font-size="17" font-weight="700" text-anchor="middle">登录页</text>
+  <text x="262" y="295" fill="#4ade80" font-size="18" text-anchor="middle">BFS→</text>
+  <rect x="290" y="262" width="120" height="54" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.2"/>
+  <text x="350" y="295" fill="#cbd5e1" font-size="17" font-weight="600" text-anchor="middle">页面 N 个</text>
+  <text x="462" y="295" fill="#64748b" font-size="18" text-anchor="middle">→</text>
+  <rect x="490" y="262" width="210" height="54" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.2"/>
+  <text x="595" y="295" fill="#cbd5e1" font-size="17" font-weight="600" text-anchor="middle">动作三级分级 T1/T2/T3</text>
+  <text x="375" y="348" fill="#64748b" font-size="14.5" text-anchor="middle">危险按钮零点击只记录 · 网络层拦截一切非 GET</text>
+
+  <!-- 中部：双库内省 -->
+  <text x="50" y="398" fill="#94a3b8" font-size="15" font-weight="600" letter-spacing="1">只读内省（采样逐值脱敏）</text>
+  <rect x="50" y="416" width="330" height="130" rx="12" fill="#132335" stroke="#334155" stroke-width="1.2"/>
+  <text x="70" y="452" fill="#7dd3fc" font-size="18" font-weight="700">MySQL / PostgreSQL</text>
+  <text x="70" y="482" fill="#cbd5e1" font-size="14.5">表 · 列注释 · 主外键 · 索引</text>
+  <text x="70" y="510" fill="#cbd5e1" font-size="14.5">隐式 FK 三重预筛推断</text>
+  <rect x="370" y="416" width="330" height="130" rx="12" fill="#132335" stroke="#334155" stroke-width="1.2"/>
+  <text x="390" y="452" fill="#fbbf24" font-size="18" font-weight="700">Redis</text>
+  <text x="390" y="482" fill="#cbd5e1" font-size="14.5">SCAN 游标采集</text>
+  <text x="390" y="510" fill="#cbd5e1" font-size="14.5">键模式聚类 · TTL/类型分布</text>
+  <text x="375" y="580" fill="#64748b" font-size="14.5" text-anchor="middle">会话级只读 + SQL/命令语句白名单双护栏</text>
+
+  <!-- 三角关联 -->
+  <text x="50" y="634" fill="#94a3b8" font-size="15" font-weight="600" letter-spacing="1">UI ↔ API ↔ DB 三角关联（必须有数值证据）</text>
+  <rect x="50" y="652" width="190" height="58" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.2"/>
+  <text x="145" y="687" fill="#cbd5e1" font-size="16" font-weight="600" text-anchor="middle">页面 URL/DOM</text>
+  <rect x="280" y="652" width="190" height="58" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.2"/>
+  <text x="375" y="687" fill="#cbd5e1" font-size="16" font-weight="600" text-anchor="middle">API 请求/响应</text>
+  <rect x="510" y="652" width="190" height="58" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.2"/>
+  <text x="605" y="687" fill="#cbd5e1" font-size="16" font-weight="600" text-anchor="middle">DB 表 / Redis 键</text>
+  <text x="245" y="687" fill="#4ade80" font-size="16" text-anchor="middle">◄►</text>
+  <text x="475" y="687" fill="#4ade80" font-size="16" text-anchor="middle">◄►</text>
+  <text x="375" y="742" fill="#94a3b8" font-size="14" text-anchor="middle">重合度 / 包含度数值证据 —— 不靠"看着像"</text>
+
+  <!-- 证据与结论分离 + 产出 -->
+  <rect x="50" y="768" width="650" height="74" rx="12" fill="#132335" stroke="#4ade80" stroke-opacity="0.35" stroke-width="1.2"/>
+  <text x="70" y="800" fill="#e2e8f0" font-size="16" font-weight="600">证据与结论严格分离</text>
+  <text x="70" y="826" fill="#94a3b8" font-size="14.5">脚本层零 LLM 调用、不出语义结论 · 语义结论由宿主 LLM 按契约回填 · CLI 校验收口</text>
+  <rect x="50" y="862" width="318" height="66" rx="12" fill="#132335" stroke="#334155" stroke-width="1.2"/>
+  <text x="70" y="891" fill="#4ade80" font-size="17" font-weight="700">UNDERSTANDING.md</text>
+  <text x="70" y="916" fill="#94a3b8" font-size="14">固定 10 节《系统功能理解文档》</text>
+  <rect x="382" y="862" width="318" height="66" rx="12" fill="#132335" stroke="#334155" stroke-width="1.2"/>
+  <text x="402" y="891" fill="#7dd3fc" font-size="17" font-weight="700">understanding.json</text>
+  <text x="402" y="916" fill="#94a3b8" font-size="14">机读 JSON + Mermaid 图</text>
+
+  <!-- 底部 -->
+  <text x="50" y="962" fill="#64748b" font-size="13">五条安全红线：凭据不落盘 · DB 只读白名单 · Redis 只读白名单 · 浏览器只 GET · 危险按钮零点击 · 依赖缺失诚实降级</text>
+  <text x="700" y="962" fill="#64748b" font-size="13" text-anchor="end">@TraeMultiAgentSkill</text>
+</svg>

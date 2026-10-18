@@ -11,7 +11,7 @@
   <circle cx="700" cy="60" r="190" fill="#38bdf8" opacity="0.05"/>
   <circle cx="40" cy="960" r="150" fill="#38bdf8" opacity="0.04"/>
 
-  <text x="50" y="78" fill="#38bdf8" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 3/5 · v2.12</text>
+  <text x="50" y="78" fill="#38bdf8" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 4/6 · v2.12</text>
   <text x="50" y="146" fill="#f1f5f9" font-size="42" font-weight="700">浏览器端功能与视觉测试闭环</text>
   <text x="50" y="196" fill="#94a3b8" font-size="21">Agent 说"我测过了，都正常"——证据呢？</text>
   <text x="50" y="228" fill="#94a3b8" font-size="21">v2.12：每一步操作、每一条断言，全部结构化落盘</text>

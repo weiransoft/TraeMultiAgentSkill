@@ -14,7 +14,7 @@
   <circle cx="700" cy="60" r="190" fill="#818cf8" opacity="0.06"/>
   <circle cx="40" cy="960" r="150" fill="#818cf8" opacity="0.04"/>
 
-  <text x="50" y="78" fill="#818cf8" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 1/5 · v2.10</text>
+  <text x="50" y="78" fill="#818cf8" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 2/6 · v2.10</text>
   <text x="50" y="146" fill="#f1f5f9" font-size="42" font-weight="700">多角色交叉评审与共识收敛</text>
   <text x="50" y="196" fill="#94a3b8" font-size="21">一个模型评审自己的方案 = 自己给自己发奖状</text>
   <text x="50" y="228" fill="#94a3b8" font-size="21">方案放行前，先过四专家 + 产品经理的五视角交叉评审</text>
