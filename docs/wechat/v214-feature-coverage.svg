@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1000" viewBox="0 0 750 1000" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1420"/><stop offset="1" stop-color="#201418"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#f87171" flood-opacity="0.2"/>
+    </filter>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect width="750" height="1000" fill="url(#bg)"/>
+  <circle cx="700" cy="60" r="190" fill="#f87171" opacity="0.05"/>
+  <circle cx="40" cy="960" r="150" fill="#f87171" opacity="0.04"/>
+
+  <text x="50" y="78" fill="#f87171" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 5/5 · v2.14</text>
+  <text x="50" y="146" fill="#f1f5f9" font-size="42" font-weight="700">功能覆盖驱动 × 缺陷台账</text>
+  <text x="50" y="196" fill="#94a3b8" font-size="21">用例全过 ≠ 功能都测到了——</text>
+  <text x="50" y="228" fill="#94a3b8" font-size="21">没为按钮写用例，它永远不会红给你看</text>
+
+  <!-- 卡1：FUNC 覆盖 -->
+  <g filter="url(#sh)">
+    <rect x="50" y="270" width="650" height="230" rx="16" fill="#1c2740" stroke="#334155"/>
+  </g>
+  <text x="80" y="316" fill="#e2e8f0" font-size="22" font-weight="600">FUNC-* 每页功能清单 = 覆盖的分母</text>
+  <g font-size="18.5">
+    <text x="80" y="358" fill="#f1f5f9">kind 五类：<tspan fill="#38bdf8">interactive</tspan> <tspan fill="#818cf8">form</tspan> <tspan fill="#34d399">display</tspan> <tspan fill="#fbbf24">nav</tspan> <tspan fill="#f472b6">branch</tspan></text>
+    <text x="80" y="394" fill="#f1f5f9">交互/表单 <tspan fill="#f87171" font-weight="700">必须 P0 覆盖，禁止豁免</tspan>；证据强制 文件:行号</text>
+    <text x="80" y="430" fill="#f1f5f9">finalize <tspan font-weight="700">现算</tspan> FUNC×PASS 矩阵 → feature_gate</text>
+    <text x="80" y="466" fill="#94a3b8">清单原件 SHA256 锚定——中途删功能项"移动球门"→ FAIL</text>
+  </g>
+
+  <!-- 卡2：缺陷台账 -->
+  <g filter="url(#sh)">
+    <rect x="50" y="530" width="650" height="270" rx="16" fill="#1c2740" stroke="#334155"/>
+  </g>
+  <text x="80" y="576" fill="#e2e8f0" font-size="22" font-weight="600">缺陷台账：疑似缺陷必须有下文</text>
+  <g font-size="16" font-family="Menlo, monospace">
+    <rect x="80" y="600" width="110" height="40" rx="20" fill="none" stroke="#fbbf24" stroke-width="1.6"/>
+    <text x="135" y="625" fill="#fbbf24" text-anchor="middle">open</text>
+    <line x1="196" y1="620" x2="256" y2="620" stroke="#64748b" stroke-width="1.5" marker-end="url(#ar)"/>
+    <rect x="260" y="600" width="110" height="40" rx="20" fill="none" stroke="#38bdf8" stroke-width="1.6"/>
+    <text x="315" y="625" fill="#38bdf8" text-anchor="middle">fixed</text>
+    <line x1="376" y1="620" x2="436" y2="620" stroke="#64748b" stroke-width="1.5" marker-end="url(#ar)"/>
+    <rect x="440" y="600" width="110" height="40" rx="20" fill="none" stroke="#34d399" stroke-width="1.6"/>
+    <text x="495" y="625" fill="#34d399" text-anchor="middle">closed</text>
+  </g>
+  <g font-size="18">
+    <text x="80" y="678" fill="#94a3b8">→fixed 必须登记修复 commit</text>
+    <text x="80" y="712" fill="#94a3b8">→closed 必须回归 run 关联用例全 PASS 才放行</text>
+    <text x="80" y="746" fill="#94a3b8">再犯 reopen；<tspan fill="#f87171" font-weight="700">suspected_bug 漏登工单 → 整体 FAIL</tspan></text>
+  </g>
+
+  <rect x="0" y="920" width="750" height="80" fill="#0a0e18"/>
+  <text x="50" y="952" fill="#64748b" font-size="16">收尾四道闸：P0 × data_gate × feature_gate × 缺陷登记闸，"与"关系</text>
+  <text x="50" y="980" fill="#64748b" font-size="16">19 个端到端用例 + v2.12/v2.13 全量回归 50 passed · 纯标准库零依赖</text>
+  <text x="700" y="968" fill="#f87171" font-size="16" text-anchor="end">multi-agent-team</text>
+</svg>

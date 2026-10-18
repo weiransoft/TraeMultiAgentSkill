@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1000" viewBox="0 0 750 1000" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1420"/><stop offset="1" stop-color="#151d33"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#38bdf8" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect width="750" height="1000" fill="url(#bg)"/>
+  <circle cx="700" cy="60" r="190" fill="#38bdf8" opacity="0.05"/>
+  <circle cx="40" cy="960" r="150" fill="#38bdf8" opacity="0.04"/>
+
+  <text x="50" y="78" fill="#38bdf8" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 3/5 · v2.12</text>
+  <text x="50" y="146" fill="#f1f5f9" font-size="42" font-weight="700">浏览器端功能与视觉测试闭环</text>
+  <text x="50" y="196" fill="#94a3b8" font-size="21">Agent 说"我测过了，都正常"——证据呢？</text>
+  <text x="50" y="228" fill="#94a3b8" font-size="21">v2.12：每一步操作、每一条断言，全部结构化落盘</text>
+
+  <!-- 左/上卡：规划 -->
+  <g filter="url(#sh)">
+    <rect x="50" y="270" width="650" height="190" rx="16" fill="#1c2740" stroke="#334155"/>
+  </g>
+  <text x="80" y="316" fill="#e2e8f0" font-size="22" font-weight="600">规划：先出计划，再动浏览器</text>
+  <g font-size="19">
+    <text x="80" y="358" fill="#f1f5f9">操作点 <tspan font-family="Menlo, monospace" fill="#38bdf8">OP-*</tspan>　<tspan fill="#94a3b8">一次可感知动作 + 代码位置 + 可断言预期</tspan></text>
+    <text x="80" y="394" fill="#f1f5f9">六类数据集 <tspan font-family="Menlo, monospace" fill="#38bdf8">DT-P/B/N/E/A/T</tspan>　<tspan fill="#94a3b8">正例/边界/非法/异常/时序</tspan></text>
+    <text x="80" y="430" fill="#f1f5f9">用例 <tspan font-family="Menlo, monospace" fill="#38bdf8">TC-*</tspan>　<tspan fill="#94a3b8">主路径必须 P0 → 四角色评审放行后才执行</tspan></text>
+  </g>
+
+  <!-- 卡：执行记录 -->
+  <g filter="url(#sh)">
+    <rect x="50" y="490" width="650" height="300" rx="16" fill="#1c2740" stroke="#334155"/>
+  </g>
+  <text x="80" y="536" fill="#e2e8f0" font-size="22" font-weight="600">执行：三宿主逐一跑，全程留痕</text>
+  <g font-size="18">
+    <text x="80" y="580" fill="#94a3b8">agent-browser　·　Trae 内置浏览器　·　Chrome DevTools MCP</text>
+  </g>
+  <g font-size="16" font-family="Menlo, monospace" fill="#7dd3fc">
+    <text x="80" y="622">recorder step    --action-name click --target "#submit"</text>
+    <text x="80" y="652">recorder assert  --kind text --expected "保存成功" --pass</text>
+    <text x="80" y="682">recorder shot    --path screenshots/TC-01-03.png</text>
+    <text x="80" y="712">recorder finalize --run-id r1   <tspan fill="#34d399"># P0 100% 才绿灯</tspan></text>
+  </g>
+  <text x="80" y="756" fill="#64748b" font-size="16">阻碍六类协议（选择器失效/数据准备/环境故障…）先解决再推进，不许绕</text>
+
+  <rect x="0" y="920" width="750" height="80" fill="#0a0e18"/>
+  <text x="50" y="952" fill="#64748b" font-size="16">schema 强制的记录器：截图文件必须真实存在，断言必须有实际值</text>
+  <text x="50" y="980" fill="#64748b" font-size="16">summary.json/md 双格式收尾——测试报告从"写作文"变成"查台账"</text>
+  <text x="700" y="968" fill="#38bdf8" font-size="16" text-anchor="end">multi-agent-team</text>
+</svg>

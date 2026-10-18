@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="750" height="1000" viewBox="0 0 750 1000" font-family="PingFang SC, Microsoft YaHei, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1420"/><stop offset="1" stop-color="#10231f"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#34d399" flood-opacity="0.22"/>
+    </filter>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#64748b"/>
+    </marker>
+    <marker id="arb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#f87171"/>
+    </marker>
+  </defs>
+  <rect width="750" height="1000" fill="url(#bg)"/>
+  <circle cx="700" cy="60" r="190" fill="#34d399" opacity="0.05"/>
+  <circle cx="40" cy="960" r="150" fill="#34d399" opacity="0.04"/>
+
+  <text x="50" y="78" fill="#34d399" font-size="16" letter-spacing="4" font-weight="600">TRAE MULTI-AGENT SKILL · 进化史 2/5 · v2.11</text>
+  <text x="50" y="146" fill="#f1f5f9" font-size="42" font-weight="700">业务动线分析</text>
+  <text x="50" y="196" fill="#94a3b8" font-size="21">页面都在线上，流程却走不通——</text>
+  <text x="50" y="228" fill="#94a3b8" font-size="21">断点不报错，只是用户默默流失</text>
+
+  <!-- 动线断点示意 -->
+  <g filter="url(#sh)">
+    <rect x="50" y="270" width="650" height="200" rx="16" fill="#1c2740" stroke="#334155"/>
+  </g>
+  <text x="80" y="316" fill="#e2e8f0" font-size="22" font-weight="600">FLOW 动线 × BREAK 断点定位</text>
+  <g font-size="17" font-family="Menlo, monospace">
+    <rect x="80" y="342" width="120" height="42" rx="10" fill="#12291f" stroke="#34d399"/>
+    <text x="140" y="368" fill="#34d399" text-anchor="middle">列表页</text>
+    <line x1="204" y1="363" x2="276" y2="363" stroke="#64748b" stroke-width="1.6" marker-end="url(#ar)"/>
+    <rect x="280" y="342" width="120" height="42" rx="10" fill="#12291f" stroke="#34d399"/>
+    <text x="340" y="368" fill="#34d399" text-anchor="middle">详情页</text>
+    <line x1="404" y1="363" x2="476" y2="363" stroke="#f87171" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arb)"/>
+    <rect x="480" y="342" width="150" height="42" rx="10" fill="#2b1418" stroke="#f87171" stroke-dasharray="5 4"/>
+    <text x="555" y="368" fill="#f87171" text-anchor="middle">编辑页 · 不存在</text>
+    <text x="440" y="330" fill="#f87171" font-size="14" text-anchor="middle">BREAK</text>
+  </g>
+  <text x="80" y="424" fill="#64748b" font-size="16">每个 OP 操作点带代码位置证据；跳转缺失 / 参数丢失 / 状态不衔接 → 逐一登记 BREAK</text>
+
+  <!-- 闭环四步 -->
+  <g filter="url(#sh)">
+    <rect x="50" y="500" width="650" height="300" rx="16" fill="#1c2740" stroke="#334155"/>
+  </g>
+  <text x="80" y="546" fill="#e2e8f0" font-size="22" font-weight="600">分析 → 设计 → 评审 → 开发 闭环</text>
+  <g font-size="19" fill="#f1f5f9">
+    <text x="80" y="592"><tspan fill="#34d399" font-weight="700">① Phase 0-1 梳理</tspan>　文档+代码反推 FLOW/OP，找断点与漏洞</text>
+    <text x="80" y="636"><tspan fill="#34d399" font-weight="700">② Phase 2 补缺</tspan>　　缺失页面逐个详细设计（布局/字段/交互）</text>
+    <text x="80" y="680"><tspan fill="#34d399" font-weight="700">③ 多角色评审</tspan>　　　动线完整性过 v2.10 共识收敛门禁</text>
+    <text x="80" y="724"><tspan fill="#34d399" font-weight="700">④ 评审后执行</tspan>　　　共识清零才进开发，产出直接喂给 v2.12 测试</text>
+  </g>
+  <text x="80" y="774" fill="#64748b" font-size="17">产出: business-flow-analysis.md + 缺失页面设计稿 · CLI: --business-flow-analysis</text>
+
+  <rect x="0" y="920" width="750" height="80" fill="#0a0e18"/>
+  <text x="50" y="952" fill="#64748b" font-size="16">理解存量系统不靠猜：从路由、页面、接口反向重建业务动线</text>
+  <text x="50" y="980" fill="#64748b" font-size="16">断点清单是设计输入——先补动线，再谈写代码</text>
+  <text x="700" y="968" fill="#34d399" font-size="16" text-anchor="end">multi-agent-team</text>
+</svg>
